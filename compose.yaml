@@ -84,6 +84,22 @@ services:
         condition: service_healthy
     restart: "no"
 
+  ingest:
+    build:
+      context: .
+      dockerfile: services/ingest/Dockerfile
+    environment:
+      <<: *infra-env
+      EARTHDATA_TOKEN: ${EARTHDATA_TOKEN:-}
+      BUNDLE_DIR: /bundle
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - ./services/ingest/bundle:/bundle:ro
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
 volumes:
   nats-data:
   redis-data:

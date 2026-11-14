@@ -2,10 +2,28 @@ name: stack
 
 on:
   pull_request:
-    paths: ["compose.yaml", "deploy/**", "Makefile", ".env.example", "go.mod", "go.sum"]
+    paths:
+      - "compose.yaml"
+      - "deploy/**"
+      - "internal/**"
+      - "services/**"
+      - "gen/go/**"
+      - "Makefile"
+      - ".env.example"
+      - "go.mod"
+      - "go.sum"
   push:
     branches: [main]
-    paths: ["compose.yaml", "deploy/**", "Makefile", ".env.example", "go.mod", "go.sum"]
+    paths:
+      - "compose.yaml"
+      - "deploy/**"
+      - "internal/**"
+      - "services/**"
+      - "gen/go/**"
+      - "Makefile"
+      - ".env.example"
+      - "go.mod"
+      - "go.sum"
 
 permissions:
   contents: read
@@ -22,10 +40,16 @@ jobs:
       - name: Go vet
         run: go vet ./...
 
-      # Starts NATS, Redis and SeaweedFS and runs bootstrap. Fails if
-      # bootstrap can't create the streams and buckets.
+      - name: Go tests
+        run: make test
+
+      # Starts the infrastructure and the services, and runs bootstrap.
       - name: make up
         run: make up
+
+      # Publishes a real task and checks the result end to end.
+      - name: make smoke
+        run: make smoke
 
       - name: Logs
         if: failure()

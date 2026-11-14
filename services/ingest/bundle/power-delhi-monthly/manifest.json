@@ -1,0 +1,19 @@
+{
+  "source": "SOURCE_POWER",
+  "format": "FORMAT_POWER_JSON",
+  "variables": ["T2M", "PRECTOTCORR"],
+  "point": { "lat": 28.61, "lon": 77.21 },
+  "dates": {
+    "start": { "year": 1981, "month": 1, "day": 1 },
+    "end": { "year": 2024, "month": 12, "day": 31 }
+  },
+  "files": [
+    {
+      "blob": { "key": "power.json" },
+      "coverage": {
+        "start": { "year": 1981, "month": 1, "day": 1 },
+        "end": { "year": 2024, "month": 12, "day": 31 }
+      }
+    }
+  ]
+}
