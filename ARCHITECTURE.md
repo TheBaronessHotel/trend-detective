@@ -148,7 +148,7 @@ Each source is an ingest adapter, chosen per request. Each catalog entry sets it
 |---|---|---|
 | `harmony-subset` | NetCDF grids for a rectangle, dates and variables | HOSS service. Verified for GPM_3IMERGM, M2TMNXSLV, GLDAS_NOAH025_M, OMNO2d and GRACEDADM. Returns one file per granule because there's no concatenation. Also accepts polygons |
 | `giovanni-area` | Area-averaged CSV | Harmony plus Giovanni averaging, with Giovanni's own variable IDs. Uses the monthly Giovanni quota. Serves OMI NO2 and groundwater in mm |
-| `giovanni-point` | Point CSV | `api.giovanni.earthdata.nasa.gov/timeseries` |
+| `giovanni-point` | Point CSV | `api.giovanni.earthdata.nasa.gov/timeseries`, with Giovanni's own variable IDs. Answers in seconds, for the grid cell the point falls in. Uses the monthly Giovanni quota. A second source for the variables Giovanni has |
 | `power` | Point JSON | NASA POWER, no login. The gateway sets the point to the middle of the rectangle |
 | `csv-upload` | User CSV | Exports from Giovanni, Hydrology Time Series and AppEEARS |
 | `bundle` | Files shipped with the app | Offline demos and the video recording |
@@ -244,7 +244,7 @@ Settings are env vars per service, set in `compose.yaml` and read from `.env`. T
 | `HTTP_ADDR` | `:8080`. The gateway's Connect API |
 | `HARMONY_URL`, `CMR_URL` | `https://harmony.earthdata.nasa.gov`, `https://cmr.earthdata.nasa.gov` |
 | `POWER_URL` | `https://power.larc.nasa.gov` |
-| `GIOVANNI_URL` | `https://api.giovanni.earthdata.nasa.gov`. For the gateway's quota check |
+| `GIOVANNI_URL` | `https://api.giovanni.earthdata.nasa.gov`. For the gateway's quota check and ingest's `giovanni-point` |
 | `CORS_ORIGINS` | `*`. Comma-separated origins allowed to call the gateway from a browser |
 
 ## Repository
@@ -279,6 +279,7 @@ One public monorepo, [TheBaronessHotel/trend-detective](https://github.com/TheBa
 | `make smoke` | Runs end-to-end checks against the running stack |
 | `make smoke-harmony` | Runs a real GPM job through Harmony. Needs `EARTHDATA_TOKEN`, so CI skips it |
 | `make smoke-power` | Runs a real job through NASA POWER. No token, but CI skips it |
+| `make smoke-giovanni` | Runs a real point job through Giovanni's time-series API. Needs `EARTHDATA_TOKEN`, so CI skips it |
 | `make gen` | Regenerates `gen/` from `proto/` |
 | `make lint` | Lints and format-checks the protos |
 
