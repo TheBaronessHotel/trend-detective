@@ -63,7 +63,7 @@ Anomalies:
 - **Kinds:** absolute (the default); percent, skipped where a normal is under 1% of that pixel's largest monthly normal and refused for temperatures; standardized, skipped where a month's deviation is zero.
 - **Missing anomalies:** a step whose value is missing has no anomaly. A missing anomaly next to a present value always means that calendar month has `usable: false` in `Series.normals`.
 
-Chain checks fail the task with `INVALID_REQUEST`: an empty step, `anomaly`, `monthly_mean` or `gap_fill_display` twice, or a pixel step after `anomaly`.
+Chain checks fail the task with `INVALID_REQUEST`: an empty step, `anomaly`, `monthly_mean` or `gap_fill_display` twice, a pixel step after `anomaly`, or a `qc_range` whose max is below its min or whose limits are both 0. proto3 reads an unset limit as 0, so a `qc_range` needs both limits. One with only `min` set below 0 can't be caught and drops every value above 0.
 
 Daily or weekly data whose chain has no `monthly_mean` gets `monthly_mean{min_valid_days: 20}` before its first step other than `qc_range` or `linear`. Anomalies need calendar months, and a daily user CSV can't say so in the catalog.
 

@@ -55,6 +55,13 @@ def plan(chain: preprocess_pb2.FilterChain, step: int) -> list[Step]:
             raise _bad(f"step {i} is empty")
         steps.append((name, getattr(op, name)))
 
+    for name, op in steps:
+        # proto3 can't tell an unset limit from 0, so {min: 0} alone arrives
+        # as min 0, max 0 and would drop every positive value. A range with
+        # its max below its min, or both 0, is refused instead.
+        if name == "qc_range" and (op.max < op.min or op.min == op.max == 0):
+            raise _bad(f"qc_range needs both min and max, with max above min; got min {op.min}, max {op.max}")
+
     names = [n for n, _ in steps]
     for once in ("anomaly", "monthly_mean", "gap_fill_display"):
         if names.count(once) > 1:

@@ -255,3 +255,20 @@ def test_gap_fill_leaves_the_ends_empty():
     out = output.gap_fill(np.array([np.nan, 1.0, np.nan, 3.0, np.nan]), 2)
     assert np.isnan(out[0]) and np.isnan(out[-1])
     assert out[2] == 2.0
+
+
+def test_monthly_data_stamped_mid_month_keeps_its_values():
+    times = pd.to_datetime(["2020-01-15", "2020-02-15", "2020-04-15"]).values
+    da = xr.DataArray([1.0, 2.0, 4.0], dims=("time",), coords={"time": times})
+    dec = Decoded(data=canonical.make_dataset(da), units="", step=MONTHLY)
+    filters.apply(dec, preprocess_pb2.FilterChain())
+    assert [str(t)[:10] for t in dec.data["time"].values] == ["2020-01-01", "2020-02-01", "2020-03-01", "2020-04-01"]
+    assert dec.values.values[[0, 1, 3]].tolist() == [1.0, 2.0, 4.0]
+    assert np.isnan(dec.values.values[2])
+
+
+@pytest.mark.parametrize("qc", [{"min": 0}, {"min": 10, "max": 5}, {}])
+def test_qc_range_without_a_usable_max_is_refused(qc):
+    with pytest.raises(errors.TaskFailure) as info:
+        filters.apply(point([5.0, 10.0]), chain({"qc_range": qc}))
+    assert "qc_range" in info.value.detail

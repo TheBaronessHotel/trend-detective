@@ -139,10 +139,15 @@ def snap_to_month_start(ds: xr.Dataset) -> xr.Dataset:
 def regularize_monthly(ds: xr.Dataset) -> xr.Dataset:
     """Gives a monthly series every month from its first to its last, so a
     step's position says how far apart two steps are. Months a source skipped
-    become missing with no known reason."""
-    t = pd.DatetimeIndex(ds["time"].values)
-    if len(t) == 0:
+    become missing with no known reason.
+
+    Times are first moved to the 1st of their month. Without that, data
+    stamped on another day, like the 15th, would match none of the months
+    and every value would be lost."""
+    if ds.sizes.get("time", 0) == 0:
         return ds
+    ds = combine([snap_to_month_start(ds)])
+    t = pd.DatetimeIndex(ds["time"].values)
     full = pd.date_range(t.min(), t.max(), freq="MS")
     if len(full) == len(t):
         return ds
