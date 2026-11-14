@@ -549,6 +549,13 @@ p {
   background: var(--bg);
 }
 
+.job-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .job .step-title {
   margin-bottom: 0.9rem;
 }
@@ -587,6 +594,10 @@ p {
 
 .stage-failed .stage-glyph {
   color: var(--bad);
+}
+
+.stage-stopped .stage-glyph {
+  color: var(--muted);
 }
 
 .stage-status {

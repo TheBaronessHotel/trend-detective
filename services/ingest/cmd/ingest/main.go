@@ -13,6 +13,7 @@ import (
 	"github.com/TheBaronessHotel/trend-detective/internal/blob"
 	"github.com/TheBaronessHotel/trend-detective/internal/envx"
 	"github.com/TheBaronessHotel/trend-detective/internal/obs"
+	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/appeears"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/bundle"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/core"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/csvupload"
@@ -87,12 +88,17 @@ func run() error {
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		return fmt.Errorf("connect to Redis: %w", err)
 	}
+	harmonyMaxWait, err := envx.Duration("HARMONY_MAX_WAIT", 40*time.Minute)
+	if err != nil {
+		return err
+	}
 	harmonyCfg := harmony.Config{
 		HarmonyURL:  envx.String("HARMONY_URL", "https://harmony.earthdata.nasa.gov"),
 		CMRURL:      envx.String("CMR_URL", "https://cmr.earthdata.nasa.gov"),
 		TeamToken:   os.Getenv("EARTHDATA_TOKEN"),
 		Concurrency: harmonyConcurrency,
 		Downloads:   4,
+		MaxWait:     harmonyMaxWait,
 	}
 	harmonyAdapter := harmony.New(harmonyCfg, rdb)
 	giovanniArea := harmony.NewAreaAverage(harmonyCfg, rdb)
@@ -102,8 +108,21 @@ func run() error {
 		util.Logger.Warn(ctx, "EARTHDATA_TOKEN is empty, so Harmony and Giovanni tasks fail unless the user gives a token")
 	}
 	powerAdapter := power.New(envx.String("POWER_URL", "https://power.larc.nasa.gov"))
+	appeearsMaxWait, err := envx.Duration("APPEEARS_MAX_WAIT", 2*time.Hour)
+	if err != nil {
+		return err
+	}
+	appeearsAdapter := appeears.New(appeears.Config{
+		URL:      envx.String("APPEEARS_URL", "https://appeears.earthdatacloud.nasa.gov/api"),
+		Username: os.Getenv("EARTHDATA_USERNAME"),
+		Password: os.Getenv("EARTHDATA_PASSWORD"),
+		MaxWait:  appeearsMaxWait,
+	}, rdb)
+	if os.Getenv("EARTHDATA_USERNAME") == "" || os.Getenv("EARTHDATA_PASSWORD") == "" {
+		util.Logger.Warn(ctx, "EARTHDATA_USERNAME or EARTHDATA_PASSWORD is empty, so AppEEARS tasks fail")
+	}
 	csvUpload := csvupload.New(store.Bucket("uploads"), int64(maxUploadMB)<<20)
-	svc := core.New(store.Bucket("raw"), bundles, harmonyAdapter, giovanniArea, giovanniPoint, powerAdapter, csvUpload)
+	svc := core.New(store.Bucket("raw"), bundles, harmonyAdapter, giovanniArea, giovanniPoint, powerAdapter, csvUpload, appeearsAdapter)
 
 	nc, err := nats.Connect(env["NATS_URL"], nats.Name("ingest"), nats.MaxReconnects(-1))
 	if err != nil {
@@ -126,7 +145,7 @@ func run() error {
 		return fmt.Errorf("metrics: %w", err)
 	}
 
-	w := worker.New(js, svc, worker.NewRedisAttempts(rdb, 24*time.Hour), util, kit, worker.Config{
+	w := worker.New(js, svc, worker.NewRedisAttempts(rdb, 24*time.Hour), worker.NewRedisCancels(rdb), util, kit, worker.Config{
 		Concurrency:  concurrency,
 		MaxAttempts:  3,
 		MaxDeliver:   2000,

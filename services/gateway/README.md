@@ -16,11 +16,15 @@ Go. The public Connect API on port 8080, and the orchestrator of every job. It p
 
 ## API
 
-So far: `ListVariables`, `CreateJob`, `GetJob`, `WatchJob`, `GetResultURL`, `CreateUploadURL` and `Narrate`. `GetQuota` still returns `unimplemented`.
+`ListVariables`, `CreateJob`, `GetJob`, `WatchJob`, `CancelJob`, `GetResultURL`, `CreateUploadURL`, `Narrate` and `GetQuota`.
+
+`CancelJob` stops a job that hasn't finished. In one Redis transaction the job and its unfinished tasks become cancelled, and `td:job:{<id>}:canceled` is set for the stages. Ingest checks that flag before each delivery and cancels the task's Harmony job at NASA, which frees the slot. A `StageDone` that arrives after the cancel is ignored, and the scripts that add a stage or finish a job refuse to touch a cancelled one, so a stage finishing at the same moment can't undo it. A finished job is returned as it is.
+
+`GetQuota` reports the share of this month's Giovanni quota the team token has used, the `QUOTA_CUTOFF` past which Giovanni jobs are refused, and the Harmony jobs running on the team token against `HARMONY_CONCURRENCY`. It counts the same slots ingest takes, through `internal/harmonyslots`. If Giovanni can't be asked, the share comes back as -1 and the rest still answers. The app shows the parts that apply to the chosen source.
 
 A task's `TaskProgress` updates mark it running and set its `started_at`, `percent` and `activity`, which `WatchJob` passes on, so the app can show "working, 35%" while NASA works. A finished task is never changed by a late update.
 
-`WatchJob` sends the job right away and again after every change, then ends the stream once the job succeeds or fails. Every write to a job wakes its watchers at once, and they also re-read the job every 5 seconds in case a wake-up was missed. In the browser, connect-es handles the stream. `deploy/smoke/watch.py` is a small client that uses only the Python standard library.
+`WatchJob` sends the job right away and again after every change, then ends the stream once the job succeeds or fails. Every write to a job wakes its watchers at once, and they also re-read the job every 5 seconds in case a wake-up was missed. After 30 seconds without a change it sends the job again anyway, so a stream waiting on NASA's queue for many minutes isn't cut as idle. In the browser, connect-es handles the stream. `deploy/smoke/watch.py` is a small client that uses only the Python standard library.
 
 Connect speaks plain JSON over HTTP, so curl works:
 
@@ -137,6 +141,7 @@ Add an entry to `catalog.yaml` and run `make test`. The catalog test fails on un
 | `MAX_GRANULES` | 1000 | Most granules a Harmony job may fetch. Checked in preflight and again in ingest |
 | `TASK_CAP` | 256 | Most tasks one job may plan |
 | `QUOTA_CUTOFF` | 0.9 | Share of the Giovanni quota after which Giovanni jobs are refused |
+| `HARMONY_CONCURRENCY` | 4 | Harmony slots per token, the same value ingest uses. Only for `GetQuota` |
 | `EARTHDATA_TOKEN` | empty | The team's token, for the Giovanni quota check |
 | `CMR_URL`, `HARMONY_URL`, `GIOVANNI_URL` | NASA's public addresses | |
 | `NARRATOR_URL` | `http://narrator:8081` | The narrator's Connect address, called over h2c |

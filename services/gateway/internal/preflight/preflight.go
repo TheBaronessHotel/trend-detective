@@ -182,19 +182,39 @@ func (c *Checker) giovanniQuota(ctx context.Context, userToken string) error {
 		// Ingest reports the missing token with the right message.
 		return nil
 	}
-	var q struct {
-		Quota float64 `json:"quota"`
-	}
-	if err := c.getJSON(ctx, c.cfg.GiovanniURL+"/quota", token, &q); err != nil {
+	used, err := c.quotaUsed(ctx, token)
+	if err != nil {
 		return err
 	}
-	if q.Quota >= c.cfg.QuotaCutoff {
+	if used >= c.cfg.QuotaCutoff {
 		return &Refusal{
-			Msg:   fmt.Sprintf("%.0f%% of this month's Giovanni quota is used, so new Giovanni jobs are paused. Use another source, or add your own Earthdata token.", q.Quota*100),
+			Msg:   fmt.Sprintf("%.0f%% of this month's Giovanni quota is used, so new Giovanni jobs are paused. Use another source, or add your own Earthdata token.", used*100),
 			Quota: true,
 		}
 	}
 	return nil
+}
+
+// GiovanniQuota returns the share of the team token's monthly Giovanni quota
+// that's used, 0 to 1, and the share past which Giovanni jobs are refused.
+func (c *Checker) GiovanniQuota(ctx context.Context) (used, cutoff float64, err error) {
+	if c.cfg.TeamToken == "" {
+		return 0, c.cfg.QuotaCutoff, errors.New("no EARTHDATA_TOKEN to read the Giovanni quota with")
+	}
+	ctx, cancel := context.WithTimeout(ctx, c.cfg.Timeout)
+	defer cancel()
+	used, err = c.quotaUsed(ctx, c.cfg.TeamToken)
+	return used, c.cfg.QuotaCutoff, err
+}
+
+func (c *Checker) quotaUsed(ctx context.Context, token string) (float64, error) {
+	var q struct {
+		Quota float64 `json:"quota"`
+	}
+	if err := c.getJSON(ctx, c.cfg.GiovanniURL+"/quota", token, &q); err != nil {
+		return 0, err
+	}
+	return q.Quota, nil
 }
 
 func (c *Checker) getJSON(ctx context.Context, u, token string, out any) error {

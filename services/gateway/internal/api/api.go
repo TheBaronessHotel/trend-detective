@@ -16,6 +16,7 @@ import (
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/jobs"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/narrate"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/preflight"
+	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/quota"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/results"
 	"github.com/lein3000zzz/the-watchers/pkg/observability/logging"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -30,20 +31,40 @@ const LLMKeyHeader = narrate.APIKeyHeader
 // msgNarratorDown is shown when the narrator can't be reached.
 const msgNarratorDown = "The explanation service isn't reachable right now. The charts and numbers still work. Try again in a moment."
 
-// Server implements GatewayService. Methods that belong to later tasks
-// return Unimplemented.
+// Server implements GatewayService.
 type Server struct {
 	gatewayv1connect.UnimplementedGatewayServiceHandler
 	cat     *catalog.Catalog
 	jobs    *jobs.Orchestrator
 	results *results.Service
 	narrate *narrate.Service
+	quota   *quota.Service
 	log     logging.Logger
 }
 
 // New returns a Server.
-func New(cat *catalog.Catalog, orch *jobs.Orchestrator, res *results.Service, narr *narrate.Service, log logging.Logger) *Server {
-	return &Server{cat: cat, jobs: orch, results: res, narrate: narr, log: log.With("component", "api")}
+func New(cat *catalog.Catalog, orch *jobs.Orchestrator, res *results.Service, narr *narrate.Service, q *quota.Service, log logging.Logger) *Server {
+	return &Server{cat: cat, jobs: orch, results: res, narrate: narr, quota: q, log: log.With("component", "api")}
+}
+
+// CancelJob implements GatewayService.
+func (s *Server) CancelJob(ctx context.Context, req *gatewayv1.CancelJobRequest) (*gatewayv1.CancelJobResponse, error) {
+	if req.GetJobId() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, "job_id is required")
+	}
+	job, err := s.jobs.CancelJob(ctx, req.GetJobId())
+	if err != nil {
+		return nil, s.toConnect(ctx, err)
+	}
+	return &gatewayv1.CancelJobResponse{Job: job}, nil
+}
+
+// GetQuota implements GatewayService.
+func (s *Server) GetQuota(ctx context.Context, _ *gatewayv1.GetQuotaRequest) (*gatewayv1.GetQuotaResponse, error) {
+	if s.quota == nil {
+		return nil, connect.NewError(connect.CodeUnavailable, "The quota isn't available.")
+	}
+	return s.quota.Get(ctx), nil
 }
 
 // ListVariables implements GatewayService.

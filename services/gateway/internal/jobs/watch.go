@@ -60,7 +60,10 @@ func (o *Orchestrator) Watch(ctx context.Context, id string, send func(*gatewayv
 	poll := time.NewTicker(o.watchPoll)
 	defer poll.Stop()
 
-	var last []byte
+	var (
+		last   []byte
+		sentAt time.Time
+	)
 	for {
 		job, err := o.GetJob(ctx, id)
 		if err != nil {
@@ -73,11 +76,11 @@ func (o *Orchestrator) Watch(ctx context.Context, id string, send func(*gatewayv
 		if err != nil {
 			return err
 		}
-		if string(snapshot) != string(last) {
+		if string(snapshot) != string(last) || time.Since(sentAt) >= o.watchKeepalive {
 			if err := send(job); err != nil {
 				return err
 			}
-			last = snapshot
+			last, sentAt = snapshot, time.Now()
 		}
 		if isFinal(job.GetState()) {
 			return nil

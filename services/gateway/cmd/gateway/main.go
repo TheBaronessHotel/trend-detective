@@ -32,6 +32,7 @@ import (
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/jobs"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/narrate"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/preflight"
+	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/quota"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/results"
 	"github.com/lein3000zzz/the-watchers/pkg/observability/logging"
 	"github.com/nats-io/nats.go"
@@ -106,14 +107,21 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	orch.UsePreflight(preflight.New(preflight.Config{
+	checker := preflight.New(preflight.Config{
 		CMRURL:      envx.String("CMR_URL", "https://cmr.earthdata.nasa.gov"),
 		HarmonyURL:  envx.String("HARMONY_URL", "https://harmony.earthdata.nasa.gov"),
 		GiovanniURL: envx.String("GIOVANNI_URL", "https://api.giovanni.earthdata.nasa.gov"),
 		TeamToken:   os.Getenv("EARTHDATA_TOKEN"),
 		QuotaCutoff: quotaCutoff,
 		Timeout:     5 * time.Second,
-	}, log))
+	}, log)
+	orch.UsePreflight(checker)
+	// Must match ingest's HARMONY_CONCURRENCY; compose sets both from one value.
+	harmonyLimit, err := envx.Int("HARMONY_CONCURRENCY", 4)
+	if err != nil {
+		return err
+	}
+	quotas := quota.New(checker, rdb, os.Getenv("EARTHDATA_TOKEN"), int32(harmonyLimit), log)
 
 	store, err := blob.New(env["S3_ENDPOINT"], env["S3_ACCESS_KEY"], env["S3_SECRET_KEY"])
 	if err != nil {
@@ -146,7 +154,7 @@ func run() error {
 	narr := narrate.New(orch, cat, narratorClient, narratorTimeout, log)
 
 	connectServer := connect.NewServer()
-	gatewayv1connect.RegisterGatewayServiceHandler(connectServer, api.New(cat, orch, res, narr, log))
+	gatewayv1connect.RegisterGatewayServiceHandler(connectServer, api.New(cat, orch, res, narr, quotas, log))
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, connectServer)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok\n")) })

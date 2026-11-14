@@ -14,6 +14,7 @@ import (
 	gatewayv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/gateway/v1"
 	ingestv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/ingest/v1"
 	preprocessv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/preprocess/v1"
+	"github.com/TheBaronessHotel/trend-detective/internal/jobcancel"
 	"github.com/TheBaronessHotel/trend-detective/internal/natsx"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/catalog"
@@ -511,5 +512,80 @@ func TestProgressForAnUnknownTaskIsIgnored(t *testing.T) {
 	}
 	if keys := h.mr.Keys(); len(keys) != 0 {
 		t.Errorf("progress for an unknown job wrote %v", keys)
+	}
+}
+
+func TestCancelStopsARunningJob(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	job, _ := h.o.CreateJob(ctx, spec(), "")
+	ingest := h.pub.last(t).task
+
+	got, err := h.o.CancelJob(ctx, job.GetId())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.GetState() != gatewayv1.JobState_JOB_STATE_CANCELED || got.GetTasks()[0].GetState() != gatewayv1.TaskState_TASK_STATE_CANCELED {
+		t.Fatalf("after cancel: %v", got)
+	}
+	if !h.mr.Exists(jobcancel.Key(job.GetId())) {
+		t.Error("no cancel flag for the stages")
+	}
+
+	// Ingest finishing anyway changes nothing and starts no next stage.
+	if err := h.o.OnStageDone(ctx, done(ingest)); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = h.o.GetJob(ctx, job.GetId())
+	if got.GetState() != gatewayv1.JobState_JOB_STATE_CANCELED || got.GetTasks()[0].GetState() != gatewayv1.TaskState_TASK_STATE_CANCELED {
+		t.Errorf("a late StageDone changed a cancelled job: %v", got)
+	}
+	if len(h.pub.msgs) != 1 {
+		t.Errorf("published %d tasks after cancel, want only the first ingest one", len(h.pub.msgs))
+	}
+}
+
+// A stage can finish between the cancel and the orchestrator's next step.
+// Neither starting the next stage nor finishing the job may undo the cancel.
+func TestLateWritesCantUndoACancel(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	job, _ := h.o.CreateJob(ctx, spec(), "")
+	if _, err := h.o.CancelJob(ctx, job.GetId()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.o.store.addStage(ctx, job.GetId(), 2, nil, time.Now()); !errors.Is(err, errCanceled) {
+		t.Errorf("addStage on a cancelled job: %v", err)
+	}
+	if err := h.o.store.finish(ctx, job.GetId(), gatewayv1.JobState_JOB_STATE_SUCCEEDED, &gatewayv1.JobResults{}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := h.o.GetJob(ctx, job.GetId()); got.GetState() != gatewayv1.JobState_JOB_STATE_CANCELED {
+		t.Errorf("finish overwrote the cancel: %v", got.GetState())
+	}
+}
+
+func TestCancelAFinishedJobChangesNothing(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	s := spec()
+	s.StopAfter = gatewayv1.Stage_STAGE_INGEST
+	job, _ := h.o.CreateJob(ctx, s, "")
+	if err := h.o.OnStageDone(ctx, done(h.pub.last(t).task)); err != nil {
+		t.Fatal(err)
+	}
+	got, err := h.o.CancelJob(ctx, job.GetId())
+	if err != nil || got.GetState() != gatewayv1.JobState_JOB_STATE_SUCCEEDED {
+		t.Errorf("cancel of a finished job: %v, %v", got.GetState(), err)
+	}
+	if h.mr.Exists(jobcancel.Key(job.GetId())) {
+		t.Error("raised the cancel flag for a finished job")
+	}
+}
+
+func TestCancelAnUnknownJob(t *testing.T) {
+	h := newHarness(t)
+	if _, err := h.o.CancelJob(context.Background(), "nope"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("cancel of an unknown job: %v", err)
 	}
 }

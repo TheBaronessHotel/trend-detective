@@ -78,6 +78,9 @@ type Orchestrator struct {
 	preflight Preflight
 	// How often Watch re-reads a job when nothing woke it.
 	watchPoll time.Duration
+	// Watch sends the job again after this long without a change, so a quiet
+	// stream, like one waiting on NASA's queue, isn't cut as idle.
+	watchKeepalive time.Duration
 }
 
 // New returns an Orchestrator.
@@ -92,7 +95,8 @@ func New(cat *catalog.Catalog, store *Store, pub Publisher, limits Limits, log l
 		newID:  func() string { return uuid.Must(uuid.NewV7()).String() },
 		hub:    newHub(),
 
-		watchPoll: 5 * time.Second,
+		watchPoll:      5 * time.Second,
+		watchKeepalive: 30 * time.Second,
 	}
 }
 
@@ -186,6 +190,21 @@ func (o *Orchestrator) GetJob(ctx context.Context, id string) (*gatewayv1.Job, e
 	return job, err
 }
 
+// CancelJob stops a job that hasn't finished: it and its unfinished tasks
+// become cancelled, stages see the flag and drop its tasks, and later reports
+// from them change nothing. A finished job comes back unchanged.
+func (o *Orchestrator) CancelJob(ctx context.Context, id string) (*gatewayv1.Job, error) {
+	changed, err := o.store.cancel(ctx, id, o.now())
+	if err != nil {
+		return nil, err
+	}
+	if changed {
+		o.log.Info(ctx, "job cancelled", "job_id", id)
+		o.hub.notify(id)
+	}
+	return o.GetJob(ctx, id)
+}
+
 // OnTaskProgress records how far a running task has got and tells anyone
 // watching the job. Progress is best effort, so an update for a task that's
 // unknown or already finished changes nothing.
@@ -220,6 +239,10 @@ func (o *Orchestrator) OnStageDone(ctx context.Context, d *gatewayv1.StageDone) 
 	finished, total, err := o.store.recordDone(ctx, d, status, o.now())
 	if errors.Is(err, ErrNotFound) {
 		o.log.Warn(ctx, "StageDone for a job that doesn't exist")
+		return nil
+	}
+	if errors.Is(err, errCanceled) {
+		o.log.Info(ctx, "StageDone for a cancelled job, ignored")
 		return nil
 	}
 	if err != nil {
@@ -273,7 +296,10 @@ func (o *Orchestrator) advance(ctx context.Context, id string, stage gatewayv1.S
 	if err := o.store.setResults(ctx, id, results, now); err != nil {
 		return err
 	}
-	if _, err := o.store.addStage(ctx, id, int32(next), queued, now); err != nil {
+	if _, err := o.store.addStage(ctx, id, int32(next), queued, now); errors.Is(err, errCanceled) {
+		// Cancelled while this stage was finishing: start nothing more.
+		return nil
+	} else if err != nil {
 		return err
 	}
 	// Publish even if an earlier attempt already added the stage: it may
@@ -373,8 +399,13 @@ func subjectFor(s gatewayv1.Stage) string {
 }
 
 func isFinal(s gatewayv1.JobState) bool {
-	return s == gatewayv1.JobState_JOB_STATE_SUCCEEDED || s == gatewayv1.JobState_JOB_STATE_FAILED
+	return s == gatewayv1.JobState_JOB_STATE_SUCCEEDED || s == gatewayv1.JobState_JOB_STATE_FAILED ||
+		s == gatewayv1.JobState_JOB_STATE_CANCELED
 }
+
+// errCanceled means the job was cancelled, so a stage's late report changes
+// nothing.
+var errCanceled = errors.New("job was cancelled")
 
 // resolve checks spec and returns a copy with every default filled in.
 func (o *Orchestrator) resolve(spec *gatewayv1.JobSpec) (*gatewayv1.JobSpec, *catalog.Entry, error) {

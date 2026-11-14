@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Job } from "@gen/gateway/v1/gateway_pb";
+import { type Job, JobState } from "@gen/gateway/v1/gateway_pb";
 import { Stage } from "@gen/gateway/v1/task_pb";
 import type { RawDataset } from "@gen/ingest/v1/ingest_pb";
 import type { Series } from "@gen/preprocess/v1/data_pb";
@@ -29,6 +29,8 @@ interface Props {
   /** The variable's name, for the chart's title. */
   seriesTitle: (variableId: string) => string;
   onSaveCsv: () => Promise<void>;
+  /** Cancels the running job. */
+  onStop: () => Promise<void>;
 }
 
 // Never colour alone: each state has its own glyph as well as its hue.
@@ -37,6 +39,7 @@ const glyphs: Record<StageView["state"], string> = {
   running: "◐",
   done: "●",
   failed: "✕",
+  stopped: "–",
 };
 
 /** The time now, ticking every second while active, so elapsed times count up. */
@@ -73,6 +76,8 @@ function status(v: StageView, now: number): string {
   switch (v.state) {
     case "waiting":
       return "not started";
+    case "stopped":
+      return "stopped";
     case "running": {
       const parts = ["working"];
       if (v.percent !== undefined) parts.push(`${v.percent}%`);
@@ -181,7 +186,8 @@ function Results({ series, title, onSaveCsv }: { series: Series; title: string; 
 }
 
 /** The job: each stage as it runs, what went wrong, and what came back. */
-export function JobPanel({ run, stopAfter, seriesTitle, onSaveCsv }: Props) {
+export function JobPanel({ run, stopAfter, seriesTitle, onSaveCsv, onStop }: Props) {
+  const [stopping, setStopping] = useState(false);
   const views = stageViews(run?.job, stopAfter);
   const now = useNow(views.some((v) => v.state === "running"));
   if (!run) return null;
@@ -190,7 +196,22 @@ export function JobPanel({ run, stopAfter, seriesTitle, onSaveCsv }: Props) {
   return (
     <section className={run.series ? "job with-chart" : "job"}>
       <div className="job-status" aria-live="polite">
-        <h2 className="step-title">{titles[run.phase]}</h2>
+        <div className="job-head">
+          <h2 className="step-title">{run.job?.state === JobState.CANCELED ? "Job stopped" : titles[run.phase]}</h2>
+          {run.phase === "watching" && run.job && (
+            <button
+              type="button"
+              className="action small"
+              disabled={stopping}
+              onClick={() => {
+                setStopping(true);
+                void onStop().finally(() => setStopping(false));
+              }}
+            >
+              {stopping ? "Stopping…" : "Stop"}
+            </button>
+          )}
+        </div>
         {run.error && <Alert>{run.error}</Alert>}
         {run.job && (
           <ol className="stages">

@@ -92,6 +92,11 @@ services:
       <<: *infra-env
       EARTHDATA_TOKEN: ${EARTHDATA_TOKEN:-}
       HARMONY_CONCURRENCY: ${HARMONY_CONCURRENCY:-4}
+      HARMONY_MAX_WAIT: ${HARMONY_MAX_WAIT:-40m}
+      # AppEEARS logs in with an Earthdata account, not the token.
+      EARTHDATA_USERNAME: ${EARTHDATA_USERNAME:-}
+      EARTHDATA_PASSWORD: ${EARTHDATA_PASSWORD:-}
+      APPEEARS_MAX_WAIT: ${APPEEARS_MAX_WAIT:-2h}
       # The same limit as the gateway's, checked again when reading.
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-20}
       BUNDLE_DIR: /bundle
@@ -150,6 +155,8 @@ services:
       MAX_GRANULES: ${MAX_GRANULES:-1000}
       TASK_CAP: ${TASK_CAP:-256}
       QUOTA_CUTOFF: ${QUOTA_CUTOFF:-0.9}
+      # GetQuota reports Harmony jobs against the same limit ingest uses.
+      HARMONY_CONCURRENCY: ${HARMONY_CONCURRENCY:-4}
       EARTHDATA_TOKEN: ${EARTHDATA_TOKEN:-}
       # No depends_on on narrator: the stack starts without it, and Narrate
       # answers unavailable until it is up.

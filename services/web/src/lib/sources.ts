@@ -35,7 +35,10 @@ const sources: Record<Source, SourceInfo> = {
     label: "Copy shipped with the app",
     hint: "Works offline, for one fixed place.",
   },
-  [Source.APPEEARS]: { label: "NASA AppEEARS", hint: "" },
+  [Source.APPEEARS]: {
+    label: "Area average from NASA AppEEARS",
+    hint: "1 km MODIS satellite images, averaged over the rectangle. NASA takes requests in turn, so it takes a few minutes, longer when it's busy.",
+  },
 };
 
 export function sourceLabel(s: Source): string {

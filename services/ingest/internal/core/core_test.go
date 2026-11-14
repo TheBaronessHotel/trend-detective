@@ -194,3 +194,24 @@ func TestCacheKey(t *testing.T) {
 		t.Error("a different fingerprint gave the same cache key")
 	}
 }
+
+type cancelingAdapter struct {
+	fakeAdapter
+	canceled int
+}
+
+func (c *cancelingAdapter) Cancel(context.Context, *ingestv1.IngestTask) error {
+	c.canceled++
+	return nil
+}
+
+func TestCancelReachesAdaptersThatCanStop(t *testing.T) {
+	stoppable := &cancelingAdapter{}
+	if err := New(newMemStore(), stoppable).Cancel(context.Background(), bundleTask()); err != nil || stoppable.canceled != 1 {
+		t.Errorf("cancel: %v, %d calls", err, stoppable.canceled)
+	}
+	// An adapter with nothing running elsewhere has nothing to stop.
+	if err := New(newMemStore(), &fakeAdapter{}).Cancel(context.Background(), bundleTask()); err != nil {
+		t.Errorf("cancel without a Canceler: %v", err)
+	}
+}
