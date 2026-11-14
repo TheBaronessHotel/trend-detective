@@ -1,4 +1,39 @@
-.PHONY: gen lint fmt breaking
+.PHONY: up down logs ps clean gen lint fmt breaking
+
+# Start the stack in the background and wait until bootstrap has finished.
+# The first run creates .env from .env.example. `up --wait` would treat
+# bootstrap exiting as a failure, so this waits on its exit code instead.
+up: .env
+	docker compose up -d --build
+	@docker compose wait bootstrap >/dev/null; \
+	code=$$(docker compose ps -a bootstrap --format '{{.ExitCode}}'); \
+	if [ "$$code" = 0 ]; then \
+		echo "Stack is up. Streams and buckets are ready."; \
+	else \
+		echo "Bootstrap failed with exit code $$code:"; \
+		docker compose logs --no-log-prefix bootstrap; \
+		exit 1; \
+	fi
+
+# Stop the stack. Data stays in the Docker volumes.
+down:
+	docker compose down
+
+# Follow the logs of every container.
+logs:
+	docker compose logs -f --tail=100
+
+# List the containers, including bootstrap after it exits.
+ps:
+	docker compose ps -a
+
+# Stop the stack and delete its data: streams, job state and every bucket.
+clean:
+	docker compose down -v
+
+.env:
+	cp .env.example .env
+	@echo "Created .env from .env.example. Set EARTHDATA_TOKEN in it before fetching NASA data."
 
 # Regenerate gen/ from proto/. Commit the result together with the proto change.
 gen:

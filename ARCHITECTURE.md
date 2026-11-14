@@ -48,9 +48,18 @@ Rules:
 ## Infrastructure
 
 **NATS JetStream**
-- Subjects: `tasks.ingest`, `tasks.preprocess`, `tasks.analysis` and `events.stage.done`.
-- Task subjects use work-queue streams with durable consumers. Each service creates its own consumer at startup with `CreateOrUpdateConsumer`.
-- Delivery is at least once, with a limit of 3 attempts and backoff. When a task hits the limit, NATS publishes an advisory, and the gateway listens for it and marks the task failed.
+
+Bootstrap creates three streams. Each keeps messages for 7 days, the same as job state in Redis.
+
+| Stream | Subjects | Retention | Read by |
+|---|---|---|---|
+| `TASKS` | `tasks.ingest`, `tasks.preprocess`, `tasks.analysis` | Work queue. A task is deleted once it's acked | One durable consumer per stage, filtered to its subject |
+| `EVENTS` | `events.>`, so far only `events.stage.done` | Limits. Events stay after acks, so a job can be replayed | The gateway |
+| `ADVISORIES` | `$JS.EVENT.ADVISORY.CONSUMER.MAX_DELIVERIES.TASKS.>` | Limits | The gateway |
+
+- `TASKS` lists its subjects one by one, so a publish to a misspelled subject fails instead of sitting in the stream.
+- Each service creates its own consumer at startup with `CreateOrUpdateConsumer`.
+- Delivery is at least once, with a limit of 3 attempts and backoff. When a task hits the limit, NATS publishes an advisory. `ADVISORIES` stores it, so the gateway marks the task failed even if it was down when the advisory fired.
 - Publishers set `Nats-Msg-Id` so duplicate publishes are dropped.
 - Messages carry references and metadata only. Data lives in SeaweedFS.
 
@@ -67,7 +76,8 @@ Rules:
 - Ingest keeps a counter of in-flight Harmony jobs per Earthdata token. It needs its own counter because a task waiting on `NakWithDelay` isn't reliably counted as in-flight by JetStream.
 
 **Bootstrap**
-A one-shot container that runs on every `make up` and creates the JetStream streams and the SeaweedFS buckets.
+
+A one-shot Go program in `deploy/bootstrap`. It runs on every `make up`, creates the streams and buckets that are missing, updates stream settings that changed, and exits. A service that uses NATS or S3 waits for it with `depends_on: bootstrap: condition: service_completed_successfully`.
 
 **Observability**
 - Go services use [the-watchers](https://github.com/lein3000zzz/the-watchers): slog logging, Prometheus metrics, OpenTelemetry traces and Pyroscope profiling.
@@ -215,11 +225,13 @@ Settings are env vars per service, set in `compose.yaml` and read from `.env`. T
 | `SUBREGION_N` | 8 |
 | `DEFAULT_SOURCE` | `harmony-subset` |
 | `EARTHDATA_TOKEN` | none, required |
-| `NATS_URL` | none, set in compose |
-| `REDIS_URL` | none, set in compose |
-| `S3_ENDPOINT` | none, set in compose |
-| `S3_ACCESS_KEY` | none, set in compose |
-| `S3_SECRET_KEY` | none, set in compose |
+| `NATS_URL` | `nats://nats:4222`, set in compose |
+| `REDIS_URL` | `redis://redis:6379/0`, set in compose |
+| `S3_ENDPOINT` | `http://seaweedfs:8333`, set in compose |
+| `S3_ACCESS_KEY` | from `.env`. `.env.example` has a local value |
+| `S3_SECRET_KEY` | from `.env`. `.env.example` has a local value |
+| `S3_PUBLIC_ENDPOINT` | `http://localhost:8333`. The gateway signs presigned URLs for this host, so it must be what the browser uses |
+| `S3_ALLOWED_ORIGINS` | `*`. Browser origins SeaweedFS accepts for presigned URLs |
 
 ## Repository
 
@@ -243,11 +255,14 @@ One public monorepo, [TheBaronessHotel/trend-detective](https://github.com/TheBa
 
 | Target | What it does |
 |---|---|
-| `make up` | Starts everything, including bootstrap |
-| `make up-obs` | Starts everything plus the observability stack |
-| `make down` | Stops everything |
+| `make up` | Creates `.env` on the first run, starts everything, and waits for bootstrap to finish |
+| `make up-obs` | Starts everything plus the observability stack. Not built yet, comes with PLAT-5 |
+| `make down` | Stops everything. Data stays in the Docker volumes |
 | `make logs` | Follows logs |
+| `make ps` | Lists containers, including bootstrap after it exits |
+| `make clean` | Stops everything and deletes all data |
 | `make gen` | Regenerates `gen/` from `proto/` |
+| `make lint` | Lints and format-checks the protos |
 
 Each service has its own Dockerfile in its folder. Compose builds with the repo root as the context, so every service can use `gen/`.
 
