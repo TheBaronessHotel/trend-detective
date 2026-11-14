@@ -80,8 +80,12 @@ def _weighted_mean(
     with np.errstate(invalid="ignore", divide="ignore"):
         mean = np.where(valid, v, 0.0).reshape(v.shape[0], -1)
         mean = (mean * w_valid.reshape(v.shape[0], -1)).sum(axis=1) / w_valid.reshape(v.shape[0], -1).sum(axis=1)
-    pixels = v.shape[1] * v.shape[2]
-    coverage = valid.reshape(v.shape[0], -1).sum(axis=1) / pixels
+    # Coverage counts only pixels that have data at least once in the record.
+    # Pixels that never do, like ocean in a land-only product such as GLDAS or
+    # latitudes a satellite never sees, act as a mask. Counting them would
+    # push every month of a coastal rectangle below min_valid_fraction.
+    pixels = int(valid.any(axis=0).sum())
+    coverage = valid.reshape(v.shape[0], -1).sum(axis=1) / max(pixels, 1)
 
     min_fraction = aggregation.min_valid_fraction or DEFAULT_MIN_VALID_FRACTION
     reasons = np.zeros(v.shape[0], dtype="int8")
@@ -102,9 +106,18 @@ def _dominant(reasons: np.ndarray) -> int:
     return int(codes[np.argmax(counts)])
 
 
-def grid(dec: Decoded, variable_id: str, aggregation: preprocess_pb2.Aggregation) -> GridOutput:
+def grid(
+    dec: Decoded,
+    variable_id: str,
+    aggregation: preprocess_pb2.Aggregation,
+    bbox: common_pb2.BBox | None = None,
+) -> GridOutput:
     """The pixels at native resolution, block-averaged down when a side is
-    longer than max_grid."""
+    longer than max_grid.
+
+    bbox is the requested rectangle, the same one Series.bbox carries. Without
+    one, the grid's outer pixel edges are used.
+    """
     da = dec.values
     max_grid = aggregation.max_grid
     side = max(da.sizes["lat"], da.sizes["lon"])
@@ -124,17 +137,25 @@ def grid(dec: Decoded, variable_id: str, aggregation: preprocess_pb2.Aggregation
         lons=da["lon"].values.astype("float64").tolist(),
         step=dec.step,
     )
-    g.bbox.CopyFrom(
-        common_pb2.BBox(
-            west=float(da["lon"].min()),
-            south=float(da["lat"].min()),
-            east=float(da["lon"].max()),
-            north=float(da["lat"].max()),
-        )
-    )
+    # The extent comes from the native pixels: block-averaged ones are unevenly
+    # spaced when the last block is padded.
+    g.bbox.CopyFrom(bbox if bbox is not None else _pixel_extent(dec.data["lat"].values, dec.data["lon"].values))
     g.times.extend(timestamps(da["time"].values))
     data = np.ascontiguousarray(da.transpose("time", "lat", "lon").values, dtype="<f4").tobytes()
     return GridOutput(grid=g, values=data)
+
+
+def _pixel_extent(lats: np.ndarray, lons: np.ndarray) -> common_pb2.BBox:
+    """The outer edges of the pixels, from their centers. A single pixel has no
+    spacing to go by, so its extent is its center."""
+    half_lat = abs(float(np.diff(lats).mean())) / 2 if len(lats) > 1 else 0.0
+    half_lon = abs(float(np.diff(lons).mean())) / 2 if len(lons) > 1 else 0.0
+    return common_pb2.BBox(
+        west=float(lons.min()) - half_lon,
+        south=float(lats.min()) - half_lat,
+        east=float(lons.max()) + half_lon,
+        north=float(lats.max()) + half_lat,
+    )
 
 
 def series_csv(series: data_pb2.Series) -> bytes:

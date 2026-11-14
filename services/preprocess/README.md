@@ -10,6 +10,8 @@ PRE-1 is in: the service runs, decodes every format ingest produces today, and w
 
 - **PRE-2, the filter chain.** The task's `filters` are logged and skipped, so values go out in the source's units.
 - **PRE-3, aggregation.** A grid becomes a region series by a plain cos(latitude)-weighted mean of its valid pixels. Anomalies per pixel, normals and the N×N sub-regions come with PRE-3.
+  - Coverage counts only pixels that have data at least once in the record, so ocean in a land-only product like GLDAS works as a mask instead of failing every month of a coastal rectangle.
+  - `Grid.bbox` is the requested rectangle, the same as `Series.bbox`.
 - **PRE-4, the slider cubes.** `value_cube` and `anomaly_cube` stay unset.
 
 ## Layout

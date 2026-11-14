@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import xarray as xr
 from google.protobuf import json_format
 
 from trenddetective.common.v1 import common_pb2
@@ -12,7 +13,8 @@ from trenddetective.ingest.v1 import ingest_pb2
 from trenddetective.preprocess.v1 import data_pb2, preprocess_pb2
 
 from conftest import date_range, raw_dataset, write_imerg_like
-from preprocess import errors, pipeline
+from preprocess import canonical, errors, output, pipeline
+from preprocess.canonical import Decoded
 from preprocess.settings import parse_duration
 from preprocess.storage import MemoryStorage
 
@@ -115,6 +117,8 @@ def test_grid_job_writes_grid_and_weighted_series(tmp_path: Path):
     grid = load(store, result.grid, data_pb2.Grid())
     assert (grid.rows, grid.cols) == (3, 2)
     assert list(grid.lats) == [2.5, 1.5, 0.5]
+    # The same rectangle as the Series, not the pixel centers.
+    assert grid.bbox == raw.bbox
     values = np.frombuffer(store.get("prep", grid.values.key), "<f4").reshape(2, 3, 2)
     assert np.isnan(values[0]).sum() == 5
 
@@ -142,6 +146,33 @@ def test_max_grid_block_averages(tmp_path: Path):
 
     grid = load(store, result.grid, data_pb2.Grid())
     assert (grid.rows, grid.cols) == (3, 3)
+    # No rectangle in the task, so the bbox is the pixels' outer edges.
+    assert (grid.bbox.west, grid.bbox.east) == (0.0, 8.0)
+
+
+def test_coverage_ignores_pixels_that_never_have_data():
+    # A coastal rectangle in a land-only product: the east half is ocean and
+    # always missing. One land pixel is also missing in the second month.
+    v = np.array(
+        [
+            [[1.0, np.nan], [2.0, np.nan]],
+            [[3.0, np.nan], [np.nan, np.nan]],
+        ]
+    )
+    da = xr.DataArray(
+        v,
+        dims=("time", "lat", "lon"),
+        coords={"time": np.array(["2020-01-01", "2020-02-01"], dtype="datetime64[ns]"), "lat": [1.0, 0.0], "lon": [0.0, 1.0]},
+    )
+    dec = Decoded(data=canonical.make_dataset(da), units="kg/m²", step=common_pb2.TIME_STEP_MONTHLY)
+    raw = ingest_pb2.RawDataset(variable_id="soil-moisture-gldas")
+
+    series = output.region_series(dec, raw, raw.variable_id, preprocess_pb2.Aggregation(min_valid_fraction=0.5))
+
+    assert list(series.coverage) == [1.0, 0.5]
+    assert not np.isnan(series.values[0])
+    assert series.values[1] == pytest.approx(3.0)
+    assert len(series.missing) == 0
 
 
 def test_all_missing_is_no_data(tmp_path: Path):

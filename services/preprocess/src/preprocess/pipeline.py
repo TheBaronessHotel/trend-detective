@@ -76,7 +76,7 @@ def run(
     result = preprocess_pb2.PreprocessResult()
 
     if dec.gridded:
-        g = output.grid(dec, raw.variable_id, task.aggregation)
+        g = output.grid(dec, raw.variable_id, task.aggregation, raw.bbox if raw.HasField("bbox") else None)
         g.grid.values.CopyFrom(store.put(PREP_BUCKET, f"{key}/grid-values.f32", g.values, "application/octet-stream"))
         result.grid.CopyFrom(_put_json(store, f"{key}/grid.json", g.grid))
 
