@@ -4,12 +4,14 @@ import { Stage } from "@gen/gateway/v1/task_pb";
 import type { RawDataset } from "@gen/ingest/v1/ingest_pb";
 import type { Series } from "@gen/preprocess/v1/data_pb";
 import type { SeriesAnalysis } from "@gen/analysis/v1/results_pb";
+import type { Heatmap } from "../lib/grid";
 import { errorMessage } from "../api";
 import { describePoint } from "../lib/bbox";
 import { compare, type Day, formatMonth } from "../lib/dates";
 import { type StageView, stageViews } from "../lib/job";
 import { formatLabel, sourceLabel, stepLabel } from "../lib/sources";
 import { SeriesChart } from "./SeriesChart";
+import { HeatmapLegend } from "./HeatmapLegend";
 import { VerdictPanel } from "./VerdictPanel";
 
 export type Phase = "uploading" | "creating" | "watching" | "done";
@@ -26,6 +28,8 @@ export interface Run {
   /** The trend tests, when analysis ran and they downloaded. */
   analysis?: SeriesAnalysis;
   analysisError?: string;
+  /** Per-cell trends, for gridded jobs, drawn on the globe. */
+  heatmap?: Heatmap;
 }
 
 interface Props {
@@ -161,11 +165,13 @@ function Alert({ children }: { children: React.ReactNode }) {
 function Results({
   series,
   analysis,
+  heatmap,
   title,
   onSaveCsv,
 }: {
   series: Series;
   analysis: SeriesAnalysis | undefined;
+  heatmap: Heatmap | undefined;
   title: string;
   onSaveCsv: () => Promise<void>;
 }) {
@@ -187,6 +193,7 @@ function Results({
   return (
     <div className="job-chart">
       {analysis && <VerdictPanel analysis={analysis} />}
+      {heatmap && <HeatmapLegend heatmap={heatmap} />}
       <SeriesChart
         series={series}
         analysis={analysis}
@@ -259,6 +266,7 @@ export function JobPanel({ run, stopAfter, seriesTitle, onSaveCsv, onStop }: Pro
         <Results
           series={run.series}
           analysis={run.analysis}
+          heatmap={run.heatmap}
           title={seriesTitle(run.series.variableId)}
           onSaveCsv={onSaveCsv}
         />

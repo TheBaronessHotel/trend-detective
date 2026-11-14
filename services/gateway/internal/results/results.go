@@ -88,6 +88,7 @@ var artifactNames = map[gatewayv1.Artifact]string{
 	gatewayv1.Artifact_ARTIFACT_ANOMALY_CUBE:    "anomaly map layer",
 	gatewayv1.Artifact_ARTIFACT_SERIES_ANALYSIS: "trend analysis",
 	gatewayv1.Artifact_ARTIFACT_GRID_ANALYSIS:   "heatmap",
+	gatewayv1.Artifact_ARTIFACT_GRID:            "map grid",
 }
 
 // ResultURL signs a download for one of a job's outputs. It returns
@@ -147,6 +148,8 @@ func find(r *gatewayv1.JobResults, a gatewayv1.Artifact) *commonv1.BlobRef {
 		return r.GetAnalysis().GetSeries()
 	case gatewayv1.Artifact_ARTIFACT_GRID_ANALYSIS:
 		return r.GetAnalysis().GetGrid()
+	case gatewayv1.Artifact_ARTIFACT_GRID:
+		return r.GetPreprocess().GetGrid()
 	}
 	return nil
 }

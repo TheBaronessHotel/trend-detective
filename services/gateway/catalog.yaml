@@ -9,6 +9,7 @@
 #   step             daily, weekly or monthly
 #   available        dates the product covers, YYYY-MM-DD
 #   grid             false for series-only sources, which hide the slider and heatmap
+#   pixel_size       for grid variables, the native pixel size in degrees, {lat, lon}
 #   domain           land, ocean or global
 #   default_source   one of the keys under sources
 #   sources          settings per adapter. Each one is that adapter's message in
@@ -77,6 +78,7 @@ variables:
     step: monthly
     available: { start: 1998-01-01, end: 2025-09-30 }
     grid: true
+    pixel_size: { lat: 0.1, lon: 0.1 }
     domain: global
     default_source: harmony-subset
     sources:
@@ -118,6 +120,7 @@ variables:
     step: monthly
     available: { start: 1980-01-01, end: 2026-09-30 }
     grid: true
+    pixel_size: { lat: 0.5, lon: 0.625 }
     domain: global
     default_source: harmony-subset
     sources:
@@ -151,6 +154,7 @@ variables:
     step: monthly
     available: { start: 2000-01-01, end: 2026-07-31 }
     grid: true
+    pixel_size: { lat: 0.25, lon: 0.25 }
     domain: land
     default_source: harmony-subset
     sources:
@@ -184,6 +188,7 @@ variables:
     step: monthly
     available: { start: 2000-01-01, end: 2026-07-31 }
     grid: true
+    pixel_size: { lat: 0.25, lon: 0.25 }
     domain: land
     default_source: harmony-subset
     sources:
@@ -221,6 +226,7 @@ variables:
     step: monthly
     available: { start: 1980-01-01, end: 2026-09-30 }
     grid: true
+    pixel_size: { lat: 0.5, lon: 0.625 }
     domain: global
     default_source: harmony-subset
     sources:
@@ -257,6 +263,7 @@ variables:
     step: monthly
     available: { start: 1980-01-01, end: 2026-09-30 }
     grid: true
+    pixel_size: { lat: 0.5, lon: 0.625 }
     domain: global
     default_source: harmony-subset
     sources:

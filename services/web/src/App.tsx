@@ -3,7 +3,18 @@ import type { Variable } from "@gen/gateway/v1/gateway_pb";
 import { Stage } from "@gen/gateway/v1/task_pb";
 import { Source } from "@gen/ingest/v1/ingest_pb";
 import type { Job } from "@gen/gateway/v1/gateway_pb";
-import { errorMessage, gateway, loadSeries, loadSeriesAnalysis, saveSeriesCsv, uploadCsv } from "./api";
+import {
+  errorMessage,
+  gateway,
+  loadGrid,
+  loadGridAnalysis,
+  loadSeries,
+  loadSeriesAnalysis,
+  saveSeriesCsv,
+  uploadCsv,
+} from "./api";
+import { heatmap } from "./lib/grid";
+import { CellSizePicker } from "./components/CellSizePicker";
 import { DatesPicker } from "./components/DatesPicker";
 import { JobPanel, type Run } from "./components/JobPanel";
 import { PlaceFields } from "./components/PlaceFields";
@@ -57,6 +68,8 @@ export function App() {
   const [end, setEnd] = useState<Day>();
   const [source, setSource] = useState<Source>();
   const [file, setFile] = useState<File>();
+  // Native pixels per heatmap cell side; undefined uses the variable's default.
+  const [block, setBlock] = useState<number>();
   const [run, setRun] = useState<Run>();
   const abort = useRef<AbortController | undefined>(undefined);
 
@@ -77,6 +90,7 @@ export function App() {
     setEnd(v?.available?.end);
     setSource(v?.defaultSource);
     setFile(undefined);
+    setBlock(undefined);
   }
 
   const blocker = !variable
@@ -107,7 +121,17 @@ export function App() {
       setRun({ phase: "creating" });
       const dates = jobRange(start, end, variable.available);
       const { job } = await gateway.createJob(
-        { spec: { variableId: variable.id, bbox: box, dates, source, upload, stopAfter: STOP_AFTER } },
+        {
+          spec: {
+            variableId: variable.id,
+            bbox: box,
+            dates,
+            source,
+            upload,
+            stopAfter: STOP_AFTER,
+            ...(block ? { aggregation: { blockPixels: block } } : {}),
+          },
+        },
         { signal },
       );
       if (!job) throw new Error("The gateway started no job.");
@@ -117,11 +141,14 @@ export function App() {
       // so a job that got through preprocess always draws its chart.
       const hasSeries = !!last.results?.preprocess?.series;
       const hasAnalysis = !!last.results?.analysis?.series;
+      const hasHeatmap = !!last.results?.analysis?.grid && !!last.results?.preprocess?.grid;
       setRun({ phase: "done", job: last, loadingSeries: hasSeries });
       if (!hasSeries) return;
-      const [series, analysis] = await Promise.allSettled([
+      const [series, analysis, grid, gridAnalysis] = await Promise.allSettled([
         loadSeries(job.id, signal),
         hasAnalysis ? loadSeriesAnalysis(job.id, signal) : Promise.resolve(undefined),
+        hasHeatmap ? loadGrid(job.id, signal) : Promise.resolve(undefined),
+        hasHeatmap ? loadGridAnalysis(job.id, signal) : Promise.resolve(undefined),
       ]);
       if (signal.aborted) return;
       setRun({
@@ -132,6 +159,11 @@ export function App() {
         analysis: analysis.status === "fulfilled" ? analysis.value : undefined,
         analysisError:
           analysis.status === "rejected" ? `Couldn't load the trend tests. ${errorMessage(analysis.reason)}` : undefined,
+        // The heatmap is extra: if it can't load, the rest still shows.
+        heatmap:
+          grid.status === "fulfilled" && gridAnalysis.status === "fulfilled" && grid.value && gridAnalysis.value
+            ? heatmap(grid.value, gridAnalysis.value)
+            : undefined,
       });
     } catch (err) {
       if (signal.aborted) return;
@@ -187,6 +219,7 @@ export function App() {
           }}
         />
         <SourcePicker variable={variable} source={source} onSource={setSource} file={file} onFile={setFile} />
+        <CellSizePicker variable={variable} source={source} box={box} block={block} onBlock={setBlock} />
         <button type="button" className="action primary run" disabled={!!blocker || busy} onClick={startJob}>
           {busy ? "Working…" : "Fetch the data"}
         </button>
@@ -194,7 +227,7 @@ export function App() {
       </aside>
       <main className="main">
         <Suspense fallback={<div className="map-wrap" />}>
-          <MapView box={box} onBox={setBox} />
+          <MapView box={box} onBox={setBox} heatmap={run?.heatmap} />
         </Suspense>
         <JobPanel run={run} stopAfter={STOP_AFTER} seriesTitle={seriesTitle} onSaveCsv={saveCsv} onStop={stopJob} />
       </main>

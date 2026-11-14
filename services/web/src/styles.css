@@ -97,7 +97,8 @@ p {
 
 /* ---- labels ---- */
 .label,
-.field > span:first-child {
+.field > span:first-child,
+.field > label:first-child {
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -980,4 +981,58 @@ p {
 
 .verdict-more .verdict-lines {
   margin-top: 0.5rem;
+}
+
+/* ---- the heatmap's key, under the verdict ---- */
+.heat-legend {
+  margin: 0 0 1.2rem;
+  padding: 0 0 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.heat-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+}
+
+.heat-scale {
+  display: block;
+}
+
+.heat-ends {
+  display: flex;
+  justify-content: space-between;
+  width: 220px;
+  margin: 0.2rem 0 0.4rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.heat-outline {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 0.2rem;
+  border: 1.5px solid var(--fg);
+  vertical-align: -1px;
+}
+
+.cell-size {
+  margin-top: 1rem;
+}
+
+.heat-popup .maplibregl-popup-content {
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--raised);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  box-shadow: none;
+}
+
+.heat-popup .maplibregl-popup-tip {
+  display: none;
 }

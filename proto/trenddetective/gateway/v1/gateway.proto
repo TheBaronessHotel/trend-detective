@@ -64,6 +64,13 @@ message Variable {
   repeated trenddetective.ingest.v1.Source sources = 10;
   // The product's page, for citations.
   string dataset_url = 11;
+  // Native pixel size in degrees, for gridded variables, so the app can
+  // preview the Grid before a job runs. Zero for series-only ones.
+  double pixel_lat_deg = 12;
+  double pixel_lon_deg = 13;
+  // The catalog's default Grid block size (Aggregation.block_pixels), or 0
+  // when it leaves the size to SUBREGION_N.
+  int32 default_block_pixels = 14;
 }
 
 // Where a variable has data.
@@ -198,6 +205,8 @@ enum Artifact {
   ARTIFACT_ANOMALY_CUBE = 4;
   ARTIFACT_SERIES_ANALYSIS = 5;
   ARTIFACT_GRID_ANALYSIS = 6;
+  // Preprocess's Grid document, for the heatmap's cell edges and sizes.
+  ARTIFACT_GRID = 7;
 }
 
 message GetResultURLRequest {

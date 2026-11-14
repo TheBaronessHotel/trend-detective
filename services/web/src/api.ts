@@ -6,8 +6,13 @@ import { ConnectError, createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import type { BlobRef } from "@gen/common/v1/common_pb";
 import { Artifact, GatewayService } from "@gen/gateway/v1/gateway_pb";
-import { type Series, SeriesSchema } from "@gen/preprocess/v1/data_pb";
-import { type SeriesAnalysis, SeriesAnalysisSchema } from "@gen/analysis/v1/results_pb";
+import { type Grid, GridSchema, type Series, SeriesSchema } from "@gen/preprocess/v1/data_pb";
+import {
+  type GridAnalysis,
+  GridAnalysisSchema,
+  type SeriesAnalysis,
+  SeriesAnalysisSchema,
+} from "@gen/analysis/v1/results_pb";
 
 /** Where the browser reaches the gateway. Set VITE_GATEWAY_URL to change it. */
 export const gatewayUrl: string = import.meta.env.VITE_GATEWAY_URL ?? "http://localhost:8080";
@@ -62,6 +67,18 @@ export async function loadSeries(jobId: string, signal?: AbortSignal): Promise<S
 export async function loadSeriesAnalysis(jobId: string, signal?: AbortSignal): Promise<SeriesAnalysis> {
   const res = await download(jobId, Artifact.SERIES_ANALYSIS, signal);
   return fromJson(SeriesAnalysisSchema, await res.json(), { ignoreUnknownFields: true });
+}
+
+/** The map grid's cells, edges and block size, as preprocess wrote them. */
+export async function loadGrid(jobId: string, signal?: AbortSignal): Promise<Grid> {
+  const res = await download(jobId, Artifact.GRID, signal);
+  return fromJson(GridSchema, await res.json(), { ignoreUnknownFields: true });
+}
+
+/** The trend tests on every grid cell, for the heatmap. */
+export async function loadGridAnalysis(jobId: string, signal?: AbortSignal): Promise<GridAnalysis> {
+  const res = await download(jobId, Artifact.GRID_ANALYSIS, signal);
+  return fromJson(GridAnalysisSchema, await res.json(), { ignoreUnknownFields: true });
 }
 
 /**

@@ -50,6 +50,7 @@ class Artifact(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ARTIFACT_ANOMALY_CUBE: _ClassVar[Artifact]
     ARTIFACT_SERIES_ANALYSIS: _ClassVar[Artifact]
     ARTIFACT_GRID_ANALYSIS: _ClassVar[Artifact]
+    ARTIFACT_GRID: _ClassVar[Artifact]
 DOMAIN_UNSPECIFIED: Domain
 DOMAIN_LAND: Domain
 DOMAIN_OCEAN: Domain
@@ -73,6 +74,7 @@ ARTIFACT_VALUE_CUBE: Artifact
 ARTIFACT_ANOMALY_CUBE: Artifact
 ARTIFACT_SERIES_ANALYSIS: Artifact
 ARTIFACT_GRID_ANALYSIS: Artifact
+ARTIFACT_GRID: Artifact
 
 class ListVariablesRequest(_message.Message):
     __slots__ = ()
@@ -85,7 +87,7 @@ class ListVariablesResponse(_message.Message):
     def __init__(self, variables: _Optional[_Iterable[_Union[Variable, _Mapping]]] = ...) -> None: ...
 
 class Variable(_message.Message):
-    __slots__ = ("id", "name", "definition", "units", "step", "available", "grid", "domain", "default_source", "sources", "dataset_url")
+    __slots__ = ("id", "name", "definition", "units", "step", "available", "grid", "domain", "default_source", "sources", "dataset_url", "pixel_lat_deg", "pixel_lon_deg", "default_block_pixels")
     ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     DEFINITION_FIELD_NUMBER: _ClassVar[int]
@@ -97,6 +99,9 @@ class Variable(_message.Message):
     DEFAULT_SOURCE_FIELD_NUMBER: _ClassVar[int]
     SOURCES_FIELD_NUMBER: _ClassVar[int]
     DATASET_URL_FIELD_NUMBER: _ClassVar[int]
+    PIXEL_LAT_DEG_FIELD_NUMBER: _ClassVar[int]
+    PIXEL_LON_DEG_FIELD_NUMBER: _ClassVar[int]
+    DEFAULT_BLOCK_PIXELS_FIELD_NUMBER: _ClassVar[int]
     id: str
     name: str
     definition: str
@@ -108,7 +113,10 @@ class Variable(_message.Message):
     default_source: _ingest_pb2.Source
     sources: _containers.RepeatedScalarFieldContainer[_ingest_pb2.Source]
     dataset_url: str
-    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., definition: _Optional[str] = ..., units: _Optional[str] = ..., step: _Optional[_Union[_common_pb2.TimeStep, str]] = ..., available: _Optional[_Union[_common_pb2.DateRange, _Mapping]] = ..., grid: _Optional[bool] = ..., domain: _Optional[_Union[Domain, str]] = ..., default_source: _Optional[_Union[_ingest_pb2.Source, str]] = ..., sources: _Optional[_Iterable[_Union[_ingest_pb2.Source, str]]] = ..., dataset_url: _Optional[str] = ...) -> None: ...
+    pixel_lat_deg: float
+    pixel_lon_deg: float
+    default_block_pixels: int
+    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., definition: _Optional[str] = ..., units: _Optional[str] = ..., step: _Optional[_Union[_common_pb2.TimeStep, str]] = ..., available: _Optional[_Union[_common_pb2.DateRange, _Mapping]] = ..., grid: _Optional[bool] = ..., domain: _Optional[_Union[Domain, str]] = ..., default_source: _Optional[_Union[_ingest_pb2.Source, str]] = ..., sources: _Optional[_Iterable[_Union[_ingest_pb2.Source, str]]] = ..., dataset_url: _Optional[str] = ..., pixel_lat_deg: _Optional[float] = ..., pixel_lon_deg: _Optional[float] = ..., default_block_pixels: _Optional[int] = ...) -> None: ...
 
 class CreateJobRequest(_message.Message):
     __slots__ = ("spec",)
