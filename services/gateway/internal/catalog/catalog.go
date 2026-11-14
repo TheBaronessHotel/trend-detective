@@ -104,6 +104,7 @@ type rawEntry struct {
 	Tests         json.RawMessage             `json:"tests"`
 	LLMHints      string                      `json:"llm_hints"`
 	DatasetURL    string                      `json:"dataset_url"`
+	PixelSize     struct{ Lat, Lon float64 }  `json:"pixel_size"`
 }
 
 // Parse reads catalog YAML. It rejects unknown fields and reports every
@@ -179,6 +180,9 @@ func (r rawEntry) entry() (*Entry, error) {
 	}
 	tests := &analysisv1.TestPlan{}
 	errs = appendErr(errs, unmarshalOptional("tests", r.Tests, tests))
+	if r.Grid && (r.PixelSize.Lat <= 0 || r.PixelSize.Lon <= 0) {
+		errs = append(errs, errors.New("a grid variable needs pixel_size, its native pixel size in degrees"))
+	}
 
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
@@ -197,6 +201,10 @@ func (r rawEntry) entry() (*Entry, error) {
 			DefaultSource: defaultSource,
 			Sources:       slices.Sorted(maps.Keys(adapters)),
 			DatasetUrl:    r.DatasetURL,
+			PixelLatDeg:   r.PixelSize.Lat,
+			PixelLonDeg:   r.PixelSize.Lon,
+			// GetBlockPixels is 0 for a nil aggregation.
+			DefaultBlockPixels: aggregation.GetBlockPixels(),
 		},
 		SourceUnits: r.SourceUnits,
 		LLMHints:    strings.TrimSpace(r.LLMHints),

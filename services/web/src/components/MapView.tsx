@@ -1,22 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 import type { FeatureCollection } from "geojson";
 import {
+  type ExpressionSpecification,
   type GeoJSONSource,
   type LayerSpecification,
   Map as MapLibreMap,
+  type MapLayerMouseEvent,
   type MapMouseEvent,
   NavigationControl,
+  Popup,
   setWorkerUrl,
   type StyleSpecification,
 } from "maplibre-gl";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { type Box, type Corner, fromCorners } from "../lib/bbox";
+import { DIVERGING, type Heatmap } from "../lib/grid";
+import { formatSigned } from "../lib/series";
 import { useDarkTheme } from "../lib/useDarkTheme";
 
 interface Props {
   box: Box | undefined;
   onBox: (b: Box) => void;
+  /** Per-cell trends from a finished job, drawn over the map. */
+  heatmap?: Heatmap;
 }
 
 // MapLibre picks its worker file by a name built at run time, which no
@@ -129,6 +136,49 @@ function polygon(b: Box | undefined): FeatureCollection {
   };
 }
 
+const heatSource = "heatmap";
+
+function heatColour(max: number): ExpressionSpecification {
+  const m = max > 0 ? max : 1;
+  return ["interpolate", ["linear"], ["get", "slope"], -m, DIVERGING.low, 0, DIVERGING.mid, m, DIVERGING.high];
+}
+
+/**
+ * The heatmap: each cell coloured by its trend, and the cells that pass the
+ * test after the false discovery rate correction outlined in ink. It goes
+ * under the rectangle's outline, which stays on top.
+ */
+function addHeatmap(map: MapLibreMap, h: Heatmap | undefined, dark: boolean) {
+  if (!h) return;
+  const source = map.getSource(heatSource) as GeoJSONSource | undefined;
+  if (source) source.setData(h.cells);
+  else map.addSource(heatSource, { type: "geojson", data: h.cells });
+  const before = map.getLayer("bbox-line") ? "bbox-line" : undefined;
+  if (map.getLayer("heat-fill")) map.setPaintProperty("heat-fill", "fill-color", heatColour(h.max));
+  else
+    map.addLayer(
+      { id: "heat-fill", type: "fill", source: heatSource, paint: { "fill-color": heatColour(h.max), "fill-opacity": 0.75 } },
+      before,
+    );
+  if (!map.getLayer("heat-sig")) {
+    map.addLayer(
+      {
+        id: "heat-sig",
+        type: "line",
+        source: heatSource,
+        filter: ["==", ["get", "significant"], true],
+        paint: { "line-color": ink(dark), "line-width": 1.5 },
+      },
+      before,
+    );
+  }
+}
+
+function removeHeatmap(map: MapLibreMap) {
+  for (const id of ["heat-sig", "heat-fill"]) if (map.getLayer(id)) map.removeLayer(id);
+  if (map.getSource(heatSource)) map.removeSource(heatSource);
+}
+
 function addRectangle(map: MapLibreMap, b: Box | undefined, dark: boolean) {
   if (!map.getSource(sourceId)) map.addSource(sourceId, { type: "geojson", data: polygon(b) });
   if (!map.getLayer("bbox-fill")) {
@@ -148,15 +198,15 @@ function showRectangle(map: MapLibreMap | undefined, b: Box | undefined) {
  * rectangle" and drag to draw one instead; spinning is off while drawing.
  * The rectangle can also be typed in beside the globe.
  */
-export function MapView({ box, onBox }: Props) {
+export function MapView({ box, onBox, heatmap }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | undefined>(undefined);
   const [drawing, setDrawing] = useState(false);
   const dark = useDarkTheme();
 
   // The map's handlers outlive renders, so they read the latest values here.
-  const latest = useRef({ box, onBox, drawing, dark });
-  latest.current = { box, onBox, drawing, dark };
+  const latest = useRef({ box, onBox, drawing, dark, heatmap });
+  latest.current = { box, onBox, drawing, dark, heatmap };
 
   // Which theme's style the map shows, or is loading. A quick double toggle
   // can leave an older style still loading; only the newest one is applied.
@@ -194,7 +244,25 @@ export function MapView({ box, onBox }: Props) {
       created.touchZoomRotate.disableRotation();
       created.addControl(new NavigationControl({ showCompass: false }), "bottom-right");
       // Every style, the first and each one after a theme change, gets the rectangle.
-      created.on("style.load", () => addRectangle(created, latest.current.box, latest.current.dark));
+      created.on("style.load", () => {
+        addRectangle(created, latest.current.box, latest.current.dark);
+        addHeatmap(created, latest.current.heatmap, latest.current.dark);
+      });
+
+      // A cell's numbers, on hover.
+      const popup = new Popup({ closeButton: false, closeOnClick: false, className: "heat-popup" });
+      created.on("mousemove", "heat-fill", (e: MapLayerMouseEvent) => {
+        const f = e.features?.[0];
+        const h = latest.current.heatmap;
+        if (!f || !h) return;
+        const slope = Number(f.properties?.slope);
+        const sure = f.properties?.significant === true || f.properties?.significant === "true";
+        popup
+          .setLngLat(e.lngLat)
+          .setText(`${formatSigned(slope)}${h.units ? ` ${h.units}` : ""} per decade, ${sure ? "passes the test" : "could be chance"}`)
+          .addTo(created);
+      });
+      created.on("mouseleave", "heat-fill", () => popup.remove());
 
       let start: Corner | undefined;
       const corner = (e: MapMouseEvent): Corner => ({ lat: e.lngLat.lat, lng: e.lngLat.lng });
@@ -229,6 +297,19 @@ export function MapView({ box, onBox }: Props) {
   useEffect(() => {
     showRectangle(map.current, box);
   }, [box]);
+
+  // A new heatmap goes on the map, and the view moves to it.
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !m.isStyleLoaded()) return;
+    if (!heatmap) {
+      removeHeatmap(m);
+      return;
+    }
+    addHeatmap(m, heatmap, latest.current.dark);
+    const b = latest.current.box;
+    if (b) m.fitBounds([b.west, b.south, b.east, b.north], { padding: 48, maxZoom: 7 });
+  }, [heatmap]);
 
   useEffect(() => {
     if (map.current) showTheme(map.current, dark);

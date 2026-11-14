@@ -213,6 +213,8 @@ const (
 	Artifact_ARTIFACT_ANOMALY_CUBE    Artifact = 4
 	Artifact_ARTIFACT_SERIES_ANALYSIS Artifact = 5
 	Artifact_ARTIFACT_GRID_ANALYSIS   Artifact = 6
+	// Preprocess's Grid document, for the heatmap's cell edges and sizes.
+	Artifact_ARTIFACT_GRID Artifact = 7
 )
 
 // Enum value maps for Artifact.
@@ -225,6 +227,7 @@ var (
 		4: "ARTIFACT_ANOMALY_CUBE",
 		5: "ARTIFACT_SERIES_ANALYSIS",
 		6: "ARTIFACT_GRID_ANALYSIS",
+		7: "ARTIFACT_GRID",
 	}
 	Artifact_value = map[string]int32{
 		"ARTIFACT_UNSPECIFIED":     0,
@@ -234,6 +237,7 @@ var (
 		"ARTIFACT_ANOMALY_CUBE":    4,
 		"ARTIFACT_SERIES_ANALYSIS": 5,
 		"ARTIFACT_GRID_ANALYSIS":   6,
+		"ARTIFACT_GRID":            7,
 	}
 )
 
@@ -365,9 +369,16 @@ type Variable struct {
 	// Every source that can serve this variable.
 	Sources []v11.Source `protobuf:"varint,10,rep,packed,name=sources,proto3,enum=trenddetective.ingest.v1.Source" json:"sources,omitempty"`
 	// The product's page, for citations.
-	DatasetUrl    string `protobuf:"bytes,11,opt,name=dataset_url,json=datasetUrl,proto3" json:"dataset_url,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	DatasetUrl string `protobuf:"bytes,11,opt,name=dataset_url,json=datasetUrl,proto3" json:"dataset_url,omitempty"`
+	// Native pixel size in degrees, for gridded variables, so the app can
+	// preview the Grid before a job runs. Zero for series-only ones.
+	PixelLatDeg float64 `protobuf:"fixed64,12,opt,name=pixel_lat_deg,json=pixelLatDeg,proto3" json:"pixel_lat_deg,omitempty"`
+	PixelLonDeg float64 `protobuf:"fixed64,13,opt,name=pixel_lon_deg,json=pixelLonDeg,proto3" json:"pixel_lon_deg,omitempty"`
+	// The catalog's default Grid block size (Aggregation.block_pixels), or 0
+	// when it leaves the size to SUBREGION_N.
+	DefaultBlockPixels int32 `protobuf:"varint,14,opt,name=default_block_pixels,json=defaultBlockPixels,proto3" json:"default_block_pixels,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *Variable) Reset() {
@@ -475,6 +486,27 @@ func (x *Variable) GetDatasetUrl() string {
 		return x.DatasetUrl
 	}
 	return ""
+}
+
+func (x *Variable) GetPixelLatDeg() float64 {
+	if x != nil {
+		return x.PixelLatDeg
+	}
+	return 0
+}
+
+func (x *Variable) GetPixelLonDeg() float64 {
+	if x != nil {
+		return x.PixelLonDeg
+	}
+	return 0
+}
+
+func (x *Variable) GetDefaultBlockPixels() int32 {
+	if x != nil {
+		return x.DefaultBlockPixels
+	}
+	return 0
 }
 
 type CreateJobRequest struct {
@@ -1696,7 +1728,7 @@ const file_trenddetective_gateway_v1_gateway_proto_rawDesc = "" +
 	"'trenddetective/gateway/v1/gateway.proto\x12\x19trenddetective.gateway.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a)trenddetective/analysis/v1/analysis.proto\x1a%trenddetective/common/v1/common.proto\x1a$trenddetective/gateway/v1/task.proto\x1a%trenddetective/ingest/v1/ingest.proto\x1a)trenddetective/narrator/v1/narrator.proto\x1a-trenddetective/preprocess/v1/preprocess.proto\"\x16\n" +
 	"\x14ListVariablesRequest\"Z\n" +
 	"\x15ListVariablesResponse\x12A\n" +
-	"\tvariables\x18\x01 \x03(\v2#.trenddetective.gateway.v1.VariableR\tvariables\"\xd4\x03\n" +
+	"\tvariables\x18\x01 \x03(\v2#.trenddetective.gateway.v1.VariableR\tvariables\"\xce\x04\n" +
 	"\bVariable\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1e\n" +
@@ -1712,7 +1744,10 @@ const file_trenddetective_gateway_v1_gateway_proto_rawDesc = "" +
 	"\asources\x18\n" +
 	" \x03(\x0e2 .trenddetective.ingest.v1.SourceR\asources\x12\x1f\n" +
 	"\vdataset_url\x18\v \x01(\tR\n" +
-	"datasetUrl\"J\n" +
+	"datasetUrl\x12\"\n" +
+	"\rpixel_lat_deg\x18\f \x01(\x01R\vpixelLatDeg\x12\"\n" +
+	"\rpixel_lon_deg\x18\r \x01(\x01R\vpixelLonDeg\x120\n" +
+	"\x14default_block_pixels\x18\x0e \x01(\x05R\x12defaultBlockPixels\"J\n" +
 	"\x10CreateJobRequest\x126\n" +
 	"\x04spec\x18\x01 \x01(\v2\".trenddetective.gateway.v1.JobSpecR\x04spec\"E\n" +
 	"\x11CreateJobResponse\x120\n" +
@@ -1826,7 +1861,7 @@ const file_trenddetective_gateway_v1_gateway_proto_rawDesc = "" +
 	"\x12TASK_STATE_RUNNING\x10\x02\x12\x18\n" +
 	"\x14TASK_STATE_SUCCEEDED\x10\x03\x12\x15\n" +
 	"\x11TASK_STATE_FAILED\x10\x04\x12\x17\n" +
-	"\x13TASK_STATE_CANCELED\x10\x05*\xc0\x01\n" +
+	"\x13TASK_STATE_CANCELED\x10\x05*\xd3\x01\n" +
 	"\bArtifact\x12\x18\n" +
 	"\x14ARTIFACT_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fARTIFACT_SERIES\x10\x01\x12\x17\n" +
@@ -1834,7 +1869,8 @@ const file_trenddetective_gateway_v1_gateway_proto_rawDesc = "" +
 	"\x13ARTIFACT_VALUE_CUBE\x10\x03\x12\x19\n" +
 	"\x15ARTIFACT_ANOMALY_CUBE\x10\x04\x12\x1c\n" +
 	"\x18ARTIFACT_SERIES_ANALYSIS\x10\x05\x12\x1a\n" +
-	"\x16ARTIFACT_GRID_ANALYSIS\x10\x062\xce\a\n" +
+	"\x16ARTIFACT_GRID_ANALYSIS\x10\x06\x12\x11\n" +
+	"\rARTIFACT_GRID\x10\a2\xce\a\n" +
 	"\x0eGatewayService\x12r\n" +
 	"\rListVariables\x12/.trenddetective.gateway.v1.ListVariablesRequest\x1a0.trenddetective.gateway.v1.ListVariablesResponse\x12f\n" +
 	"\tCreateJob\x12+.trenddetective.gateway.v1.CreateJobRequest\x1a,.trenddetective.gateway.v1.CreateJobResponse\x12]\n" +

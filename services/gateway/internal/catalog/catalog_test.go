@@ -70,14 +70,15 @@ variables:
 		t.Fatalf("valid entry rejected: %v", err)
 	}
 	tests := map[string]struct{ old, new, want string }{
-		"unknown field":        {"    units: u\n", "    units: u\n    colour: red\n", "colour"},
-		"default not offered":  {"default_source: bundle", "default_source: power", "default_source"},
-		"unknown adapter":      {"      bundle: { name: b }", "      bundle: { name: b }\n      ftp: {}", "ftp"},
-		"bad step":             {"step: monthly", "step: hourly", "step"},
-		"end before start":     {"end: 2001-01-01", "end: 1999-01-01", "available"},
-		"bad adapter settings": {"{ name: b }", "{ nmae: b }", "nmae"},
-		"missing definition":   {"    definition: d\n", "", "definition"},
-		"bad filter op":        {"    units: u\n", "    units: u\n    filters: { ops: [ { blur: {} } ] }\n", "filters"},
+		"unknown field":           {"    units: u\n", "    units: u\n    colour: red\n", "colour"},
+		"default not offered":     {"default_source: bundle", "default_source: power", "default_source"},
+		"unknown adapter":         {"      bundle: { name: b }", "      bundle: { name: b }\n      ftp: {}", "ftp"},
+		"bad step":                {"step: monthly", "step: hourly", "step"},
+		"end before start":        {"end: 2001-01-01", "end: 1999-01-01", "available"},
+		"bad adapter settings":    {"{ name: b }", "{ nmae: b }", "nmae"},
+		"missing definition":      {"    definition: d\n", "", "definition"},
+		"bad filter op":           {"    units: u\n", "    units: u\n    filters: { ops: [ { blur: {} } ] }\n", "filters"},
+		"grid without pixel size": {"    domain: land\n", "    domain: land\n    grid: true\n", "pixel_size"},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -86,5 +87,25 @@ variables:
 				t.Errorf("want an error mentioning %q, got %v", tt.want, err)
 			}
 		})
+	}
+}
+
+// The app previews the grid from these before a job runs.
+func TestGridVariablesCarryPixelSizeAndBlock(t *testing.T) {
+	c, err := Parse(gateway.CatalogYAML)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range c.Variables() {
+		if v.GetGrid() && (v.GetPixelLatDeg() <= 0 || v.GetPixelLonDeg() <= 0) {
+			t.Errorf("%s: grid without a pixel size", v.GetId())
+		}
+	}
+	gpm, ok := c.Get("precipitation-gpm")
+	if !ok {
+		t.Fatal("no precipitation-gpm")
+	}
+	if v := gpm.Variable; v.GetPixelLatDeg() != 0.1 || v.GetDefaultBlockPixels() != 4 {
+		t.Errorf("precipitation-gpm: %v", v)
 	}
 }
