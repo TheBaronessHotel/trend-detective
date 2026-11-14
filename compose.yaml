@@ -1,0 +1,90 @@
+# The local stack. Start it with `make up`. Settings come from .env.
+#
+# Ports bind to 127.0.0.1 only, so nothing is reachable from your network.
+#   4222  NATS clients        8222  NATS monitoring (/jsz?streams=true)
+#   6379  Redis
+#   8333  SeaweedFS S3        9333  SeaweedFS master UI    8888  filer UI
+
+name: trend-detective
+
+# Connection settings every service needs. A service adds them with
+#   environment:
+#     <<: *infra-env
+x-infra-env: &infra-env
+  NATS_URL: nats://nats:4222
+  REDIS_URL: redis://redis:6379/0
+  S3_ENDPOINT: http://seaweedfs:8333
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY in .env}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:?set S3_SECRET_KEY in .env}
+
+services:
+  nats:
+    image: nats:2.15.3-alpine
+    command: ["--jetstream", "--store_dir", "/data", "--http_port", "8222"]
+    ports:
+      - "127.0.0.1:4222:4222"
+      - "127.0.0.1:8222:8222"
+    volumes:
+      - nats-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8222/healthz?js-enabled-only=true"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  redis:
+    image: redis:8.8.4-alpine
+    # AOF persistence, so job state survives a restart.
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.53
+    entrypoint: ["/bin/sh", "/deploy/start.sh"]
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY in .env}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?set S3_SECRET_KEY in .env}
+      S3_ALLOWED_ORIGINS: ${S3_ALLOWED_ORIGINS:-*}
+    ports:
+      - "127.0.0.1:8333:8333"
+      - "127.0.0.1:9333:9333"
+      - "127.0.0.1:8888:8888"
+    volumes:
+      - ./deploy/seaweedfs/start.sh:/deploy/start.sh:ro
+      - seaweedfs-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8333/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+
+  # Creates the JetStream streams and the buckets, then exits. Services that
+  # use NATS or S3 should wait for it with
+  #   depends_on:
+  #     bootstrap:
+  #       condition: service_completed_successfully
+  bootstrap:
+    build:
+      context: .
+      dockerfile: deploy/bootstrap/Dockerfile
+    environment:
+      <<: *infra-env
+    depends_on:
+      nats:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  nats-data:
+  redis-data:
+  seaweedfs-data:

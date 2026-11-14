@@ -11,8 +11,8 @@ The design is in [ARCHITECTURE.md](ARCHITECTURE.md). Tasks and decisions live in
 ```
 .
 ├── ARCHITECTURE.md
-├── compose.yaml, .env.example               (coming in PLAT-2 to PLAT-4)
-├── Makefile                                gen, lint, fmt, breaking for now
+├── compose.yaml, .env.example               the local stack and its settings
+├── Makefile                                up, down, logs, gen, lint and more
 ├── buf.yaml, buf.gen.yaml                  buf module and codegen settings
 ├── go.mod                                  one Go module for gen/go, gateway and ingest
 ├── proto/trenddetective/<service>/v1/      contracts, one package per owning service
@@ -29,14 +29,27 @@ The design is in [ARCHITECTURE.md](ARCHITECTURE.md). Tasks and decisions live in
 
 ## Running it
 
-Nothing runs yet. Once compose lands, it will be:
+You need Docker. Then:
 
 ```
-cp .env.example .env    # then set EARTHDATA_TOKEN
 make up
 ```
 
-You need Docker. Get an Earthdata token at [urs.earthdata.nasa.gov](https://urs.earthdata.nasa.gov) under "Generate Token".
+The first run copies `.env.example` to `.env`. Put your Earthdata token in it as `EARTHDATA_TOKEN`. You get one at [urs.earthdata.nasa.gov](https://urs.earthdata.nasa.gov) under "Generate Token".
+
+So far `make up` starts the infrastructure: NATS, Redis and SeaweedFS. Bootstrap then creates the JetStream streams and the S3 buckets. The services join compose as they get built. Other targets:
+
+| Target | What it does |
+|---|---|
+| `make down` | Stops everything. Data stays in the Docker volumes |
+| `make logs` | Follows the logs |
+| `make ps` | Lists the containers |
+| `make clean` | Stops everything and deletes all data |
+
+The ports listen on 127.0.0.1 only:
+- NATS: 4222, and 8222 for monitoring.
+- Redis: 6379.
+- SeaweedFS: 8333 for S3, 9333 for the master UI, and 8888 for the filer UI.
 
 ## Working here
 
