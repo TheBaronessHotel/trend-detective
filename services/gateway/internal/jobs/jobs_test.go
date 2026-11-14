@@ -110,7 +110,7 @@ func TestCreateJobPublishesTheIngestTaskWithDefaults(t *testing.T) {
 	}
 
 	s := job.GetSpec()
-	if s.GetSource() != ingestv1.Source_SOURCE_BUNDLE {
+	if s.GetSource() != ingestv1.Source_SOURCE_POWER {
 		t.Errorf("default source: %v", s.GetSource())
 	}
 	if len(s.GetFilters().GetOps()) == 0 || len(s.GetTests().GetSeries()) == 0 {
@@ -125,8 +125,13 @@ func TestCreateJobPublishesTheIngestTaskWithDefaults(t *testing.T) {
 		t.Errorf("published %s %s", p.subject, p.msgID)
 	}
 	in := p.task.GetIngest()
-	if in.GetBundle().GetName() != "power-delhi-monthly" || in.GetBundle().GetVariables()[0] != "T2M" {
-		t.Errorf("ingest settings: %v", in.GetBundle())
+	pw := in.GetPower()
+	if len(pw.GetParameters()) != 1 || pw.GetParameters()[0] != "T2M" || pw.GetCommunity() != "AG" {
+		t.Errorf("ingest settings: %v", pw)
+	}
+	// The rectangle is 77 to 78 east and 28 to 29 north.
+	if pw.GetPoint().GetLat() != 28.5 || pw.GetPoint().GetLon() != 77.5 {
+		t.Errorf("POWER should sample the rectangle's center, got %v", pw.GetPoint())
 	}
 	if in.GetVariableId() != "air-temperature-power" || in.GetBbox().GetWest() != 77 || in.GetDates().GetEnd().GetYear() != 2024 {
 		t.Errorf("ingest task: %v", in)

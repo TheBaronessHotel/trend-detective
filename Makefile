@@ -1,4 +1,4 @@
-.PHONY: up down logs ps clean smoke smoke-harmony test gen lint fmt breaking
+.PHONY: up down logs ps clean smoke smoke-harmony smoke-power test gen lint fmt breaking
 
 # Start the stack in the background and wait until bootstrap has finished.
 # The first run creates .env from .env.example. `up --wait` would treat
@@ -39,6 +39,10 @@ smoke:
 # Live check against real NASA services. Needs EARTHDATA_TOKEN in .env.
 smoke-harmony:
 	sh deploy/smoke/harmony.sh
+
+# Live check against NASA POWER. No token needed, but CI skips it.
+smoke-power:
+	sh deploy/smoke/power.sh
 
 # Go unit tests.
 test:

@@ -31,7 +31,9 @@ done
 grep -q air-temperature-power /tmp/smoke-vars.json || { echo "FAIL: ListVariables never answered"; exit 1; }
 
 echo "Creating a job that stops after ingest"
-spec='{"spec": {"variableId": "air-temperature-power",
+# The bundle source keeps CI independent of NASA's servers. make smoke-power
+# checks the live POWER adapter.
+spec='{"spec": {"variableId": "air-temperature-power", "source": "SOURCE_BUNDLE",
   "bbox": {"west": 77, "south": 28, "east": 78, "north": 29},
   "dates": {"start": {"year": 1981, "month": 1, "day": 1}, "end": {"year": 2024, "month": 12, "day": 31}},
   "stopAfter": "STAGE_INGEST"}}'
