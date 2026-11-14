@@ -23,6 +23,7 @@ import (
 	"github.com/TheBaronessHotel/trend-detective/internal/blob"
 	"github.com/TheBaronessHotel/trend-detective/internal/envx"
 	"github.com/TheBaronessHotel/trend-detective/internal/obs"
+	"github.com/TheBaronessHotel/trend-detective/services/narrator/internal/egress"
 	"github.com/TheBaronessHotel/trend-detective/services/narrator/internal/server"
 	"github.com/lein3000zzz/the-watchers/pkg/observability/logging"
 )
@@ -30,6 +31,10 @@ import (
 // maxRequestBytes bounds one NarrateRequest. History is capped in the server
 // too, this just stops a huge body early.
 const maxRequestBytes = 1 << 20
+
+// shutdownGrace is how long streams in flight may finish after SIGTERM.
+// compose.yaml gives the container a little longer (stop_grace_period).
+const shutdownGrace = 10 * time.Second
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
@@ -50,6 +55,10 @@ func run() error {
 		return err
 	}
 	timeout, err := envx.Duration("NARRATE_TIMEOUT", 3*time.Minute)
+	if err != nil {
+		return err
+	}
+	headerTimeout, err := llmHeaderTimeout(timeout)
 	if err != nil {
 		return err
 	}
@@ -77,7 +86,7 @@ func run() error {
 		Loader:           server.BucketLoader{Name: bucket, Bucket: store.Bucket(bucket)},
 		Builder:          newBuilder(),
 		Verifier:         newVerifier(),
-		NewClient:        newLLMClient(newLLMHTTPClient()),
+		NewClient:        newLLMClient(newLLMHTTPClient(egress.NewGuard(func(host string) bool { return server.HostListed(host, allowlist) })), headerTimeout),
 		Log:              log,
 		Timeout:          timeout,
 		BaseURLAllowlist: allowlist,
@@ -106,7 +115,7 @@ func run() error {
 
 	errc := make(chan error, 1)
 	go func() {
-		log.Info(ctx, "listening", "addr", srv.Addr, "bucket", bucket, "narrate_timeout", timeout.String(), "base_url_allowlist", allowlist)
+		log.Info(ctx, "listening", "addr", srv.Addr, "bucket", bucket, "narrate_timeout", timeout.String(), "llm_header_timeout", headerTimeout.String(), "base_url_allowlist", allowlist)
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			errc <- err
 		}
@@ -118,19 +127,34 @@ func run() error {
 		log.Error(context.Background(), "stopping", logging.Err(err))
 		return err
 	}
-	// Let streams in flight finish, up to a bound.
-	sctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// Let streams in flight finish, up to a bound, then cut the rest. A
+	// stream can run for NARRATE_TIMEOUT, so running out of grace is normal
+	// and not a failed exit.
+	sctx, cancel := context.WithTimeout(context.Background(), shutdownGrace)
 	defer cancel()
-	return srv.Shutdown(sctx)
+	if err := srv.Shutdown(sctx); err != nil {
+		log.Warn(context.Background(), "closing streams still running after the shutdown grace", "grace", shutdownGrace.String(), logging.Err(err))
+		_ = srv.Close()
+	}
+	return nil
 }
 
 func healthcheck() int {
-	host, port, err := net.SplitHostPort(envx.String("HTTP_ADDR", ":8081"))
+	return healthcheckAddr(envx.String("HTTP_ADDR", ":8081"))
+}
+
+// healthcheckAddr asks the narrator listening on addr for /healthz. A
+// wildcard host means this machine.
+func healthcheckAddr(addr string) int {
+	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return 1
 	}
-	if host == "" || host == "0.0.0.0" {
+	switch host {
+	case "", "0.0.0.0":
 		host = "127.0.0.1"
+	case "::":
+		host = "::1"
 	}
 	client := &http.Client{Timeout: 2 * time.Second}
 	resp, err := client.Get("http://" + net.JoinHostPort(host, port) + "/healthz")

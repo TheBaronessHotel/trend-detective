@@ -168,8 +168,10 @@ func TestBuildQuestionAndHistory(t *testing.T) {
 	if got.Messages[2].Role != llm.RoleUser || got.Messages[2].Text != "Is 18 enough?" {
 		t.Fatalf("question: %#v", got.Messages[2])
 	}
-	if !hasValue(facts, "question.number", 18) {
-		t.Fatal("question number was not recorded")
+	for _, f := range facts {
+		if strings.HasPrefix(f.Name, "question") {
+			t.Fatalf("a number from the question became a fact: %#v", f)
+		}
 	}
 }
 

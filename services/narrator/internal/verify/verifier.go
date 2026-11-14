@@ -18,13 +18,16 @@ type verifier struct{}
 func NewVerifier() Verifier { return verifier{} }
 
 // Unverified lists number tokens in answer, as written, that match no fact.
-// Years inside dates.start_year..dates.end_year, dates written inside that
-// range, and plain integers from 0 to 10 (counts) are allowed. Matching allows
-// rounding to the decimals shown, a percent form of a fraction, per-year as
-// per-decade/10, and the absolute value after a decrease word. A threshold
-// written after p < or p ≤ is allowed when some p-value fact is <= that
-// threshold. "12 months" and "per 10 years" are calendar phrases, not results.
-// ScanNumbers already drops tokens glued to letters, such as MERRA-2 and 20th.
+// Years inside dates.start_year..dates.end_year (unless a count noun follows,
+// as in "2000 cells"), dates written inside that range, and plain integers
+// from 0 to 10 (counts) are allowed. Matching allows rounding to the decimals
+// shown, a percent form of a fraction, per-year as per-decade/10, and the
+// absolute value after a decrease word in the same sentence. Date parts and
+// coordinates only back numbers written as such (see factMatches). A
+// threshold written after p < or p ≤ is allowed when a headline p-value is <=
+// that threshold (see pValueThreshold). "12 months" and "per 10 years" are
+// calendar phrases, not results. ScanNumbers already drops names with digits,
+// such as MERRA-2, and ordinals such as 20th.
 func (verifier) Unverified(answer string, facts []prompt.Fact) []string {
 	nums := prompt.ScanNumbers(answer)
 	b := dateBounds(facts)
@@ -35,7 +38,7 @@ func (verifier) Unverified(answer string, facts []prompt.Fact) []string {
 		if n.PlainInt && !n.Neg && !n.Percent && n.Value >= 0 && n.Value <= 10 {
 			continue
 		}
-		if yearToken(n, b) || covered(n, spans) || ignoredPhrase(answer, n) || tokenMatches(answer, n, facts) {
+		if yearToken(answer, n, b) || covered(n, spans) || ignoredPhrase(answer, n) || tokenMatches(answer, n, facts) {
 			continue
 		}
 		if seen[n.Raw] {
@@ -47,28 +50,91 @@ func (verifier) Unverified(answer string, facts []prompt.Fact) []string {
 	return out
 }
 
+// surround is what the words around a number say about it.
+type surround struct {
+	// decrease: a decrease word earlier in the sentence, so a positive
+	// number may restate a negative fact.
+	decrease bool
+	// coordinate: degrees, a compass point, or latitude/longitude next to
+	// the number.
+	coordinate bool
+	// calendar: a month name, "month" or "day" next to the number.
+	calendar bool
+	// counted: a count noun follows, as in "2001 cells".
+	counted bool
+}
+
+func contextOf(answer string, n prompt.Number) surround {
+	return surround{
+		decrease:   decreaseBefore(answer, n.Start),
+		coordinate: coordinateNear(answer, n),
+		calendar:   calendarNear(answer, n),
+		counted:    countNouns[nextWord(answer[n.End:])],
+	}
+}
+
 func tokenMatches(answer string, n prompt.Number, facts []prompt.Fact) bool {
 	if pValueThreshold(answer, n, facts) {
 		return true
 	}
-	dec := decreaseBefore(answer, n.Start)
+	c := contextOf(answer, n)
 	for _, f := range facts {
-		if factMatches(n, f, dec) {
+		if factMatches(n, f, c) {
 			return true
 		}
 	}
 	return false
 }
 
+// headlinePValues are the p-values a bare "p < 0.05" may refer to. Monthly
+// and trend-triangle p-values are facts too, but one of twelve months is
+// almost always small, so they must not back a claim about the trend.
+var headlinePValues = map[string]string{
+	"regression":   "regression.p_value",
+	"mann_kendall": "mann_kendall.p_value",
+	"pettitt":      "pettitt.p_value",
+	"shuffle":      "shuffle.p_value",
+}
+
+// testNameRE finds the test a p-value threshold is about. The last match
+// before the number wins.
+var testNameRE = regexp.MustCompile(`(?i)\b(regression|linear|least.squares|mann.kendall|sen'?s|kendall|pettitt|change.point|shift|shuffle|permutation)`)
+
+// testBefore names the test mentioned last in the sentence before start, or
+// "" when there is none.
+func testBefore(answer string, start int) string {
+	ms := testNameRE.FindAllString(sentenceBefore(answer, start, 200), -1)
+	if len(ms) == 0 {
+		return ""
+	}
+	w := strings.ToLower(ms[len(ms)-1])
+	switch {
+	case strings.HasPrefix(w, "regression"), strings.HasPrefix(w, "linear"), strings.HasPrefix(w, "least"):
+		return "regression"
+	case strings.HasPrefix(w, "mann"), strings.HasPrefix(w, "sen"), strings.HasPrefix(w, "kendall"):
+		return "mann_kendall"
+	case strings.HasPrefix(w, "pettitt"), strings.HasPrefix(w, "change"), strings.HasPrefix(w, "shift"):
+		return "pettitt"
+	default:
+		return "shuffle"
+	}
+}
+
 // pValueThreshold allows "p < 0.001", "p ≤ 0.05", "p<0.01" and "p <= 0.05"
-// when some fact whose name contains "p_value" is <= the threshold. Any
-// p-value fact qualifies. A comparison that is not a p-value does not.
+// when a headline p-value (regression, Mann-Kendall, Pettitt or shuffle) is
+// <= the threshold. When the sentence names a test before the threshold,
+// only that test's p-value counts. A comparison that is not a p-value does
+// not qualify.
 func pValueThreshold(answer string, n prompt.Number, facts []prompt.Fact) bool {
 	if n.Start < 0 || n.Start > len(answer) || !hasPCompare(answer, n.Start) {
 		return false
 	}
+	want := ""
+	if test := testBefore(answer, n.Start); test != "" {
+		want = headlinePValues[test]
+	}
 	for _, f := range facts {
-		if !isPValueFact(f) || math.IsNaN(f.Value) || math.IsInf(f.Value, 0) {
+		if !isHeadlinePValue(f) || (want != "" && f.Name != want) || math.IsNaN(f.Value) || math.IsInf(f.Value, 0) {
 			continue
 		}
 		for _, rd := range readings(n) {
@@ -84,8 +150,13 @@ func pValueThreshold(answer string, n prompt.Number, facts []prompt.Fact) bool {
 	return false
 }
 
-func isPValueFact(f prompt.Fact) bool {
-	return strings.Contains(f.Name, "p_value")
+func isHeadlinePValue(f prompt.Fact) bool {
+	for _, name := range headlinePValues {
+		if f.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // hasPCompare reports whether a p-value comparison operator sits immediately
@@ -201,12 +272,35 @@ func prevWord(s string) string {
 	return strings.ToLower(s[j:i])
 }
 
-func factMatches(n prompt.Number, f prompt.Fact, dec bool) bool {
+// factMatches reports whether n restates f. Matching is by value, but a
+// fact only backs numbers that can mean the same kind of thing:
+//   - a date part (units month or day) only backs a number next to a month
+//     name, "month" or "day", never a percent;
+//   - a coordinate (units degrees) only backs a number next to degrees, a
+//     compass point or latitude/longitude, never a percent;
+//   - a year never backs a percent or a number followed by a count noun;
+//   - a percent restates a fraction (units 1) times 100, or a fact already in
+//     percent (units percent, or units with %), or a number quoted from text.
+func factMatches(n prompt.Number, f prompt.Fact, c surround) bool {
 	if math.IsNaN(f.Value) || math.IsInf(f.Value, 0) {
 		return false
 	}
+	switch kindOf(f) {
+	case kindDatePart:
+		if !c.calendar || n.Percent {
+			return false
+		}
+	case kindCoordinate:
+		if !c.coordinate || n.Percent {
+			return false
+		}
+	case kindYear:
+		if c.counted || n.Percent {
+			return false
+		}
+	}
 	mags := []float64{f.Value}
-	if dec && !n.Neg {
+	if c.decrease && !n.Neg {
 		mags = append(mags, math.Abs(f.Value))
 	}
 	reads := readings(n)
@@ -215,7 +309,10 @@ func factMatches(n prompt.Number, f prompt.Fact, dec bool) bool {
 			base := mag * sc
 			for _, rd := range reads {
 				if n.Percent {
-					if samePrec(base*100, rd.val, n.Places) || samePrec(base, rd.val, n.Places) {
+					if fractionFact(f) && samePrec(base*100, rd.val, rd.places) {
+						return true
+					}
+					if percentFact(f) && samePrec(base, rd.val, rd.places) {
 						return true
 					}
 					continue
@@ -227,6 +324,62 @@ func factMatches(n prompt.Number, f prompt.Fact, dec bool) bool {
 		}
 	}
 	return false
+}
+
+type factKind int
+
+const (
+	kindValue factKind = iota
+	kindDatePart
+	kindCoordinate
+	kindYear
+)
+
+func kindOf(f prompt.Fact) factKind {
+	switch f.Units {
+	case "month", "day":
+		return kindDatePart
+	case "degrees":
+		return kindCoordinate
+	case "year":
+		return kindYear
+	}
+	return kindValue
+}
+
+// fractionFact is a value between 0 and 1 by nature, like a p-value or r²,
+// that an answer may give as a percent. Numbers quoted from text count too.
+func fractionFact(f prompt.Fact) bool {
+	return f.Units == "1" || f.Units == "text"
+}
+
+// percentFact is already a percent, so "95%" restates 95.
+func percentFact(f prompt.Fact) bool {
+	u := strings.ToLower(f.Units)
+	return u == "percent" || u == "text" || strings.Contains(u, "%") || strings.Contains(u, "percent")
+}
+
+var (
+	coordBeforeRE    = regexp.MustCompile(`(?i)(?:^|[^a-z])(lat|lon|lng|latitude|longitude|north|south|east|west|degrees?)[^a-z0-9]*$`)
+	coordAfterRE     = regexp.MustCompile(`(?i)^\s*(°|º|deg\b|degrees?\b|[nsew]\b|north\b|south\b|east\b|west\b)`)
+	monthWords       = `january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec`
+	calendarBeforeRE = regexp.MustCompile(`(?i)(?:^|[^a-z])(month|day|` + monthWords + `)[^a-z0-9]*$`)
+	calendarAfterRE  = regexp.MustCompile(`(?i)^[^a-z0-9]{0,2}(` + monthWords + `)\b`)
+)
+
+// coordinateNear reports whether degrees, a compass point or
+// latitude/longitude sits right before or after n, as in "latitude 28.6",
+// "28.6°N" or "77.2 E".
+func coordinateNear(answer string, n prompt.Number) bool {
+	before := answer[max(0, n.Start-24):n.Start]
+	return coordBeforeRE.MatchString(before) || coordAfterRE.MatchString(answer[n.End:])
+}
+
+// calendarNear reports whether a month name sits right before or after n, as
+// in "15 March" or "March 15", or n follows "month" or "day".
+func calendarNear(answer string, n prompt.Number) bool {
+	before := answer[max(0, n.Start-24):n.Start]
+	return calendarBeforeRE.MatchString(before) || calendarAfterRE.MatchString(answer[n.End:])
 }
 
 type reading struct {
@@ -355,22 +508,32 @@ func allZero(s string) bool {
 	return true
 }
 
-var decreaseRE = regexp.MustCompile(`(?i)\b(decreas\w*|declin\w*|drop\w*|fall\w*|fell|reduc\w*|shrink\w*|loss|lost|downward|down by|lower by)\b`)
+var decreaseRE = regexp.MustCompile(`(?i)\b(decreas\w*|declin\w*|drop\w*|fall\w*|fell|reduc\w*|shrink\w*|shrank|loss|lost|los(e|es|ing)|downward\w*|down by|lower by|(went|gone|goes|go|going|come|came|comes) down|cool\w*|colder|drier|dri(ed|es)|drying|negative|weaken\w*|retreat\w*|sank|sink\w*|dip\w*|minus)\b`)
 
+// decreaseBefore reports whether a decrease word comes before start in the
+// same sentence, at most 80 runes back.
 func decreaseBefore(answer string, start int) bool {
 	if start < 0 || start > len(answer) {
 		return false
 	}
-	// 80 runes, not bytes, so a phrase with multi-byte characters still fits.
+	return decreaseRE.MatchString(sentenceBefore(answer, start, 80))
+}
+
+// sentenceBefore returns up to limit runes before start, cut at the start of
+// the sentence that holds start. A period between digits doesn't end one.
+func sentenceBefore(answer string, start, limit int) string {
 	from := start
-	for n := 0; n < 80 && from > 0; n++ {
-		_, size := utf8.DecodeLastRuneInString(answer[:from])
+	for n := 0; n < limit && from > 0; n++ {
+		r, size := utf8.DecodeLastRuneInString(answer[:from])
 		if size < 1 {
+			break
+		}
+		if r == '\n' || ((r == '.' || r == '!' || r == '?') && from < len(answer) && answer[from] == ' ') {
 			break
 		}
 		from -= size
 	}
-	return decreaseRE.MatchString(answer[from:start])
+	return answer[from:start]
 }
 
 type bounds struct {
@@ -419,8 +582,22 @@ func dateBounds(facts []prompt.Fact) bounds {
 	return b
 }
 
-func yearToken(n prompt.Number, b bounds) bool {
+// countNouns follow a count or a measurement, never a year: "2000 cells".
+var countNouns = map[string]bool{
+	"cell": true, "cells": true, "value": true, "values": true, "point": true, "points": true,
+	"sample": true, "samples": true, "month": true, "months": true, "day": true, "days": true,
+	"year": true, "years": true, "step": true, "steps": true, "measurement": true, "measurements": true,
+	"observation": true, "observations": true, "station": true, "stations": true, "pixel": true, "pixels": true,
+	"km": true, "m": true, "mm": true, "cm": true, "kg": true, "people": true, "times": true,
+}
+
+// yearToken reports whether n is a whole year inside the requested range and
+// isn't followed by a count noun.
+func yearToken(answer string, n prompt.Number, b bounds) bool {
 	if !b.ok || n.Percent {
+		return false
+	}
+	if countNouns[nextWord(answer[n.End:])] {
 		return false
 	}
 	for _, rd := range readings(n) {

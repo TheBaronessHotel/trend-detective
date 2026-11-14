@@ -51,7 +51,7 @@ func decodeAnthropic(event sseEvent) (Delta, bool, error) {
 		return Delta{}, false, fmt.Errorf("invalid Anthropic event: %w", err)
 	}
 	if chunk.Error != nil {
-		return Delta{}, false, fmt.Errorf("%w: %s", chunk.Error.kind(), chunk.Error.Message)
+		return Delta{}, false, &ProviderError{Kind: chunk.Error.kind(), Message: chunk.Error.Message}
 	}
 	kind := chunk.Type
 	if kind == "" {

@@ -211,16 +211,17 @@ func TestBuild(t *testing.T) {
 					t.Errorf("unexpected %q in:\n%s", s, got)
 				}
 			}
-			checkShape(t, got)
+			checkShape(t, BuildSentences(tc.series(), tc.grid, tc.variable, tc.dates))
 		})
 	}
 }
 
 // checkShape holds for every overview: 3 to 5 sentences, the causation
 // reminder last, and no em dash.
-func checkShape(t *testing.T, text string) {
+func checkShape(t *testing.T, sentences []string) {
 	t.Helper()
-	n := len(Sentences(text))
+	text := strings.Join(sentences, "")
+	n := len(sentences)
 	if n < 3 || n > maxSentences {
 		t.Errorf("%d sentences, want 3 to %d:\n%s", n, maxSentences, text)
 	}
@@ -244,7 +245,7 @@ func TestBuildCapsAtFiveSentences(t *testing.T) {
 	s.Pettitt = &analysisv1.PettittResult{PValue: 0.01, Significant: true, MeanBefore: 1, MeanAfter: 2}
 	g := &analysisv1.GridAnalysis{Layers: []*analysisv1.GridLayer{{SlopesPerDecade: []float64{1}, Significant: []bool{true}}}}
 	got := Build(s, g, rain, span)
-	if n := len(Sentences(got)); n != maxSentences {
+	if n := len(BuildSentences(s, g, rain, span)); n != maxSentences {
 		t.Fatalf("%d sentences, want %d:\n%s", n, maxSentences, got)
 	}
 	if !strings.Contains(got, "Caveat: Only 20 years of data.") || !strings.Contains(got, "Pettitt") || strings.Contains(got, "heatmap") {
@@ -260,25 +261,79 @@ func TestBuildIsDeterministic(t *testing.T) {
 	}
 }
 
-func TestSentences(t *testing.T) {
+func TestBuildSentences(t *testing.T) {
+	s := upSeries()
+	// A warning with a period of its own stays one sentence.
+	s.Warnings = []string{"Gap in 2015. Sensor change in 2016"}
+	parts := BuildSentences(s, nil, rain, span)
+	if got, want := strings.Join(parts, ""), Build(s, nil, rain, span); got != want {
+		t.Fatalf("parts don't join to Build:\n%q\n%q", got, want)
+	}
+	for i, p := range parts {
+		last := i == len(parts)-1
+		if strings.HasSuffix(p, " ") == last {
+			t.Errorf("part %d %q: want a trailing space on all but the last", i, p)
+		}
+	}
+	found := false
+	for _, p := range parts {
+		if strings.Contains(p, "Gap in 2015. Sensor change in 2016") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("the warning was split: %q", parts)
+	}
+}
+
+// The probe cases from the review: p at the threshold and intervals near zero.
+func TestBuildRoundingNearThresholds(t *testing.T) {
+	v := &narratorv1.VariableContext{Name: "Precipitation", Units: "mm/day"}
 	tests := []struct {
-		in   string
+		name string
+		reg  *analysisv1.RegressionResult
 		want []string
+		bad  []string
 	}{
-		{"", nil},
-		{"One.", []string{"One."}},
-		{"One. Two (p = 0.5). Three.", []string{"One. ", "Two (p = 0.5). ", "Three."}},
-		{"Rose by 0.42 mm. Then fell.", []string{"Rose by 0.42 mm. ", "Then fell."}},
-		{"Caveats: a; b. lower stays.", []string{"Caveats: a; b. lower stays."}},
+		{
+			name: "p just below alpha",
+			reg:  &analysisv1.RegressionResult{SlopePerDecade: 0.12, SlopeCiLow: 0.001, SlopeCiHigh: 0.24, PValue: 0.0496, Significant: true},
+			want: []string{"(p = 0.0496, below the significance level of 0.05)", "runs from 0.001 to 0.240"},
+			bad:  []string{"p = 0.05,"},
+		},
+		{
+			name: "p just above alpha, interval crosses zero",
+			reg:  &analysisv1.RegressionResult{SlopePerDecade: 0.12, SlopeCiLow: -0.001, SlopeCiHigh: 0.24, PValue: 0.0504},
+			want: []string{"(p = 0.0504, above the significance level of 0.05)", "runs from -0.001 to 0.240"},
+			bad:  []string{"from 0.00 "},
+		},
+		{
+			name: "small lower bound",
+			reg:  &analysisv1.RegressionResult{SlopePerDecade: 1.2, SlopeCiLow: -0.04, SlopeCiHigh: 2.4, PValue: 0.06},
+			want: []string{"rose by about 1.20 mm/day per decade", "runs from -0.04 to 2.40"},
+			bad:  []string{"from 0.0 "},
+		},
+		{
+			name: "no change",
+			reg:  &analysisv1.RegressionResult{SlopePerDecade: 0, SlopeCiLow: -0.3, SlopeCiHigh: 0.3, PValue: 1},
+			want: []string{"shows no change (0.00 mm/day per decade), and the 95% confidence interval"},
+		},
 	}
 	for _, tc := range tests {
-		got := Sentences(tc.in)
-		if strings.Join(got, "|") != strings.Join(tc.want, "|") || len(got) != len(tc.want) {
-			t.Errorf("Sentences(%q) = %q, want %q", tc.in, got, tc.want)
-		}
-		if strings.Join(got, "") != tc.in {
-			t.Errorf("Sentences(%q) does not join back", tc.in)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			s := &analysisv1.SeriesAnalysis{Units: "mm/day", Alpha: 0.05, NValid: 240, Regression: tc.reg}
+			got := Build(s, nil, v, nil)
+			for _, w := range tc.want {
+				if !strings.Contains(got, w) {
+					t.Errorf("missing %q in:\n%s", w, got)
+				}
+			}
+			for _, b := range tc.bad {
+				if strings.Contains(got, b) {
+					t.Errorf("unwanted %q in:\n%s", b, got)
+				}
+			}
+		})
 	}
 }
 
@@ -294,10 +349,19 @@ func TestNumberFormatting(t *testing.T) {
 		{"interval shares decimals", num(0.7377, decimalsFor(0.4213, 0.7377)), "0.74"},
 		{"zero skipped for decimals", num(0.5, decimalsFor(0, 0.5)), "0.50"},
 		{"negative zero", num(-0.0001, 2), "0.00"},
-		{"tiny p", pText(0.00002), "p < 0.001"},
-		{"p capped at three decimals", pText(0.0031), "p = 0.003"},
-		{"p drops trailing zeros", pText(0.020), "p = 0.02"},
-		{"ordinary p", pText(0.41), "p = 0.41"},
+		{"tiny p", pText(0.00002, 0.05), "p < 0.001"},
+		{"p capped at three decimals", pText(0.0031, 0.05), "p = 0.003"},
+		{"p drops trailing zeros", pText(0.020, 0.05), "p = 0.02"},
+		{"ordinary p", pText(0.41, 0.05), "p = 0.41"},
+		{"p just below alpha keeps its digits", pText(0.0496, 0.05), "p = 0.0496"},
+		{"p just above alpha keeps its digits", pText(0.0504, 0.05), "p = 0.0504"},
+		{"p very close to alpha", pText(0.04999, 0.05), "p = 0.04999"},
+		{"p equal to alpha", pText(0.05, 0.05), "p = 0.05"},
+		{"p rounding across alpha 0.01", pText(0.0104, 0.01), "p = 0.0104"},
+		{"no alpha", pText(0.0496, 0), "p = 0.05"},
+		{"bound keeps a digit", num(-0.04, keepBounds(1, -0.04, 2.4)), "-0.04"},
+		{"bounds already fine", num(0.11, keepBounds(2, 0.11, 0.43)), "0.11"},
+		{"tiny bound", num(-0.001, keepBounds(2, -0.001, 0.24)), "-0.001"},
 		{"lowercase a common word", lowerFirst("Precipitation"), "precipitation"},
 		{"keep an acronym", lowerFirst("NO2 column"), "NO2 column"},
 		{"keep a chemical formula", lowerFirst("O3"), "O3"},

@@ -35,6 +35,14 @@ const (
 // Build returns the overview. Any argument may be nil. It never fails: when a
 // test is missing, the text says so instead of guessing.
 func Build(series *analysisv1.SeriesAnalysis, grid *analysisv1.GridAnalysis, variable *narratorv1.VariableContext, dates *commonv1.DateRange) string {
+	return strings.Join(BuildSentences(series, grid, variable, dates), "")
+}
+
+// BuildSentences returns the overview one sentence per element, each with
+// its trailing space except the last, so joining them gives Build's text.
+// The server streams one element per text_delta. Splitting Build's text
+// instead would break a warning that holds a period of its own.
+func BuildSentences(series *analysisv1.SeriesAnalysis, grid *analysisv1.GridAnalysis, variable *narratorv1.VariableContext, dates *commonv1.DateRange) []string {
 	o := newOverview(series, variable, dates)
 	required := []string{}
 	if t, ok := o.trend(); ok {
@@ -53,30 +61,10 @@ func Build(series *analysisv1.SeriesAnalysis, grid *analysisv1.GridAnalysis, var
 		}
 	}
 	all := append(append(required, extra...), cause)
-	return strings.Join(all, " ")
-}
-
-// Sentences splits an overview into sentences, each with its trailing space
-// except the last, so that joining them gives the text back. The server
-// streams one sentence per text_delta.
-func Sentences(text string) []string {
-	var out []string
-	start := 0
-	for i := 0; i+1 < len(text); i++ {
-		if (text[i] == '.' || text[i] == '?' || text[i] == '!') && text[i+1] == ' ' && i+2 < len(text) && isSentenceStart(text[i+2:]) {
-			out = append(out, text[start:i+2])
-			start = i + 2
-		}
+	for i := range all[:len(all)-1] {
+		all[i] += " "
 	}
-	if start < len(text) {
-		out = append(out, text[start:])
-	}
-	return out
-}
-
-func isSentenceStart(s string) bool {
-	r, _ := utf8.DecodeRuneInString(s)
-	return unicode.IsUpper(r)
+	return all
 }
 
 type overview struct {
@@ -149,11 +137,15 @@ func (o *overview) rateSentence(t trendFacts) string {
 	var b strings.Builder
 	b.WriteString(o.periodPrefix())
 	fmt.Fprintf(&b, "the average %s in the selected region%s ", o.name, o.fieldNote())
+	hasCI := finite(t.low) && finite(t.high) && t.low <= t.high && (t.low != 0 || t.high != 0)
 	dec := decimalsFor(t.slope, t.low, t.high)
+	if hasCI {
+		dec = keepBounds(dec, t.low, t.high)
+	}
 	amount := num(math.Abs(t.slope), dec) + " " + o.perDecade()
 	switch {
 	case t.slope == 0:
-		fmt.Fprintf(&b, "shows no change, %s", amount)
+		fmt.Fprintf(&b, "shows no change (%s)", amount)
 	case t.slope > 0:
 		fmt.Fprintf(&b, "rose by about %s", amount)
 	default:
@@ -162,7 +154,7 @@ func (o *overview) rateSentence(t trendFacts) string {
 	if t.method != methodRegression {
 		fmt.Fprintf(&b, " (%s)", t.method)
 	}
-	if finite(t.low) && finite(t.high) && t.low <= t.high && (t.low != 0 || t.high != 0) {
+	if hasCI {
 		fmt.Fprintf(&b, ", and the %s for that rate runs from %s to %s", o.ciName(), num(t.low, dec), num(t.high, dec))
 	}
 	b.WriteString(".")
@@ -179,7 +171,7 @@ func (o *overview) significanceSentence(t trendFacts) string {
 		b.WriteString("This trend is not statistically significant")
 	}
 	if finite(t.p) {
-		fmt.Fprintf(&b, " (%s%s)", pText(t.p), o.alphaComparison(t.p, t.significant))
+		fmt.Fprintf(&b, " (%s%s)", pText(t.p, o.alpha), o.alphaComparison(t.p, t.significant))
 	}
 	if !t.significant {
 		b.WriteString(", so natural ups and downs could explain it")
@@ -202,7 +194,7 @@ func (o *overview) agreementClause(t trendFacts) string {
 	}
 	p := ""
 	if finite(mk.GetPValue()) {
-		p = " (" + pText(mk.GetPValue()) + ")"
+		p = " (" + pText(mk.GetPValue(), o.alpha) + ")"
 	}
 	const mkName = "the Mann-Kendall test, which is less sensitive to extreme months,"
 	switch {
@@ -265,7 +257,7 @@ func (o *overview) changePointSentence() string {
 		fmt.Fprintf(&b, " around %s %d", t.Month(), t.Year())
 	}
 	if finite(pt.GetPValue()) {
-		fmt.Fprintf(&b, " (%s)", pText(pt.GetPValue()))
+		fmt.Fprintf(&b, " (%s)", pText(pt.GetPValue(), o.alpha))
 	}
 	before, after := pt.GetMeanBefore(), pt.GetMeanAfter()
 	if finite(before) && finite(after) && before != after {
@@ -402,17 +394,50 @@ func (o *overview) ciName() string {
 	return "confidence interval"
 }
 
-// pText is "p = 0.012", or "p < 0.001" for tiny values. It shows at most
-// three decimals, without trailing zeros.
-func pText(p float64) string {
+// pText is "p = 0.012", or "p < 0.001" for tiny values. It shows up to
+// three decimals, without trailing zeros, and more when the rounded value
+// would equal alpha or land on its other side: p = 0.0496 with alpha 0.05
+// reads "p = 0.0496", never "p = 0.05". An alpha outside (0, 1) is ignored.
+func pText(p, alpha float64) string {
 	if p < 0.001 {
 		return "p < 0.001"
 	}
-	s := num(p, min(decimalsFor(p), 3))
+	dec := min(decimalsFor(p), 3)
+	s := trimZeros(num(p, dec))
+	if alpha > 0 && alpha < 1 {
+		for dec < 6 {
+			v, err := strconv.ParseFloat(s, 64)
+			if err != nil || (v != alpha && (v < alpha) == (p < alpha)) {
+				break
+			}
+			dec++
+			s = trimZeros(num(p, dec))
+		}
+	}
+	return "p = " + s
+}
+
+func trimZeros(s string) string {
 	if strings.Contains(s, ".") {
 		s = strings.TrimRight(strings.TrimRight(s, "0"), ".")
 	}
-	return "p = " + s
+	return s
+}
+
+// keepBounds raises dec until each nonzero bound of an interval keeps a
+// significant digit, so an interval like -0.04 to 2.4 doesn't read "0.0 to
+// 2.4" and hide that it crosses zero. It stops at 6 decimals.
+func keepBounds(dec int, bounds ...float64) int {
+	for _, v := range bounds {
+		if !finite(v) || v == 0 {
+			continue
+		}
+		need := -int(math.Floor(math.Log10(math.Abs(v))))
+		if strings.Trim(num(v, dec), "-0.") == "" {
+			dec = max(dec, min(need, 6))
+		}
+	}
+	return dec
 }
 
 // decimalsFor returns how many decimals show the first value that is finite

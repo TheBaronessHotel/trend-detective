@@ -15,6 +15,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/netip"
 	"net/url"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	analysisv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/analysis/v1"
 	narratorv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/narrator/v1"
 	"github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/narrator/v1/narratorv1connect"
+	"github.com/TheBaronessHotel/trend-detective/services/narrator/internal/egress"
 	"github.com/TheBaronessHotel/trend-detective/services/narrator/internal/llm"
 	"github.com/TheBaronessHotel/trend-detective/services/narrator/internal/overview"
 	"github.com/TheBaronessHotel/trend-detective/services/narrator/internal/prompt"
@@ -118,7 +120,7 @@ func (s *Server) Narrate(ctx context.Context, req *narratorv1.NarrateRequest, st
 	s.log.Info(ctx, "narrated",
 		"provider", req.GetLlm().GetProvider().String(),
 		"model", res.model,
-		"overview", req.GetQuestion() == "",
+		"overview", strings.TrimSpace(req.GetQuestion()) == "",
 		"chars", res.chars,
 		"unverified", res.unverified,
 		"duration_ms", time.Since(start).Milliseconds(),
@@ -147,12 +149,14 @@ func (s *Server) narrate(ctx context.Context, req *narratorv1.NarrateRequest, ap
 	if err := validateLLM(cfg); err != nil {
 		return outcome{}, err
 	}
-	if !hostAllowed(cfg.GetBaseUrl(), s.allowlist) {
-		return outcome{}, connect.NewError(connect.CodePermissionDenied,
-			"This server doesn't allow that llm.base_url host. Ask the operator to add it to NARRATOR_LLM_BASE_URL_ALLOWLIST.")
+	if err := checkBaseURL(cfg.GetBaseUrl(), s.allowlist); err != nil {
+		return outcome{}, err
 	}
 	if apiKey == "" && !isLocalBaseURL(cfg.GetBaseUrl()) {
 		return outcome{}, connect.NewError(connect.CodeUnauthenticated, msgNeedKey)
+	}
+	if apiKey != "" && strings.HasPrefix(strings.ToLower(cfg.GetBaseUrl()), "http:") && !isLocalBaseURL(cfg.GetBaseUrl()) {
+		return outcome{}, invalid("Use https for a remote llm.base_url, so the key isn't sent in clear text.")
 	}
 
 	in, err := s.load(ctx, req, apiKey)
@@ -240,8 +244,10 @@ func (s *Server) narrateTemplate(ctx context.Context, req *narratorv1.NarrateReq
 	if err != nil {
 		return outcome{}, err
 	}
-	text := overview.Build(in.Series, in.Grid, req.GetVariable(), req.GetDates())
-	for _, sentence := range overview.Sentences(text) {
+	sentences := overview.BuildSentences(in.Series, in.Grid, req.GetVariable(), req.GetDates())
+	chars := 0
+	for _, sentence := range sentences {
+		chars += len(sentence)
 		if err := ctx.Err(); err != nil {
 			return outcome{}, err
 		}
@@ -255,7 +261,7 @@ func (s *Server) narrateTemplate(ctx context.Context, req *narratorv1.NarrateReq
 	if err := stream.Send(done); err != nil {
 		return outcome{}, err
 	}
-	return outcome{model: overview.Model, chars: len(text)}, nil
+	return outcome{model: overview.Model, chars: chars}, nil
 }
 
 func textDelta(text string) *narratorv1.NarrateResponse {
@@ -314,7 +320,8 @@ func validateLLM(cfg *narratorv1.LlmConfig) error {
 // isLocalBaseURL reports whether base points at a server on this machine or
 // network, like Ollama or LM Studio, which usually needs no key: a loopback
 // or private address, localhost, host.docker.internal, or a single-label
-// host such as a compose service name.
+// host such as a compose service name. Link-local addresses are not local
+// here: they hold the cloud metadata service and are never called.
 func isLocalBaseURL(base string) bool {
 	if base == "" {
 		return false
@@ -324,17 +331,81 @@ func isLocalBaseURL(base string) bool {
 		return false
 	}
 	host := strings.ToLower(u.Hostname())
-	if host == "" {
-		return false
-	}
 	if addr, err := netip.ParseAddr(host); err == nil {
-		return addr.IsLoopback() || addr.IsPrivate() || addr.IsLinkLocalUnicast()
+		addr = addr.Unmap()
+		return (addr.IsLoopback() || addr.IsPrivate()) && !egress.Forbidden(addr)
 	}
-	if host == "localhost" || strings.HasSuffix(host, ".localhost") || host == "host.docker.internal" {
-		return true
+	return egress.LocalName(host)
+}
+
+// internalServices are the compose services next to the narrator. A
+// base_url may only name one when the allowlist lists it by name, so an
+// empty allowlist can't be used to reach SeaweedFS or NATS.
+var internalServices = map[string]bool{
+	"seaweedfs": true, "nats": true, "redis": true, "gateway": true, "narrator": true,
+	"bootstrap": true, "ingest": true, "preprocess": true, "analysis": true, "web": true,
+}
+
+// msgForbiddenHost answers a base_url this server never calls.
+const msgForbiddenHost = "This server never calls that llm.base_url address. Use the provider's public URL or a local LLM server."
+
+// checkBaseURL refuses a base_url this server must not call: a forbidden IP
+// literal such as the cloud metadata address, an internal compose service
+// the allowlist doesn't name, or a host outside a non-empty allowlist. The
+// dialer checks the resolved address again (see egress.Guard).
+func checkBaseURL(base string, allowlist []string) error {
+	if base == "" {
+		return nil
 	}
-	// A bare name only resolves inside a local network, never on the internet.
-	return !strings.Contains(host, ".")
+	u, err := url.Parse(base)
+	if err != nil {
+		return invalid("llm.base_url must be an http or https URL, like http://localhost:11434/v1")
+	}
+	host := strings.ToLower(u.Hostname())
+	if addr, err := netip.ParseAddr(host); err == nil && egress.Forbidden(addr) {
+		return connect.NewError(connect.CodePermissionDenied, msgForbiddenHost)
+	}
+	if internalServices[host] && !listedExactly(u, allowlist) {
+		return connect.NewError(connect.CodePermissionDenied, msgForbiddenHost)
+	}
+	if !hostAllowed(base, allowlist) {
+		return connect.NewError(connect.CodePermissionDenied,
+			"This server doesn't allow that llm.base_url host. Ask the operator to add it to NARRATOR_LLM_BASE_URL_ALLOWLIST.")
+	}
+	return nil
+}
+
+// listedExactly reports whether the allowlist names u's host, or host:port,
+// without a wildcard.
+func listedExactly(u *url.URL, allowlist []string) bool {
+	host, hostPort := strings.ToLower(u.Hostname()), strings.ToLower(u.Host)
+	for _, entry := range allowlist {
+		if entry == host || entry == hostPort {
+			return true
+		}
+	}
+	return false
+}
+
+// HostListed reports whether host matches an allowlist entry, ignoring any
+// port in the entry. An empty allowlist lists nothing. egress.Guard uses it
+// to let a listed name resolve to an internal address.
+func HostListed(host string, allowlist []string) bool {
+	host = strings.ToLower(host)
+	for _, entry := range allowlist {
+		if h, _, err := net.SplitHostPort(entry); err == nil {
+			entry = h
+		}
+		switch {
+		case strings.HasPrefix(entry, "*."):
+			if strings.HasSuffix(host, entry[1:]) {
+				return true
+			}
+		case entry == host:
+			return true
+		}
+	}
+	return false
 }
 
 // ParseAllowlist splits a comma-separated host list, like
@@ -353,6 +424,7 @@ func ParseAllowlist(s string) []string {
 // hostAllowed reports whether base may be called under allowlist. An entry
 // matches the URL's hostname exactly, or host:port when it has a port, and
 // "*.example.com" matches any subdomain of example.com but not example.com.
+// An entry without a port allows every port of that host.
 func hostAllowed(base string, allowlist []string) bool {
 	if base == "" || len(allowlist) == 0 {
 		return true

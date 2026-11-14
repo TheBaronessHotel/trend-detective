@@ -44,8 +44,8 @@ func NewBuilder() Builder { return builder{} }
 // An empty question asks for an overview. Every number written into the facts
 // block is returned as a Fact. Dates are also published as dates.start_year
 // and dates.end_year so the verifier can allow years inside the request.
-// Numbers in the user question are published as question.number. They are not
-// written into the facts block.
+// Numbers in the user's question are not facts: an answer that repeats them
+// is checked like any other number.
 //
 // When the browser sends the overview back as the first turn, that turn is an
 // assistant message with no user message before it. Build inserts the overview
@@ -62,8 +62,7 @@ func (builder) Build(in Input) (llm.Request, []Fact, error) {
 	years, hasYears := d.dates(in.Req.GetDates())
 	u := unitsOf(in.Series, in.Req.GetVariable())
 	d.series(in.Series, u, years, hasYears)
-	d.grid(in.Grid)
-	d.questionNumbers(in.Req.GetQuestion())
+	d.grid(in.Grid, u)
 
 	msgs := ensureUserFirst(mapHistory(in.Req.GetHistory()))
 	msgs = append(msgs, llm.Message{Role: llm.RoleUser, Text: userText(in.Req.GetQuestion())})
@@ -134,18 +133,6 @@ func (d *doc) prose(name, text string) {
 		d.facts = append(d.facts, Fact{Name: fmt.Sprintf("%s#%d", name, i), Value: n.Value, Units: "text"})
 		if n.HasAlt {
 			d.facts = append(d.facts, Fact{Name: fmt.Sprintf("%s#%d.alt", name, i), Value: n.Alt, Units: "text"})
-		}
-	}
-}
-
-func (d *doc) questionNumbers(q string) {
-	if strings.TrimSpace(q) == "" {
-		return
-	}
-	for _, n := range ScanNumbers(q) {
-		d.facts = append(d.facts, Fact{Name: "question.number", Value: n.Value, Units: "question"})
-		if n.HasAlt {
-			d.facts = append(d.facts, Fact{Name: "question.number", Value: n.Alt, Units: "question"})
 		}
 	}
 }
@@ -467,7 +454,9 @@ func (d *doc) warnings(ws []string) {
 	}
 }
 
-func (d *doc) grid(g *analysisv1.GridAnalysis) {
+// grid writes the spatial facts. fallback is the series units, used when the
+// grid doesn't name its own.
+func (d *doc) grid(g *analysisv1.GridAnalysis, fallback string) {
 	if g == nil {
 		return
 	}
@@ -511,6 +500,9 @@ func (d *doc) grid(g *analysisv1.GridAnalysis) {
 		d.lineNum("grid.valid_steps_max", "count", float64(mx))
 	}
 	u := g.GetUnits()
+	if u == "" {
+		u = fallback
+	}
 	for i, layer := range g.GetLayers() {
 		if layer == nil {
 			continue

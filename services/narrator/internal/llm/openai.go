@@ -56,7 +56,7 @@ func decodeOpenAI(event sseEvent) (Delta, bool, error) {
 		return Delta{}, false, fmt.Errorf("invalid OpenAI event: %w", err)
 	}
 	if chunk.Error != nil {
-		return Delta{}, false, fmt.Errorf("%w: %s", chunk.Error.kind(), chunk.Error.Message)
+		return Delta{}, false, &ProviderError{Kind: chunk.Error.kind(), Message: chunk.Error.Message}
 	}
 	d := Delta{Model: chunk.Model}
 	for _, choice := range chunk.Choices {

@@ -35,13 +35,16 @@ type chunk struct {
 }
 
 // ScanNumbers extracts numbers from free text, left to right.
-// It accepts integers, decimals, comma decimals, signs, percents, scientific
-// notation (1.2e-3 and 1.2×10^-3), and ranges such as 0.1–0.3 (both ends).
+// It accepts integers, decimals, comma decimals, signs, percents ("5%",
+// "5 percent", "5 per cent"), scientific notation (1.2e-3, 1.2×10^-3 and
+// 1.2×10⁻³), and ranges such as 0.1–0.3 (both ends).
 // A hyphen, an en dash or a unicode minus is a minus sign when a digit does
 // not precede it, so "–0.21" and "−0.21" are negative. Between digits those
 // marks stay a range.
-// A token glued to a letter is not a number: "MERRA-2", "PM2.5", "CO2",
-// "NO2" and "20th" are skipped. "GPM" has no digit, so it contributes nothing.
+// A token that follows a letter is part of a name, not a number: "MERRA-2",
+// "PM2.5", "CO2" and "NO2" are skipped. Letters after a token are a unit and
+// the number is kept ("5km", "0.5mm"), except an ordinal or decade suffix
+// ("20th", "1990s"). "GPM" has no digit, so it contributes nothing.
 func ScanNumbers(s string) []Number {
 	var out []Number
 	for i := 0; i < len(s); {
@@ -61,17 +64,25 @@ func ScanNumbers(s string) []Number {
 	return out
 }
 
-// gluedToLetters reports whether the token touches a letter, including a
-// sign dash that continues an identifier such as MERRA-2.
+// gluedToLetters reports whether the token is part of a name: a letter right
+// before it, including before a sign dash as in MERRA-2, or an ordinal or
+// decade suffix right after it, as in 20th or 1990s. Other letters after a
+// number are a unit, so "5km" still counts as 5.
 func gluedToLetters(s string, n Number) bool {
 	if prev, ok := prevRune(s, n.Start); ok && unicode.IsLetter(prev) {
 		return true
 	}
-	if n.End < len(s) {
-		r, _ := utf8.DecodeRuneInString(s[n.End:])
-		if unicode.IsLetter(r) {
-			return true
+	j := n.End
+	for j < len(s) {
+		r, size := utf8.DecodeRuneInString(s[j:])
+		if !unicode.IsLetter(r) {
+			break
 		}
+		j += size
+	}
+	switch strings.ToLower(s[n.End:j]) {
+	case "st", "nd", "rd", "th", "s":
+		return true
 	}
 	return false
 }
@@ -185,7 +196,12 @@ func readChunks(s string, i int) ([]chunk, int, bool) {
 	}
 	var chunks []chunk
 	j := i
-	if s[j] == '.' || s[j] == ',' {
+	if s[j] == ',' {
+		// A number never starts with a comma: in "0.1,0.3" the comma
+		// separates two numbers.
+		return nil, i, false
+	}
+	if s[j] == '.' {
 		sep := s[j]
 		j++
 		ds, nj, ok := readDigits(s, j)
@@ -371,6 +387,9 @@ func readTimes10(s string, i int) (int, int, bool) {
 		return 0, i, false
 	}
 	j += 2
+	if e, end, ok := readSuperscript(s, j); ok {
+		return e, end, true
+	}
 	j = skipSpace(s, j)
 	if j >= len(s) || s[j] != '^' {
 		return 0, i, false
@@ -401,6 +420,56 @@ func readTimes10(s string, i int) (int, int, bool) {
 	return sign * n, nj, true
 }
 
+// superscriptDigit maps ⁰¹²³⁴⁵⁶⁷⁸⁹ to 0-9.
+func superscriptDigit(r rune) (int, bool) {
+	switch r {
+	case '\u2070':
+		return 0, true
+	case '\u00b9':
+		return 1, true
+	case '\u00b2':
+		return 2, true
+	case '\u00b3':
+		return 3, true
+	}
+	if r >= '\u2074' && r <= '\u2079' {
+		return int(r-'\u2074') + 4, true
+	}
+	return 0, false
+}
+
+// readSuperscript reads an exponent written in superscript, like the ⁻³ in
+// 1.2×10⁻³.
+func readSuperscript(s string, i int) (int, int, bool) {
+	j := i
+	sign := 1
+	if j < len(s) {
+		r, size := utf8.DecodeRuneInString(s[j:])
+		switch r {
+		case '\u207b':
+			sign = -1
+			j += size
+		case '\u207a':
+			j += size
+		}
+	}
+	n, digits := 0, 0
+	for j < len(s) && digits < 4 {
+		r, size := utf8.DecodeRuneInString(s[j:])
+		d, ok := superscriptDigit(r)
+		if !ok {
+			break
+		}
+		n = n*10 + d
+		digits++
+		j += size
+	}
+	if digits == 0 {
+		return 0, i, false
+	}
+	return sign * n, j, true
+}
+
 func skipSpace(s string, i int) int {
 	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
 		i++
@@ -408,6 +477,8 @@ func skipSpace(s string, i int) int {
 	return i
 }
 
+// readPercent reads "%", " %", " percent", " per cent" or " pct" after a
+// number. The word must end there, so "percentage points" is not a percent.
 func readPercent(s string, i int) (int, bool) {
 	j := i
 	if j < len(s) && s[j] == ' ' {
@@ -415,6 +486,21 @@ func readPercent(s string, i int) (int, bool) {
 	}
 	if j < len(s) && s[j] == '%' {
 		return j + 1, true
+	}
+	if j == i {
+		return i, false
+	}
+	for _, word := range []string{"percent", "per cent", "pct"} {
+		end := j + len(word)
+		if end > len(s) || !strings.EqualFold(s[j:end], word) {
+			continue
+		}
+		if end < len(s) {
+			if r, _ := utf8.DecodeRuneInString(s[end:]); unicode.IsLetter(r) {
+				continue
+			}
+		}
+		return end, true
 	}
 	return i, false
 }

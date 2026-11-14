@@ -138,6 +138,36 @@ func TestScanNumbers(t *testing.T) {
 			want: []float64{3},
 			raw:  []string{"3"},
 		},
+		{
+			name:    "percent words",
+			in:      "20 percent, 3.5 per cent, 7 PCT and 4 percentage points",
+			want:    []float64{20, 3.5, 7, 4},
+			percent: []bool{true, true, true, false},
+			raw:     []string{"20 percent", "3.5 per cent", "7 PCT", "4"},
+		},
+		{
+			name: "superscript exponent",
+			in:   "1.2 \u00d7 10\u207b\u00b3 and 4\u00d710\u2075",
+			want: []float64{0.0012, 400000},
+			sci:  []bool{true, true},
+			raw:  []string{"1.2 \u00d7 10\u207b\u00b3", "4\u00d710\u2075"},
+		},
+		{
+			name: "units glued after a number are still numbers",
+			in:   "5km, 0.5mm/day and 12C",
+			want: []float64{5, 0.5, 12},
+			raw:  []string{"5", "0.5", "12"},
+		},
+		{
+			name: "ordinal and decade suffixes are not numbers",
+			in:   "the 1st, 2nd, 3rd, 11th and the 1990s",
+		},
+		{
+			name: "a comma between two numbers is not a decimal",
+			in:   "0.1,0.3",
+			want: []float64{0.1, 0.3},
+			raw:  []string{"0.1", "0.3"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

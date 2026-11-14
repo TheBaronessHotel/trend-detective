@@ -19,6 +19,7 @@ import (
 	narratorv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/narrator/v1"
 	"github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/narrator/v1/narratorv1connect"
 	"github.com/TheBaronessHotel/trend-detective/internal/blob"
+	"github.com/TheBaronessHotel/trend-detective/services/narrator/internal/egress"
 	"github.com/TheBaronessHotel/trend-detective/services/narrator/internal/llm"
 	"github.com/TheBaronessHotel/trend-detective/services/narrator/internal/overview"
 	"github.com/TheBaronessHotel/trend-detective/services/narrator/internal/prompt"
@@ -38,9 +39,24 @@ const (
 type fakeLoader struct {
 	docs map[string]proto.Message
 	errs map[string]error
+	// block makes Load wait for ctx, then fail like the object store does,
+	// and close stopped when it returns.
+	block   bool
+	entered chan struct{}
+	stopped chan struct{}
 }
 
-func (f *fakeLoader) Load(_ context.Context, ref *commonv1.BlobRef, msg proto.Message) error {
+func (f *fakeLoader) Load(ctx context.Context, ref *commonv1.BlobRef, msg proto.Message) error {
+	if f.block {
+		if f.entered != nil {
+			close(f.entered)
+		}
+		<-ctx.Done()
+		if f.stopped != nil {
+			close(f.stopped)
+		}
+		return &StorageError{Err: ctx.Err()}
+	}
 	if err, ok := f.errs[ref.GetKey()]; ok {
 		return err
 	}
@@ -194,6 +210,8 @@ type env struct {
 	client   narratorv1connect.NarratorServiceClient
 	// allowlist is passed as Deps.BaseURLAllowlist.
 	allowlist []string
+	// timeout is Deps.Timeout. Zero means 5s.
+	timeout time.Duration
 }
 
 func newEnv(t *testing.T) *env {
@@ -223,7 +241,11 @@ func (e *env) start(t *testing.T) {
 	t.Helper()
 	var log logging.Logger
 	e.logs, log = newCapture()
-	srv, err := New(Deps{Loader: e.loader, Builder: e.builder, Verifier: e.verifier, NewClient: e.factory.New, Log: log, Timeout: 5 * time.Second, BaseURLAllowlist: e.allowlist})
+	timeout := e.timeout
+	if timeout == 0 {
+		timeout = 5 * time.Second
+	}
+	srv, err := New(Deps{Loader: e.loader, Builder: e.builder, Verifier: e.verifier, NewClient: e.factory.New, Log: log, Timeout: timeout, BaseURLAllowlist: e.allowlist})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -666,7 +688,7 @@ func TestNarrateWithoutKeyStreamsTemplateOverview(t *testing.T) {
 			if got := strings.Join(r.texts, ""); got != want {
 				t.Fatalf("text = %q\nwant %q", got, want)
 			}
-			if wantOrder := strings.Repeat("t", len(overview.Sentences(want))) + "d"; r.order != wantOrder || len(r.texts) < 3 {
+			if wantOrder := strings.Repeat("t", len(overview.BuildSentences(series, wantGrid, req.GetVariable(), req.GetDates()))) + "d"; r.order != wantOrder || len(r.texts) < 3 {
 				t.Errorf("event order = %q, want %q (one delta per sentence)", r.order, wantOrder)
 			}
 			if r.done.GetModel() != "template" || len(r.done.GetUnverifiedNumbers()) != 0 {
@@ -773,6 +795,10 @@ func TestIsLocalBaseURL(t *testing.T) {
 		{"http://host.docker.internal:11434/v1", true},
 		{"http://ollama:11434/v1", true},
 		{"http://lm.localhost:1234", true},
+		{"http://169.254.169.254/latest", false},
+		{"http://[fe80::1]:11434", false},
+		{"http://[::ffff:127.0.0.1]:11434", true},
+		{"http://localhost.:11434", false},
 		{"://bad", false},
 	}
 	for _, tc := range tests {
@@ -872,7 +898,17 @@ func TestNarrateBaseURLAllowlist(t *testing.T) {
 		key     string
 		want    connect.Code // CodeOf(nil) is 0, meaning success
 	}{
-		{name: "empty allowlist allows any host", allow: nil, baseURL: "http://seaweedfs:8333", key: secretKey},
+		{name: "empty allowlist allows any host", allow: nil, baseURL: "http://ollama:11434/v1", key: secretKey},
+		{name: "empty allowlist still refuses metadata", allow: nil, baseURL: "http://169.254.169.254/latest", key: secretKey, want: connect.CodePermissionDenied},
+		{name: "metadata as a mapped IPv6", allow: nil, baseURL: "http://[::ffff:169.254.169.254]/v1", key: secretKey, want: connect.CodePermissionDenied},
+		{name: "IPv6 link-local refused", allow: nil, baseURL: "http://[fe80::1]:11434/v1", key: secretKey, want: connect.CodePermissionDenied},
+		{name: "AWS IPv6 metadata refused", allow: []string{"fd00:ec2::254"}, baseURL: "http://[fd00:ec2::254]/v1", key: secretKey, want: connect.CodePermissionDenied},
+		{name: "empty allowlist refuses compose services", allow: nil, baseURL: "http://seaweedfs:8888/v1", want: connect.CodePermissionDenied},
+		{name: "compose service listed by name", allow: []string{"nats"}, baseURL: "http://nats:8222/v1"},
+		{name: "compose service not matched by a wildcard", allow: []string{"*.example.org"}, baseURL: "http://redis:6379/v1", want: connect.CodePermissionDenied},
+		{name: "key over plain http to a public host", allow: nil, baseURL: "http://api.openai.com/v1", key: secretKey, want: connect.CodeInvalidArgument},
+		{name: "key over plain http to a local host", allow: nil, baseURL: "http://192.168.1.20:11434/v1", key: secretKey},
+		{name: "key over https", allow: nil, baseURL: "https://api.openai.com/v1", key: secretKey},
 		{name: "provider default endpoint", allow: allow, baseURL: "", key: secretKey},
 		{name: "local host listed, no key", allow: allow, baseURL: "http://localhost:11434/v1"},
 		{name: "listed host, case-insensitive", allow: allow, baseURL: "https://openrouter.ai/api/v1", key: secretKey},
@@ -906,6 +942,33 @@ func TestNarrateBaseURLAllowlist(t *testing.T) {
 				t.Errorf("the LLM factory was called for a refused host")
 			}
 		})
+	}
+}
+
+// A dial the egress guard refused maps to permission_denied, not to
+// unavailable, though the error also wraps llm.ErrUpstream.
+func TestNarrateDialRefused(t *testing.T) {
+	e := newEnv(t)
+	e.llm.streamErr = fmt.Errorf("%w: request failed: %w", llm.ErrUpstream, fmt.Errorf("dial: %w", egress.ErrForbidden))
+	e.start(t)
+	r := e.call(t, t.Context(), baseRequest(), secretKey)
+	if got := connect.CodeOf(r.err); got != connect.CodePermissionDenied {
+		t.Fatalf("code = %v, want permission_denied (%v)", got, r.err)
+	}
+}
+
+func TestHostListed(t *testing.T) {
+	allow := []string{"localhost", "llm.home.lan:8080", "*.example.org"}
+	for host, want := range map[string]bool{
+		"localhost": true, "LLM.home.lan": true, "a.example.org": true,
+		"example.org": false, "other.lan": false,
+	} {
+		if got := HostListed(host, allow); got != want {
+			t.Errorf("HostListed(%q) = %v, want %v", host, got, want)
+		}
+	}
+	if HostListed("localhost", nil) {
+		t.Error("an empty allowlist lists nothing")
 	}
 }
 
@@ -952,5 +1015,134 @@ func TestHostAllowed(t *testing.T) {
 	}
 	if !hostAllowed("http://anything:1", nil) {
 		t.Error("an empty allowlist must allow every host")
+	}
+}
+
+func TestNarrateProviderMessages(t *testing.T) {
+	tests := []struct {
+		name   string
+		deltas []llm.Delta
+		err    error
+		want   connect.Code
+		msg    string
+	}{
+		{
+			name: "auth error never shows the provider text",
+			err:  &llm.ProviderError{Kind: llm.ErrUnauthorized, Message: "Incorrect API key provided: sk-...abcd"},
+			want: connect.CodeUnauthenticated, msg: msgUnauthorized,
+		},
+		{
+			name: "rate limit with the provider's words",
+			err:  &llm.ProviderError{Kind: llm.ErrRateLimited, Status: 429, Message: "Rate limit reached for requests"},
+			want: connect.CodeResourceExhausted, msg: msgRateLimited + " Provider said: Rate limit reached for requests",
+		},
+		{
+			name:   "quota mid-stream after text",
+			deltas: []llm.Delta{{Text: "Air "}, {Err: &llm.ProviderError{Kind: llm.ErrQuotaExhausted, Message: "You have no credits remaining."}}},
+			want:   connect.CodeResourceExhausted, msg: msgQuota + " Provider said: You have no credits remaining.",
+		},
+		{
+			name: "the key is redacted again",
+			err:  &llm.ProviderError{Kind: llm.ErrBadRequest, Status: 400, Message: "bad model for " + secretKey},
+			want: connect.CodeInvalidArgument, msg: msgBadRequest + " Provider said: bad model for [redacted]",
+		},
+		{
+			name: "a redirect asks for the final URL",
+			err:  fmt.Errorf("%w: HTTP 301", llm.ErrRedirect),
+			want: connect.CodeInvalidArgument, msg: msgRedirect,
+		},
+		{
+			name: "no provider message, our text only",
+			err:  fmt.Errorf("%w: HTTP 502: <html>gateway</html>", llm.ErrUpstream),
+			want: connect.CodeUnavailable, msg: msgUpstream,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newEnv(t)
+			e.llm.deltas = tc.deltas
+			e.llm.streamErr = tc.err
+			e.start(t)
+			r := e.call(t, t.Context(), baseRequest(), secretKey)
+			var ce *connect.Error
+			if !errors.As(r.err, &ce) || ce.Code() != tc.want || ce.Message() != tc.msg {
+				t.Fatalf("err = %v, want %v %q", r.err, tc.want, tc.msg)
+			}
+		})
+	}
+}
+
+func TestNarrateSlowStart(t *testing.T) {
+	e := newEnv(t)
+	e.llm.streamErr = fmt.Errorf("%w: no response headers within 2m30s", llm.ErrSlowStart)
+	e.start(t)
+	r := e.call(t, t.Context(), baseRequest(), secretKey)
+	var ce *connect.Error
+	if !errors.As(r.err, &ce) || ce.Code() != connect.CodeDeadlineExceeded || ce.Message() != msgSlowStart {
+		t.Fatalf("err = %v, want deadline_exceeded %q", r.err, msgSlowStart)
+	}
+}
+
+// NARRATE_TIMEOUT ends a stream that is still running with deadline_exceeded:
+// the text sent so far stays, and no done follows.
+func TestNarrateTimeoutMidStream(t *testing.T) {
+	e := newEnv(t)
+	e.timeout = 150 * time.Millisecond
+	e.llm.deltas = []llm.Delta{{Text: "first"}}
+	e.llm.block = true
+	e.llm.stopped = make(chan struct{})
+	e.start(t)
+	r := e.call(t, t.Context(), baseRequest(), secretKey)
+	var ce *connect.Error
+	if !errors.As(r.err, &ce) || ce.Code() != connect.CodeDeadlineExceeded || ce.Message() != "The answer took too long." {
+		t.Fatalf("err = %v, want deadline_exceeded", r.err)
+	}
+	if r.order != "t" || r.done != nil {
+		t.Fatalf("events %q, done %v: want the first delta and no done", r.order, r.done)
+	}
+	select {
+	case <-e.llm.stopped:
+	case <-time.After(3 * time.Second):
+		t.Fatal("the LLM stream kept running after the timeout")
+	}
+}
+
+// The timeout also covers loading the results, on both paths.
+func TestNarrateTimeoutWhileLoading(t *testing.T) {
+	for _, key := range []string{secretKey, ""} {
+		e := newEnv(t)
+		e.timeout = 150 * time.Millisecond
+		e.loader.block = true
+		e.start(t)
+		r := e.call(t, t.Context(), baseRequest(), key)
+		if got := connect.CodeOf(r.err); got != connect.CodeDeadlineExceeded || r.order != "" {
+			t.Fatalf("key=%t: code %v, events %q; want deadline_exceeded and no events", key != "", got, r.order)
+		}
+	}
+}
+
+// A client that leaves during the keyless overview stops the load.
+func TestNarrateTemplateClientCancel(t *testing.T) {
+	e := newEnv(t)
+	e.loader.block = true
+	e.loader.entered = make(chan struct{})
+	e.loader.stopped = make(chan struct{})
+	e.start(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan result, 1)
+	go func() { done <- e.call(t, ctx, baseRequest(), "") }()
+	select {
+	case <-e.loader.entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("the template load never started")
+	}
+	cancel()
+	select {
+	case <-e.loader.stopped:
+	case <-time.After(3 * time.Second):
+		t.Fatal("the template load kept running after the client left")
+	}
+	if r := <-done; r.err == nil || r.done != nil {
+		t.Fatalf("want an error and no done, got %v, %v", r.err, r.done)
 	}
 }

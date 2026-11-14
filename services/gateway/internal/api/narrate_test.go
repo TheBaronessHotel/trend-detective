@@ -384,6 +384,8 @@ func TestNarrateErrors(t *testing.T) {
 		want        connect.Code
 		wantEvents  int
 		wantIn      string
+		// exact wants the message to equal wantIn.
+		exact bool
 	}{
 		{
 			name:  "no job id",
@@ -416,6 +418,26 @@ func TestNarrateErrors(t *testing.T) {
 				e.narrator.err = connect.NewError(connect.CodeResourceExhausted, "The LLM provider is rate limiting this key.")
 			},
 			want: connect.CodeResourceExhausted, wantEvents: 1, wantIn: "rate limiting",
+		},
+		{
+			// The narrator's message, provider text included, reaches the
+			// browser unchanged, and the code stays the narrator's.
+			name: "provider message passed on unchanged",
+			setup: func(e *narrateEnv) {
+				e.narrator.err = connect.NewError(connect.CodeResourceExhausted,
+					"This LLM key has no credits left. Add credits with the provider or use another key. Provider said: You have no credits remaining.")
+			},
+			want:   connect.CodeResourceExhausted,
+			wantIn: "This LLM key has no credits left. Add credits with the provider or use another key. Provider said: You have no credits remaining.",
+			exact:  true,
+		},
+		{
+			name: "slow provider keeps the narrator's code",
+			setup: func(e *narrateEnv) {
+				e.narrator.err = connect.NewError(connect.CodeDeadlineExceeded,
+					"The LLM provider took too long to start answering.")
+			},
+			want: connect.CodeDeadlineExceeded, wantIn: "took too long to start answering",
 		},
 		{
 			name:        "narrator not running",
@@ -457,6 +479,10 @@ func TestNarrateErrors(t *testing.T) {
 			}
 			if tc.wantIn != "" && !strings.Contains(r.err.Error(), tc.wantIn) {
 				t.Errorf("error %q does not mention %q", r.err, tc.wantIn)
+			}
+			var ce *connect.Error
+			if tc.exact && (!errors.As(r.err, &ce) || ce.Message() != tc.wantIn) {
+				t.Errorf("message = %q, want exactly %q", ce.Message(), tc.wantIn)
 			}
 			e.checkNoKeyLeak(t, r)
 		})

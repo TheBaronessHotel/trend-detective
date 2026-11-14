@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -169,6 +170,99 @@ func TestNarrateEndToEnd(t *testing.T) {
 				if !strings.Contains(string(body), want) {
 					t.Errorf("LLM request body lacks %s", want)
 				}
+			}
+			if strings.Contains(logs.text(), secretKey) {
+				t.Errorf("the key leaked into the logs")
+			}
+		})
+	}
+}
+
+// Provider error bodies travel through the real adapters and handler: our
+// message first, then the provider's own words when it sent a JSON error,
+// and nothing from any other body.
+func TestNarrateEndToEndProviderErrors(t *testing.T) {
+	seriesJSON, err := protojson.Marshal(realisticSeries())
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name     string
+		provider narratorv1.Provider
+		status   int
+		body     string
+		want     connect.Code
+		wantMsg  string
+	}{
+		{
+			name: "openai no credits", provider: narratorv1.Provider_PROVIDER_OPENAI_CHAT, status: 429,
+			body: `{"error":{"message":"You have no credits remaining.","type":"insufficient_quota","code":"insufficient_quota"}}`,
+			want: connect.CodeResourceExhausted, wantMsg: msgQuota + " Provider said: You have no credits remaining.",
+		},
+		{
+			name: "gemini model gone", provider: narratorv1.Provider_PROVIDER_OPENAI_CHAT, status: 404,
+			body:    `[{"error":{"code":404,"message":"models/gemini-2.0-flash is no longer available to new users.","status":"NOT_FOUND"}}]`,
+			want:    connect.CodeInvalidArgument,
+			wantMsg: msgBadRequest + " Provider said: models/gemini-2.0-flash is no longer available to new users.",
+		},
+		{
+			name: "anthropic credit balance", provider: narratorv1.Provider_PROVIDER_ANTHROPIC_MESSAGES, status: 400,
+			body:    `{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."}}`,
+			want:    connect.CodeResourceExhausted,
+			wantMsg: msgQuota + " Provider said: Your credit balance is too low to access the Anthropic API.",
+		},
+		{
+			name: "anthropic overloaded", provider: narratorv1.Provider_PROVIDER_ANTHROPIC_MESSAGES, status: 529,
+			body: `{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}`,
+			want: connect.CodeUnavailable, wantMsg: msgUpstream + " Provider said: Overloaded",
+		},
+		{
+			name: "non-json body is not shown", provider: narratorv1.Provider_PROVIDER_OPENAI_CHAT, status: 500,
+			body: "<html>admin console of an internal service</html>",
+			want: connect.CodeUnavailable, wantMsg: msgUpstream,
+		},
+		{
+			name: "key in the body is redacted", provider: narratorv1.Provider_PROVIDER_OPENAI_CHAT, status: 400,
+			body:    `{"error":{"message":"model not allowed for key ` + secretKey + `"}}`,
+			want:    connect.CodeInvalidArgument,
+			wantMsg: msgBadRequest + " Provider said: model not allowed for key [redacted]",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(tc.status)
+				_, _ = io.WriteString(w, tc.body)
+			}))
+			defer upstream.Close()
+			logs, log := newCapture()
+			srv, err := New(Deps{
+				Loader:  BucketLoader{Name: "analysis", Bucket: &fakeBucket{objects: map[string]string{seriesKey: string(seriesJSON)}}},
+				Builder: prompt.NewBuilder(), Verifier: verify.NewVerifier(),
+				NewClient: func(pr narratorv1.Provider, cfg llm.Config) (llm.Client, error) {
+					return llm.New(pr, cfg, upstream.Client())
+				},
+				Log: log, Timeout: 5 * time.Second,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			cs := connect.NewServer()
+			narratorv1connect.RegisterNarratorServiceHandler(cs, srv)
+			mux := http.NewServeMux()
+			connecthttp.Mount(mux, cs)
+			hs := httptest.NewServer(mux)
+			defer hs.Close()
+			e := &env{client: narratorv1connect.NewNarratorServiceClient(connect.NewClient(connecthttp.NewTransport(hs.Client(), hs.URL)))}
+
+			req := &narratorv1.NarrateRequest{
+				Result: &analysisv1.AnalysisResult{Series: &commonv1.BlobRef{Bucket: "analysis", Key: seriesKey}},
+				Llm:    &narratorv1.LlmConfig{Provider: tc.provider, BaseUrl: upstream.URL + "/v1", Model: "m"},
+			}
+			r := e.call(t, t.Context(), req, secretKey)
+			var ce *connect.Error
+			if !errors.As(r.err, &ce) || ce.Code() != tc.want || ce.Message() != tc.wantMsg {
+				t.Fatalf("err = %v, want %v %q", r.err, tc.want, tc.wantMsg)
 			}
 			if strings.Contains(logs.text(), secretKey) {
 				t.Errorf("the key leaked into the logs")
