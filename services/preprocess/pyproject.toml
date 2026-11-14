@@ -1,0 +1,35 @@
+[project]
+name = "trenddetective-preprocess"
+version = "0.1.0"
+description = "Decodes raw files into Series and Grid documents for Trend Detective."
+requires-python = ">=3.13"
+dependencies = [
+    "boto3>=1.40",
+    "nats-py>=2.11",
+    "netcdf4>=1.7",
+    "numpy>=2.3",
+    "pandas>=2.3",
+    # Must match the version gen/python was generated for, see the
+    # ValidateProtobufRuntimeVersion call in any *_pb2.py.
+    "protobuf>=7.36.2,<8",
+    "xarray>=2025.9",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.4"]
+
+[project.scripts]
+preprocess = "preprocess.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/preprocess"]
+
+[tool.pytest.ini_options]
+# gen/python holds the generated protobuf modules. It isn't a package of its
+# own, so it goes on the path the same way the Dockerfile's PYTHONPATH does.
+pythonpath = ["src", "../../gen/python"]
+testpaths = ["tests"]
