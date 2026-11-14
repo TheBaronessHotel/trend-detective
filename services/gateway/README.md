@@ -18,6 +18,8 @@ Go. The public Connect API on port 8080, and the orchestrator of every job. It p
 
 `ListVariables`, `CreateJob`, `GetJob`, `WatchJob`, `CancelJob`, `GetResultURL`, `CreateUploadURL`, `Narrate` and `GetQuota`.
 
+`CreateJob` fills in the variable's defaults. A job's `aggregation` goes on top of the catalog's, field by field, so a job that only picks a cell size (`block_pixels`, 1 to 64 pixels) keeps the catalog's other settings. Unset fields fall back to `SUBREGION_N`, `MAX_GRID` and a coverage share of 0.5, and a job can lower `MAX_GRID` but not raise it. The resolved settings are in the job's `spec`. Preprocess turns them into square cells; see the Regions and grids section of [ARCHITECTURE.md](../../ARCHITECTURE.md).
+
 `CancelJob` stops a job that hasn't finished. In one Redis transaction the job and its unfinished tasks become cancelled, and `td:job:{<id>}:canceled` is set for the stages. Ingest checks that flag before each delivery and cancels the task's Harmony job at NASA, which frees the slot. A `StageDone` that arrives after the cancel is ignored, and the scripts that add a stage or finish a job refuse to touch a cancelled one, so a stage finishing at the same moment can't undo it. A finished job is returned as it is.
 
 `GetQuota` reports the share of this month's Giovanni quota the team token has used, the `QUOTA_CUTOFF` past which Giovanni jobs are refused, and the Harmony jobs running on the team token against `HARMONY_CONCURRENCY`. It counts the same slots ingest takes, through `internal/harmonyslots`. If Giovanni can't be asked, the share comes back as -1 and the rest still answers. The app shows the parts that apply to the chosen source.
@@ -136,7 +138,7 @@ Add an entry to `catalog.yaml` and run `make test`. The catalog test fails on un
 | `MAX_UPLOAD_MB` | 20 | Largest CSV upload |
 | `HTTP_ADDR` | `:8080` | |
 | `CORS_ORIGINS` | `*` | Comma-separated origins allowed to call the API from a browser |
-| `SUBREGION_N` | 8 | Default sub-regions per side |
+| `SUBREGION_N` | 8 | Grid cells per side, used only when neither the job nor the catalog sets `block_pixels` |
 | `MAX_GRID` | 128 | Largest grid side. A request can lower it, never raise it |
 | `MAX_GRANULES` | 1000 | Most granules a Harmony job may fetch. Checked in preflight and again in ingest |
 | `TASK_CAP` | 256 | Most tasks one job may plan |

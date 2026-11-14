@@ -100,14 +100,16 @@ class GapFillDisplay(_message.Message):
     def __init__(self, max_gap: _Optional[int] = ...) -> None: ...
 
 class Aggregation(_message.Message):
-    __slots__ = ("subregion_n", "max_grid", "min_valid_fraction")
+    __slots__ = ("subregion_n", "max_grid", "min_valid_fraction", "block_pixels")
     SUBREGION_N_FIELD_NUMBER: _ClassVar[int]
     MAX_GRID_FIELD_NUMBER: _ClassVar[int]
     MIN_VALID_FRACTION_FIELD_NUMBER: _ClassVar[int]
+    BLOCK_PIXELS_FIELD_NUMBER: _ClassVar[int]
     subregion_n: int
     max_grid: int
     min_valid_fraction: float
-    def __init__(self, subregion_n: _Optional[int] = ..., max_grid: _Optional[int] = ..., min_valid_fraction: _Optional[float] = ...) -> None: ...
+    block_pixels: int
+    def __init__(self, subregion_n: _Optional[int] = ..., max_grid: _Optional[int] = ..., min_valid_fraction: _Optional[float] = ..., block_pixels: _Optional[int] = ...) -> None: ...
 
 class PreprocessResult(_message.Message):
     __slots__ = ("series", "series_csv", "grid", "value_cube", "anomaly_cube")

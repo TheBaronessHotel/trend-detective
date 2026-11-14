@@ -243,6 +243,7 @@ func (x *FilterOp) GetLog10() *Log10 {
 	return nil
 }
 
+// Deprecated: Marked as deprecated in trenddetective/preprocess/v1/preprocess.proto.
 func (x *FilterOp) GetCoarsen() *Coarsen {
 	if x != nil {
 		if x, ok := x.Op.(*FilterOp_Coarsen); ok {
@@ -286,6 +287,7 @@ type FilterOp_Log10 struct {
 }
 
 type FilterOp_Coarsen struct {
+	// Deprecated: Marked as deprecated in trenddetective/preprocess/v1/preprocess.proto.
 	Coarsen *Coarsen `protobuf:"bytes,6,opt,name=coarsen,proto3,oneof"`
 }
 
@@ -591,6 +593,9 @@ func (*Log10) Descriptor() ([]byte, []int) {
 }
 
 // Block-average pixels by a factor in each direction.
+// Deprecated for gridded data: it averages blocks before the region series
+// and the anomaly step, unweighted, and loses why pixels are missing. The
+// Grid's square blocks (Aggregation.block_pixels) replace it.
 type Coarsen struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Factor        int32                  `protobuf:"varint,1,opt,name=factor,proto3" json:"factor,omitempty"`
@@ -683,19 +688,38 @@ func (x *GapFillDisplay) GetMaxGap() int32 {
 }
 
 // How preprocess aggregates pixels.
+// How preprocess builds the Grid for per-cell analysis, the slider and the
+// heatmap. The region series doesn't depend on it: it always uses every valid
+// native pixel.
+//
+// The Grid averages square blocks of k x k native pixels with stride k, never
+// a fixed N x N split of the rectangle, whose cells would stretch on a
+// non-square one. Partial blocks at the edges keep their real pixels. k is:
+//  1. block_pixels, from the job or the catalog's default for the variable;
+//  2. else ceil(longer side / subregion_n);
+//  3. else 1, native pixels.
+//
+// Then k is lowered to leave at least 3 cells on the shorter side, and raised
+// to keep both sides within max_grid; max_grid wins. Grid.block_pixels
+// records the k used. See Decisions > Region model.
 type Aggregation struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Sub-regions per side for the slider and heatmap. Default 8. Zero means
-	// native pixels, still capped by max_grid.
+	// Cells per side, used to pick k only when block_pixels isn't set. The
+	// gateway's default is SUBREGION_N, 8. Zero means native pixels.
 	SubregionN int32 `protobuf:"varint,1,opt,name=subregion_n,json=subregionN,proto3" json:"subregion_n,omitempty"`
-	// Largest grid side. Bigger grids are block-averaged down. The gateway sets
-	// it from MAX_GRID.
+	// Largest grid side. The gateway sets it from MAX_GRID; a job can lower it
+	// but not raise it.
 	MaxGrid int32 `protobuf:"varint,2,opt,name=max_grid,json=maxGrid,proto3" json:"max_grid,omitempty"`
-	// A time step counts only if at least this share of the rectangle's pixels
-	// is valid. Default 0.5.
+	// A time step counts only if at least this share of the pixels that ever
+	// have data is valid, for the region series and for each Grid cell.
+	// Default 0.5.
 	MinValidFraction float64 `protobuf:"fixed64,3,opt,name=min_valid_fraction,json=minValidFraction,proto3" json:"min_valid_fraction,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Native pixels per side of a Grid block, 1 for native resolution. Wins
+	// over subregion_n. The gateway takes it from the job, else from the
+	// catalog, and accepts 1 to 64.
+	BlockPixels   *int32 `protobuf:"varint,4,opt,name=block_pixels,json=blockPixels,proto3,oneof" json:"block_pixels,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Aggregation) Reset() {
@@ -745,6 +769,13 @@ func (x *Aggregation) GetMaxGrid() int32 {
 func (x *Aggregation) GetMinValidFraction() float64 {
 	if x != nil {
 		return x.MinValidFraction
+	}
+	return 0
+}
+
+func (x *Aggregation) GetBlockPixels() int32 {
+	if x != nil && x.BlockPixels != nil {
+		return *x.BlockPixels
 	}
 	return 0
 }
@@ -842,14 +873,14 @@ const file_trenddetective_preprocess_v1_preprocess_proto_rawDesc = "" +
 	"\afilters\x18\x03 \x01(\v2).trenddetective.preprocess.v1.FilterChainR\afilters\x12K\n" +
 	"\vaggregation\x18\x04 \x01(\v2).trenddetective.preprocess.v1.AggregationR\vaggregation\"G\n" +
 	"\vFilterChain\x128\n" +
-	"\x03ops\x18\x01 \x03(\v2&.trenddetective.preprocess.v1.FilterOpR\x03ops\"\x81\x04\n" +
+	"\x03ops\x18\x01 \x03(\v2&.trenddetective.preprocess.v1.FilterOpR\x03ops\"\x85\x04\n" +
 	"\bFilterOp\x12B\n" +
 	"\bqc_range\x18\x01 \x01(\v2%.trenddetective.preprocess.v1.QcRangeH\x00R\aqcRange\x12>\n" +
 	"\x06linear\x18\x02 \x01(\v2$.trenddetective.preprocess.v1.LinearH\x00R\x06linear\x12N\n" +
 	"\fmonthly_mean\x18\x03 \x01(\v2).trenddetective.preprocess.v1.MonthlyMeanH\x00R\vmonthlyMean\x12A\n" +
 	"\aanomaly\x18\x04 \x01(\v2%.trenddetective.preprocess.v1.AnomalyH\x00R\aanomaly\x12;\n" +
-	"\x05log10\x18\x05 \x01(\v2#.trenddetective.preprocess.v1.Log10H\x00R\x05log10\x12A\n" +
-	"\acoarsen\x18\x06 \x01(\v2%.trenddetective.preprocess.v1.CoarsenH\x00R\acoarsen\x12X\n" +
+	"\x05log10\x18\x05 \x01(\v2#.trenddetective.preprocess.v1.Log10H\x00R\x05log10\x12E\n" +
+	"\acoarsen\x18\x06 \x01(\v2%.trenddetective.preprocess.v1.CoarsenB\x02\x18\x01H\x00R\acoarsen\x12X\n" +
 	"\x10gap_fill_display\x18\a \x01(\v2,.trenddetective.preprocess.v1.GapFillDisplayH\x00R\x0egapFillDisplayB\x04\n" +
 	"\x02op\"-\n" +
 	"\aQcRange\x12\x10\n" +
@@ -871,12 +902,14 @@ const file_trenddetective_preprocess_v1_preprocess_proto_rawDesc = "" +
 	"\aCoarsen\x12\x16\n" +
 	"\x06factor\x18\x01 \x01(\x05R\x06factor\")\n" +
 	"\x0eGapFillDisplay\x12\x17\n" +
-	"\amax_gap\x18\x01 \x01(\x05R\x06maxGap\"w\n" +
+	"\amax_gap\x18\x01 \x01(\x05R\x06maxGap\"\xb0\x01\n" +
 	"\vAggregation\x12\x1f\n" +
 	"\vsubregion_n\x18\x01 \x01(\x05R\n" +
 	"subregionN\x12\x19\n" +
 	"\bmax_grid\x18\x02 \x01(\x05R\amaxGrid\x12,\n" +
-	"\x12min_valid_fraction\x18\x03 \x01(\x01R\x10minValidFraction\"\xce\x02\n" +
+	"\x12min_valid_fraction\x18\x03 \x01(\x01R\x10minValidFraction\x12&\n" +
+	"\fblock_pixels\x18\x04 \x01(\x05H\x00R\vblockPixels\x88\x01\x01B\x0f\n" +
+	"\r_block_pixels\"\xce\x02\n" +
 	"\x10PreprocessResult\x129\n" +
 	"\x06series\x18\x01 \x01(\v2!.trenddetective.common.v1.BlobRefR\x06series\x12@\n" +
 	"\n" +
@@ -961,6 +994,7 @@ func file_trenddetective_preprocess_v1_preprocess_proto_init() {
 		(*FilterOp_Coarsen)(nil),
 		(*FilterOp_GapFillDisplay)(nil),
 	}
+	file_trenddetective_preprocess_v1_preprocess_proto_msgTypes[10].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

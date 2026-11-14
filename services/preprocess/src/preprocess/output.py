@@ -2,8 +2,8 @@
 
 A grid becomes a region series by a cos(latitude)-weighted mean of its valid
 pixels. Values and anomalies are averaged separately, so the region anomaly is
-the mean of the per-pixel anomalies, as the contract asks. PRE-3 adds the N×N
-sub-regions.
+the mean of the per-pixel anomalies, as the contract asks. The Grid groups
+pixels into square blocks built the same way; see grid().
 """
 
 from __future__ import annotations
@@ -13,7 +13,6 @@ import io
 from dataclasses import dataclass
 
 import numpy as np
-import xarray as xr
 from google.protobuf import timestamp_pb2
 
 from trenddetective.common.v1 import common_pb2
@@ -152,51 +151,128 @@ def gap_fill(values: np.ndarray, max_gap: int) -> np.ndarray:
     return out
 
 
+# A grid keeps at least this many cells on its shorter side when the native
+# pixels allow it, so a big block on a small rectangle still maps something.
+MIN_CELLS = 3
+
+
+def block_size(rows: int, cols: int, aggregation: preprocess_pb2.Aggregation) -> int:
+    """The side k, in native pixels, of the Grid's square blocks.
+
+    block_pixels wins, else ceil(longer side / subregion_n), else 1. Then k is
+    lowered to leave MIN_CELLS cells on the shorter side and raised to keep
+    both sides within max_grid; max_grid wins.
+    """
+    longer, shorter = max(rows, cols), min(rows, cols)
+    if aggregation.HasField("block_pixels") and aggregation.block_pixels > 0:
+        k = aggregation.block_pixels
+    elif aggregation.subregion_n > 0:
+        k = -(-longer // aggregation.subregion_n)
+    else:
+        k = 1
+    k = min(k, max(1, shorter // MIN_CELLS))
+    if aggregation.max_grid > 0:
+        k = max(k, -(-longer // aggregation.max_grid))
+    return max(k, 1)
+
+
 def grid(
     dec: Decoded,
     variable_id: str,
     aggregation: preprocess_pb2.Aggregation,
     bbox: common_pb2.BBox | None = None,
 ) -> GridOutput:
-    """The pixels at native resolution, block-averaged down when a side is
-    longer than max_grid.
+    """The Grid: square blocks of k x k native pixels, each built like the
+    region series. See block_size for k.
+
+    A cell's value is the cos(lat)-weighted mean of its valid pixels, and NaN
+    when fewer than min_valid_fraction of its pixels that ever have data are
+    valid. Anomalies are averaged per pixel with the same weights, and are NaN
+    wherever the value is. Blocks at the bottom and right edges keep only the
+    pixels that are there.
 
     bbox is the requested rectangle, the same one Series.bbox carries. Without
     one, the grid's outer pixel edges are used.
     """
-    da = _fit(dec.values, aggregation.max_grid)
-    rows, cols = da.sizes["lat"], da.sizes["lon"]
+    lats = dec.data["lat"].values.astype("float64")
+    lons = dec.data["lon"].values.astype("float64")
+    k = block_size(len(lats), len(lons), aggregation)
+    min_fraction = aggregation.min_valid_fraction or DEFAULT_MIN_VALID_FRACTION
+
+    values, cell_pixels = _block_means(dec.values.values, lats, k, min_fraction)
+    lat_edges = _cell_edges(_pixel_edges(lats), k)
+    lon_edges = _cell_edges(_pixel_edges(lons), k)
+    rows, cols = values.shape[1], values.shape[2]
     g = data_pb2.Grid(
         variable_id=variable_id,
         units=dec.units,
         rows=rows,
         cols=cols,
-        lats=da["lat"].values.astype("float64").tolist(),
-        lons=da["lon"].values.astype("float64").tolist(),
+        lats=((lat_edges[:-1] + lat_edges[1:]) / 2).tolist(),
+        lons=((lon_edges[:-1] + lon_edges[1:]) / 2).tolist(),
         step=dec.step,
+        block_pixels=k,
+        cell_pixels=cell_pixels.ravel().tolist(),
+        lat_edges=lat_edges.tolist(),
+        lon_edges=lon_edges.tolist(),
     )
-    # The extent comes from the native pixels: block-averaged ones are unevenly
-    # spaced when the last block is padded.
-    g.bbox.CopyFrom(bbox if bbox is not None else _pixel_extent(dec.data["lat"].values, dec.data["lon"].values))
-    g.times.extend(timestamps(da["time"].values))
-    out = GridOutput(grid=g, values=_f32(da))
+    g.bbox.CopyFrom(bbox if bbox is not None else _pixel_extent(lats, lons))
+    g.times.extend(timestamps(dec.data["time"].values))
+    out = GridOutput(grid=g, values=_f32(values))
     if dec.anomalies is not None:
-        out.anomalies = _f32(_fit(dec.anomalies, aggregation.max_grid))
+        anomalies, _ = _block_means(dec.anomalies.values, lats, k, None)
+        out.anomalies = _f32(np.where(np.isnan(values), np.nan, anomalies))
     return out
 
 
-def _fit(da: xr.DataArray, max_grid: int) -> xr.DataArray:
-    side = max(da.sizes["lat"], da.sizes["lon"])
-    if max_grid > 0 and side > max_grid:
-        factor = int(np.ceil(side / max_grid))
-        # mean() skips NaN for floats, so a block's value is the mean of its
-        # valid pixels, and padded edge blocks average what they have.
-        da = da.coarsen(lat=factor, lon=factor, boundary="pad").mean()
-    return da
+def _block_sum(a: np.ndarray, k: int) -> np.ndarray:
+    """Sums over k x k blocks of the last two axes, padding the edges with 0."""
+    r, c = a.shape[-2], a.shape[-1]
+    pr, pc = -(-r // k) * k - r, -(-c // k) * k - c
+    pad = [(0, 0)] * (a.ndim - 2) + [(0, pr), (0, pc)]
+    p = np.pad(a, pad)
+    shape = a.shape[:-2] + (p.shape[-2] // k, k, p.shape[-1] // k, k)
+    return p.reshape(shape).sum(axis=(-3, -1))
 
 
-def _f32(da: xr.DataArray) -> bytes:
-    return np.ascontiguousarray(da.transpose("time", "lat", "lon").values, dtype="<f4").tobytes()
+def _block_means(v: np.ndarray, lats: np.ndarray, k: int, min_fraction: float | None) -> tuple[np.ndarray, np.ndarray]:
+    """cos(lat)-weighted means of each block's valid pixels, per time step, and
+    how many pixels of each block ever have data. With min_fraction, a block
+    under that share of its ever-valid pixels is NaN."""
+    valid = ~np.isnan(v)
+    weights = np.broadcast_to(np.cos(np.deg2rad(lats))[:, None], v.shape[1:])
+    w = np.where(valid, weights[None], 0.0)
+    total = _block_sum(np.where(valid, v, 0.0) * w, k)
+    wsum = _block_sum(w, k)
+    ever = _block_sum(valid.any(axis=0).astype("int64"), k)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        mean = total / wsum
+        if min_fraction is not None:
+            coverage = _block_sum(valid.astype("int64"), k) / np.maximum(ever, 1)[None]
+            mean = np.where((coverage >= min_fraction) & (ever > 0)[None], mean, np.nan)
+    return mean, ever
+
+
+def _pixel_edges(centers: np.ndarray) -> np.ndarray:
+    """The edges of evenly or unevenly spaced pixels, halfway between centers
+    and half a spacing beyond the outer ones."""
+    if len(centers) < 2:
+        return np.array([centers[0], centers[0]]) if len(centers) else np.array([])
+    mid = (centers[:-1] + centers[1:]) / 2
+    return np.concatenate(
+        [[centers[0] - (centers[1] - centers[0]) / 2], mid, [centers[-1] + (centers[-1] - centers[-2]) / 2]]
+    )
+
+
+def _cell_edges(pixel_edges: np.ndarray, k: int) -> np.ndarray:
+    """Every k-th pixel edge, plus the last, so a partial last cell ends where
+    the pixels do."""
+    edges = pixel_edges[::k]
+    return edges if (len(pixel_edges) - 1) % k == 0 else np.concatenate([edges, pixel_edges[-1:]])
+
+
+def _f32(a: np.ndarray) -> bytes:
+    return np.ascontiguousarray(a, dtype="<f4").tobytes()
 
 
 def _pixel_extent(lats: np.ndarray, lons: np.ndarray) -> common_pb2.BBox:

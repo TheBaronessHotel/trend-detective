@@ -19,7 +19,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file trenddetective/preprocess/v1/preprocess.proto.
  */
 export const file_trenddetective_preprocess_v1_preprocess: GenFile = /*@__PURE__*/
-  fileDesc("Ci10cmVuZGRldGVjdGl2ZS9wcmVwcm9jZXNzL3YxL3ByZXByb2Nlc3MucHJvdG8SHHRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEi1QEKDlByZXByb2Nlc3NUYXNrEjEKA3JhdxgBIAMoCzIkLnRyZW5kZGV0ZWN0aXZlLmluZ2VzdC52MS5SYXdEYXRhc2V0EhQKDHNvdXJjZV91bml0cxgCIAEoCRI6CgdmaWx0ZXJzGAMgASgLMikudHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5GaWx0ZXJDaGFpbhI+CgthZ2dyZWdhdGlvbhgEIAEoCzIpLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEuQWdncmVnYXRpb24iQgoLRmlsdGVyQ2hhaW4SMwoDb3BzGAEgAygLMiYudHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5GaWx0ZXJPcCK6AwoIRmlsdGVyT3ASOQoIcWNfcmFuZ2UYASABKAsyJS50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLlFjUmFuZ2VIABI2CgZsaW5lYXIYAiABKAsyJC50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLkxpbmVhckgAEkEKDG1vbnRobHlfbWVhbhgDIAEoCzIpLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEuTW9udGhseU1lYW5IABI4Cgdhbm9tYWx5GAQgASgLMiUudHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5Bbm9tYWx5SAASNAoFbG9nMTAYBSABKAsyIy50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLkxvZzEwSAASOAoHY29hcnNlbhgGIAEoCzIlLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEuQ29hcnNlbkgAEkgKEGdhcF9maWxsX2Rpc3BsYXkYByABKAsyLC50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLkdhcEZpbGxEaXNwbGF5SABCBAoCb3AiIwoHUWNSYW5nZRILCgNtaW4YASABKAESCwoDbWF4GAIgASgBIjYKBkxpbmVhchINCgVzY2FsZRgBIAEoARIOCgZvZmZzZXQYAiABKAESDQoFdW5pdHMYAyABKAkiJQoLTW9udGhseU1lYW4SFgoObWluX3ZhbGlkX2RheXMYASABKAUi7AEKB0Fub21hbHkSNwoEa2luZBgBIAEoDjIpLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEuQW5vbWFseUtpbmQSNQoIYmFzZWxpbmUYAiABKAsyIy50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuWWVhclJhbmdlEh0KFW1pbl9iYXNlbGluZV9jb3ZlcmFnZRgDIAEoARI/CgZtZXRob2QYBCABKA4yLy50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLkNsaW1hdG9sb2d5TWV0aG9kEhEKCWhhcm1vbmljcxgFIAEoBSIHCgVMb2cxMCIZCgdDb2Fyc2VuEg4KBmZhY3RvchgBIAEoBSIhCg5HYXBGaWxsRGlzcGxheRIPCgdtYXhfZ2FwGAEgASgFIlAKC0FnZ3JlZ2F0aW9uEhMKC3N1YnJlZ2lvbl9uGAEgASgFEhAKCG1heF9ncmlkGAIgASgFEhoKEm1pbl92YWxpZF9mcmFjdGlvbhgDIAEoASKdAgoQUHJlcHJvY2Vzc1Jlc3VsdBIxCgZzZXJpZXMYASABKAsyIS50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuQmxvYlJlZhI1CgpzZXJpZXNfY3N2GAIgASgLMiEudHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLkJsb2JSZWYSLwoEZ3JpZBgDIAEoCzIhLnRyZW5kZGV0ZWN0aXZlLmNvbW1vbi52MS5CbG9iUmVmEjUKCnZhbHVlX2N1YmUYBCABKAsyIS50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuQmxvYlJlZhI3Cgxhbm9tYWx5X2N1YmUYBSABKAsyIS50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuQmxvYlJlZkKjAgogY29tLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjFCD1ByZXByb2Nlc3NQcm90b1ABWlxnaXRodWIuY29tL1RoZUJhcm9uZXNzSG90ZWwvdHJlbmQtZGV0ZWN0aXZlL2dlbi9nby90cmVuZGRldGVjdGl2ZS9wcmVwcm9jZXNzL3YxO3ByZXByb2Nlc3N2MaICA1RQWKoCHFRyZW5kZGV0ZWN0aXZlLlByZXByb2Nlc3MuVjHKAhxUcmVuZGRldGVjdGl2ZVxQcmVwcm9jZXNzXFYx4gIoVHJlbmRkZXRlY3RpdmVcUHJlcHJvY2Vzc1xWMVxHUEJNZXRhZGF0YeoCHlRyZW5kZGV0ZWN0aXZlOjpQcmVwcm9jZXNzOjpWMWIGcHJvdG8z", [file_trenddetective_common_v1_common, file_trenddetective_ingest_v1_ingest, file_trenddetective_preprocess_v1_data]);
+  fileDesc("Ci10cmVuZGRldGVjdGl2ZS9wcmVwcm9jZXNzL3YxL3ByZXByb2Nlc3MucHJvdG8SHHRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEi1QEKDlByZXByb2Nlc3NUYXNrEjEKA3JhdxgBIAMoCzIkLnRyZW5kZGV0ZWN0aXZlLmluZ2VzdC52MS5SYXdEYXRhc2V0EhQKDHNvdXJjZV91bml0cxgCIAEoCRI6CgdmaWx0ZXJzGAMgASgLMikudHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5GaWx0ZXJDaGFpbhI+CgthZ2dyZWdhdGlvbhgEIAEoCzIpLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEuQWdncmVnYXRpb24iQgoLRmlsdGVyQ2hhaW4SMwoDb3BzGAEgAygLMiYudHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5GaWx0ZXJPcCK+AwoIRmlsdGVyT3ASOQoIcWNfcmFuZ2UYASABKAsyJS50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLlFjUmFuZ2VIABI2CgZsaW5lYXIYAiABKAsyJC50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLkxpbmVhckgAEkEKDG1vbnRobHlfbWVhbhgDIAEoCzIpLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEuTW9udGhseU1lYW5IABI4Cgdhbm9tYWx5GAQgASgLMiUudHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5Bbm9tYWx5SAASNAoFbG9nMTAYBSABKAsyIy50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLkxvZzEwSAASPAoHY29hcnNlbhgGIAEoCzIlLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEuQ29hcnNlbkICGAFIABJIChBnYXBfZmlsbF9kaXNwbGF5GAcgASgLMiwudHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5HYXBGaWxsRGlzcGxheUgAQgQKAm9wIiMKB1FjUmFuZ2USCwoDbWluGAEgASgBEgsKA21heBgCIAEoASI2CgZMaW5lYXISDQoFc2NhbGUYASABKAESDgoGb2Zmc2V0GAIgASgBEg0KBXVuaXRzGAMgASgJIiUKC01vbnRobHlNZWFuEhYKDm1pbl92YWxpZF9kYXlzGAEgASgFIuwBCgdBbm9tYWx5EjcKBGtpbmQYASABKA4yKS50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLkFub21hbHlLaW5kEjUKCGJhc2VsaW5lGAIgASgLMiMudHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLlllYXJSYW5nZRIdChVtaW5fYmFzZWxpbmVfY292ZXJhZ2UYAyABKAESPwoGbWV0aG9kGAQgASgOMi8udHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5DbGltYXRvbG9neU1ldGhvZBIRCgloYXJtb25pY3MYBSABKAUiBwoFTG9nMTAiGQoHQ29hcnNlbhIOCgZmYWN0b3IYASABKAUiIQoOR2FwRmlsbERpc3BsYXkSDwoHbWF4X2dhcBgBIAEoBSJ8CgtBZ2dyZWdhdGlvbhITCgtzdWJyZWdpb25fbhgBIAEoBRIQCghtYXhfZ3JpZBgCIAEoBRIaChJtaW5fdmFsaWRfZnJhY3Rpb24YAyABKAESGQoMYmxvY2tfcGl4ZWxzGAQgASgFSACIAQFCDwoNX2Jsb2NrX3BpeGVscyKdAgoQUHJlcHJvY2Vzc1Jlc3VsdBIxCgZzZXJpZXMYASABKAsyIS50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuQmxvYlJlZhI1CgpzZXJpZXNfY3N2GAIgASgLMiEudHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLkJsb2JSZWYSLwoEZ3JpZBgDIAEoCzIhLnRyZW5kZGV0ZWN0aXZlLmNvbW1vbi52MS5CbG9iUmVmEjUKCnZhbHVlX2N1YmUYBCABKAsyIS50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuQmxvYlJlZhI3Cgxhbm9tYWx5X2N1YmUYBSABKAsyIS50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuQmxvYlJlZkKjAgogY29tLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjFCD1ByZXByb2Nlc3NQcm90b1ABWlxnaXRodWIuY29tL1RoZUJhcm9uZXNzSG90ZWwvdHJlbmQtZGV0ZWN0aXZlL2dlbi9nby90cmVuZGRldGVjdGl2ZS9wcmVwcm9jZXNzL3YxO3ByZXByb2Nlc3N2MaICA1RQWKoCHFRyZW5kZGV0ZWN0aXZlLlByZXByb2Nlc3MuVjHKAhxUcmVuZGRldGVjdGl2ZVxQcmVwcm9jZXNzXFYx4gIoVHJlbmRkZXRlY3RpdmVcUHJlcHJvY2Vzc1xWMVxHUEJNZXRhZGF0YeoCHlRyZW5kZGV0ZWN0aXZlOjpQcmVwcm9jZXNzOjpWMWIGcHJvdG8z", [file_trenddetective_common_v1_common, file_trenddetective_ingest_v1_ingest, file_trenddetective_preprocess_v1_data]);
 
 /**
  * Decode raw files, run the filter chain, and aggregate the region. The
@@ -121,7 +121,8 @@ export type FilterOp = Message<"trenddetective.preprocess.v1.FilterOp"> & {
     case: "log10";
   } | {
     /**
-     * @generated from field: trenddetective.preprocess.v1.Coarsen coarsen = 6;
+     * @generated from field: trenddetective.preprocess.v1.Coarsen coarsen = 6 [deprecated = true];
+     * @deprecated
      */
     value: Coarsen;
     case: "coarsen";
@@ -284,6 +285,9 @@ export const Log10Schema: GenMessage<Log10> = /*@__PURE__*/
 
 /**
  * Block-average pixels by a factor in each direction.
+ * Deprecated for gridded data: it averages blocks before the region series
+ * and the anomaly step, unweighted, and loses why pixels are missing. The
+ * Grid's square blocks (Aggregation.block_pixels) replace it.
  *
  * @generated from message trenddetective.preprocess.v1.Coarsen
  */
@@ -325,33 +329,56 @@ export const GapFillDisplaySchema: GenMessage<GapFillDisplay> = /*@__PURE__*/
 
 /**
  * How preprocess aggregates pixels.
+ * How preprocess builds the Grid for per-cell analysis, the slider and the
+ * heatmap. The region series doesn't depend on it: it always uses every valid
+ * native pixel.
+ *
+ * The Grid averages square blocks of k x k native pixels with stride k, never
+ * a fixed N x N split of the rectangle, whose cells would stretch on a
+ * non-square one. Partial blocks at the edges keep their real pixels. k is:
+ *   1. block_pixels, from the job or the catalog's default for the variable;
+ *   2. else ceil(longer side / subregion_n);
+ *   3. else 1, native pixels.
+ * Then k is lowered to leave at least 3 cells on the shorter side, and raised
+ * to keep both sides within max_grid; max_grid wins. Grid.block_pixels
+ * records the k used. See Decisions > Region model.
  *
  * @generated from message trenddetective.preprocess.v1.Aggregation
  */
 export type Aggregation = Message<"trenddetective.preprocess.v1.Aggregation"> & {
   /**
-   * Sub-regions per side for the slider and heatmap. Default 8. Zero means
-   * native pixels, still capped by max_grid.
+   * Cells per side, used to pick k only when block_pixels isn't set. The
+   * gateway's default is SUBREGION_N, 8. Zero means native pixels.
    *
    * @generated from field: int32 subregion_n = 1;
    */
   subregionN: number;
 
   /**
-   * Largest grid side. Bigger grids are block-averaged down. The gateway sets
-   * it from MAX_GRID.
+   * Largest grid side. The gateway sets it from MAX_GRID; a job can lower it
+   * but not raise it.
    *
    * @generated from field: int32 max_grid = 2;
    */
   maxGrid: number;
 
   /**
-   * A time step counts only if at least this share of the rectangle's pixels
-   * is valid. Default 0.5.
+   * A time step counts only if at least this share of the pixels that ever
+   * have data is valid, for the region series and for each Grid cell.
+   * Default 0.5.
    *
    * @generated from field: double min_valid_fraction = 3;
    */
   minValidFraction: number;
+
+  /**
+   * Native pixels per side of a Grid block, 1 for native resolution. Wins
+   * over subregion_n. The gateway takes it from the job, else from the
+   * catalog, and accepts 1 to 64.
+   *
+   * @generated from field: optional int32 block_pixels = 4;
+   */
+  blockPixels?: number | undefined;
 };
 
 /**
