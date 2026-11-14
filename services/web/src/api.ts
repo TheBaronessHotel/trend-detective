@@ -7,6 +7,7 @@ import { createConnectTransport } from "@connectrpc/connect-web";
 import type { BlobRef } from "@gen/common/v1/common_pb";
 import { Artifact, GatewayService } from "@gen/gateway/v1/gateway_pb";
 import { type Series, SeriesSchema } from "@gen/preprocess/v1/data_pb";
+import { type SeriesAnalysis, SeriesAnalysisSchema } from "@gen/analysis/v1/results_pb";
 
 /** Where the browser reaches the gateway. Set VITE_GATEWAY_URL to change it. */
 export const gatewayUrl: string = import.meta.env.VITE_GATEWAY_URL ?? "http://localhost:8080";
@@ -55,6 +56,12 @@ async function download(jobId: string, artifact: Artifact, signal?: AbortSignal)
 export async function loadSeries(jobId: string, signal?: AbortSignal): Promise<Series> {
   const res = await download(jobId, Artifact.SERIES, signal);
   return fromJson(SeriesSchema, await res.json(), { ignoreUnknownFields: true });
+}
+
+/** The trend tests on the region's series, as analysis wrote them. */
+export async function loadSeriesAnalysis(jobId: string, signal?: AbortSignal): Promise<SeriesAnalysis> {
+  const res = await download(jobId, Artifact.SERIES_ANALYSIS, signal);
+  return fromJson(SeriesAnalysisSchema, await res.json(), { ignoreUnknownFields: true });
 }
 
 /**

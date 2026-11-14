@@ -160,7 +160,7 @@ p {
 
 .main {
   display: grid;
-  grid-template-rows: minmax(320px, 1fr) auto;
+  grid-template-rows: minmax(220px, 1fr) auto;
   min-height: 0;
 }
 
@@ -689,7 +689,7 @@ p {
   display: grid;
   grid-template-columns: minmax(16rem, 21rem) minmax(0, 1fr);
   gap: 2rem;
-  max-height: 60vh;
+  max-height: 72vh;
 }
 
 @media (max-width: 1100px) {
@@ -800,6 +800,19 @@ p {
   stroke-width: 1;
 }
 
+/* The trend: a heavier ink line over a light band, so it reads over the bars. */
+.chart .trend-line {
+  fill: none;
+  stroke: var(--fg);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.chart .trend-band {
+  fill: var(--fg);
+  fill-opacity: 0.14;
+}
+
 .chart .bar {
   fill: var(--fg);
   fill-opacity: 0.6;
@@ -899,4 +912,72 @@ p {
   top: 0;
   background: var(--bg);
   color: var(--muted);
+}
+
+/* ---- the verdict: what the trend tests found, above the chart ---- */
+.verdict {
+  margin: 0 0 1.2rem;
+  padding: 0 0 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.verdict-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 0.8rem;
+  margin: 0 0 0.6rem;
+}
+
+.verdict-glyph {
+  font-size: 1.1rem;
+}
+
+.verdict-sure .verdict-glyph {
+  color: var(--ok);
+}
+
+.verdict-headline {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.verdict-rate {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.verdict-lines,
+.verdict-warnings {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.verdict-warnings {
+  margin-top: 0.6rem;
+  color: var(--muted);
+}
+
+.verdict-more {
+  margin: 0.6rem 0 0;
+  font-size: 0.8rem;
+}
+
+.verdict-more summary {
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.verdict-more summary:hover {
+  color: var(--fg);
+}
+
+.verdict-more .verdict-lines {
+  margin-top: 0.5rem;
 }

@@ -2,8 +2,8 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { Variable } from "@gen/gateway/v1/gateway_pb";
 import { Stage } from "@gen/gateway/v1/task_pb";
 import { Source } from "@gen/ingest/v1/ingest_pb";
-import { type Job, JobState } from "@gen/gateway/v1/gateway_pb";
-import { errorMessage, gateway, loadSeries, saveSeriesCsv, uploadCsv } from "./api";
+import type { Job } from "@gen/gateway/v1/gateway_pb";
+import { errorMessage, gateway, loadSeries, loadSeriesAnalysis, saveSeriesCsv, uploadCsv } from "./api";
 import { DatesPicker } from "./components/DatesPicker";
 import { JobPanel, type Run } from "./components/JobPanel";
 import { PlaceFields } from "./components/PlaceFields";
@@ -14,9 +14,8 @@ import { type Box, problem } from "./lib/bbox";
 import { compare, type Day, jobRange } from "./lib/dates";
 import { isFinished } from "./lib/job";
 
-// Jobs stop after preprocessing until the analysis service runs in the stack.
-// A later stage with no worker would leave the job waiting forever.
-const STOP_AFTER = Stage.PREPROCESS;
+// Jobs run every stage: ingest, preprocess and the trend tests.
+const STOP_AFTER = Stage.ANALYSIS;
 
 // MapLibre is most of the bundle, so the map loads on its own after the page.
 const MapView = lazy(() => import("./components/MapView").then((m) => ({ default: m.MapView })));
@@ -114,16 +113,26 @@ export function App() {
       if (!job) throw new Error("The gateway started no job.");
       setRun({ phase: "watching", job });
       const last = await watchUntilFinished(job, signal, (j) => setRun({ phase: "watching", job: j }));
-      const hasSeries = last.state === JobState.SUCCEEDED && !!last.results?.preprocess?.series;
+      // The series shows even when the trend tests failed or weren't run,
+      // so a job that got through preprocess always draws its chart.
+      const hasSeries = !!last.results?.preprocess?.series;
+      const hasAnalysis = !!last.results?.analysis?.series;
       setRun({ phase: "done", job: last, loadingSeries: hasSeries });
       if (!hasSeries) return;
-      try {
-        const series = await loadSeries(job.id, signal);
-        setRun({ phase: "done", job: last, series });
-      } catch (err) {
-        if (signal.aborted) return;
-        setRun({ phase: "done", job: last, seriesError: `Couldn't load the chart. ${errorMessage(err)}` });
-      }
+      const [series, analysis] = await Promise.allSettled([
+        loadSeries(job.id, signal),
+        hasAnalysis ? loadSeriesAnalysis(job.id, signal) : Promise.resolve(undefined),
+      ]);
+      if (signal.aborted) return;
+      setRun({
+        phase: "done",
+        job: last,
+        series: series.status === "fulfilled" ? series.value : undefined,
+        seriesError: series.status === "rejected" ? `Couldn't load the chart. ${errorMessage(series.reason)}` : undefined,
+        analysis: analysis.status === "fulfilled" ? analysis.value : undefined,
+        analysisError:
+          analysis.status === "rejected" ? `Couldn't load the trend tests. ${errorMessage(analysis.reason)}` : undefined,
+      });
     } catch (err) {
       if (signal.aborted) return;
       setRun((r) => ({ ...r, phase: "done", loadingSeries: false, error: errorMessage(err) }));

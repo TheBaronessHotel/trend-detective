@@ -3,6 +3,8 @@ import { scaleLinear, scaleUtc } from "d3-scale";
 import { area, line } from "d3-shape";
 import { TimeStep } from "@gen/common/v1/common_pb";
 import type { Series } from "@gen/preprocess/v1/data_pb";
+import { SeriesField } from "@gen/analysis/v1/analysis_pb";
+import type { SeriesAnalysis } from "@gen/analysis/v1/results_pb";
 import { describe } from "../lib/bbox";
 import {
   anomalyUnits,
@@ -20,9 +22,12 @@ import {
   valueExtent,
 } from "../lib/series";
 import { stepLabel } from "../lib/sources";
+import { type TrendPoint, trendLine } from "../lib/trend";
 
 interface Props {
   series: Series;
+  /** The trend tests, for the fitted line and its band. */
+  analysis?: SeriesAnalysis;
   /** The variable's name. */
   title: string;
   /** Buttons for the chart's header row, such as saving the data. */
@@ -30,8 +35,8 @@ interface Props {
 }
 
 const margin = { top: 12, right: 16, bottom: 26, left: 52 };
-const valuesHeight = 190;
-const anomaliesHeight = 90;
+const valuesHeight = 170;
+const anomaliesHeight = 100;
 const panelGap = 30;
 const tipWidth = 240;
 
@@ -143,7 +148,7 @@ function Table({ pts, series }: { pts: Point[]; series: Series }) {
  * anomalies as bars beneath, whichever the series has. A crosshair reads any
  * step, by pointer or arrow keys, and the table lists every value.
  */
-export function SeriesChart({ series, title, actions }: Props) {
+export function SeriesChart({ series, analysis, title, actions }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const width = useWidth(wrap) || 640;
   const [hover, setHover] = useState<number>();
@@ -154,6 +159,16 @@ export function SeriesChart({ series, title, actions }: Props) {
   const extent = valueExtent(pts);
   const hasAnomalies = pts.some((p) => p.anomaly !== undefined);
   const hasNormals = pts.some((p) => p.normal);
+  // The trend is drawn on whichever series analysis tested: anomalies by
+  // default, so it goes on the lower panel, which then shows even without bars.
+  const model = analysis?.regression?.model;
+  const trendOn = !model ? undefined : analysis?.field === SeriesField.VALUES ? "values" : "anomalies";
+  const confidence = Math.round((1 - (analysis?.alpha || 0.05)) * 100);
+  const trend = useMemo(
+    () => (model ? trendLine(model, pts.map((p) => p.time), analysis?.alpha || 0.05) : []),
+    [model, pts, analysis?.alpha],
+  );
+  const showAnomalies = hasAnomalies || trendOn === "anomalies";
   const first = pts[0];
   const last = pts.at(-1);
 
@@ -185,7 +200,7 @@ export function SeriesChart({ series, title, actions }: Props) {
 
   const innerWidth = Math.max(120, width - margin.left - margin.right);
   const anomaliesTop = valuesHeight + panelGap;
-  const innerHeight = hasAnomalies ? anomaliesTop + anomaliesHeight : valuesHeight;
+  const innerHeight = showAnomalies ? anomaliesTop + anomaliesHeight : valuesHeight;
   const height = margin.top + innerHeight + margin.bottom;
 
   // A single step gets a month either side, so it sits in the middle.
@@ -193,14 +208,18 @@ export function SeriesChart({ series, title, actions }: Props) {
   const x = scaleUtc()
     .domain(last.time > first.time ? [first.time, last.time] : [first.time - span, last.time + span])
     .range([0, innerWidth]);
-  const [lo, hi] = extent;
+  const onValues = trendOn === "values" ? trend : [];
+  const lo = Math.min(extent[0], ...onValues.map((t) => t.low));
+  const hi = Math.max(extent[1], ...onValues.map((t) => t.high));
   const pad = lo === hi ? Math.abs(lo) * 0.1 || 1 : 0;
   const y = scaleLinear()
     .domain([lo - pad, hi + pad])
     .nice()
     .range([valuesHeight, 0]);
 
-  const maxAnomaly = Math.max(...pts.map((p) => Math.abs(p.anomaly ?? 0))) || 1;
+  const onAnomalies = trendOn === "anomalies" ? trend : [];
+  const maxAnomaly =
+    Math.max(...pts.map((p) => Math.abs(p.anomaly ?? 0)), ...onAnomalies.map((t) => Math.max(Math.abs(t.low), Math.abs(t.high)))) || 1;
   const ya = scaleLinear()
     .domain([-maxAnomaly, maxAnomaly])
     .nice()
@@ -222,6 +241,15 @@ export function SeriesChart({ series, title, actions }: Props) {
         .x(px)
         .y0((p) => y((p.normal?.mean ?? 0) - (p.normal?.sd ?? 0)))
         .y1((p) => y((p.normal?.mean ?? 0) + (p.normal?.sd ?? 0)))(pts)
+    : null;
+  const ty = trendOn === "values" ? y : ya;
+  const tx = (t: TrendPoint) => x(t.time);
+  const trendPath = trend.length ? line<TrendPoint>().x(tx).y((t) => ty(t.fit))(trend) : null;
+  const trendBand = trend.length
+    ? area<TrendPoint>()
+        .x(tx)
+        .y0((t) => ty(t.low))
+        .y1((t) => ty(t.high))(trend)
     : null;
   const dots = lonePoints(pts);
   const missing = pts.filter((p) => p.value === undefined);
@@ -299,10 +327,13 @@ export function SeriesChart({ series, title, actions }: Props) {
               <line key={p.index} className="missing" x1={px(p)} x2={px(p)} y1={valuesHeight - 7} y2={valuesHeight} />
             ))}
 
-            {hasAnomalies && (
+            {trendOn === "values" && trendBand && <path className="trend-band" d={trendBand} />}
+            {trendOn === "values" && trendPath && <path className="trend-line" d={trendPath} />}
+
+            {showAnomalies && (
               <g>
                 <text className="axis-text" x={0} y={anomaliesTop - 10}>
-                  Against normal, {anomalyUnits(series)}
+                  {hasAnomalies ? `Against normal, ${anomalyUnits(series)}` : `Trend with the seasons taken out, ${analysis?.units ?? series.units}`}
                 </text>
                 {ya.ticks(2).map((t) => (
                   <g key={t} transform={`translate(0,${ya(t)})`}>
@@ -319,6 +350,8 @@ export function SeriesChart({ series, title, actions }: Props) {
                       <path key={p.index} className="bar" d={barPath(px(p) - barWidth / 2, barWidth, ya(0), ya(p.anomaly))} />
                     ),
                 )}
+                {trendOn === "anomalies" && trendBand && <path className="trend-band" d={trendBand} />}
+                {trendOn === "anomalies" && trendPath && <path className="trend-line" d={trendPath} />}
               </g>
             )}
 
@@ -367,6 +400,15 @@ export function SeriesChart({ series, title, actions }: Props) {
               <rect className="band" width="14" height="10" />
             </svg>
             normal range, ± one standard deviation
+          </li>
+        )}
+        {trend.length > 0 && (
+          <li>
+            <svg className="key-mark" width="22" height="10" aria-hidden="true">
+              <rect className="trend-band" width="22" height="10" />
+              <line className="trend-line" x1="1" x2="21" y1="5" y2="5" />
+            </svg>
+            trend, and the {confidence}% band where it likely lies
           </li>
         )}
         {summary.missing > 0 && (
