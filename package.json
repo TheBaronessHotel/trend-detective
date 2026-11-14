@@ -1,0 +1,6 @@
+{
+  "name": "trend-detective",
+  "private": true,
+  "packageManager": "bun@1.4.4",
+  "workspaces": ["services/web"]
+}

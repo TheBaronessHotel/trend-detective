@@ -1,0 +1,5 @@
+# Hoist packages into the root node_modules. The web app imports generated
+# code from gen/ts, which finds @bufbuild/protobuf by walking up from gen/
+# to the root, so the packages have to live there rather than per workspace.
+[install]
+linker = "hoisted"

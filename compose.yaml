@@ -152,6 +152,18 @@ services:
       retries: 30
     restart: unless-stopped
 
+  # The web app, built and served by nginx on http://localhost:3000. For
+  # hot reload while working on it, run `make web-dev` (port 5173) instead.
+  web:
+    build:
+      context: .
+      dockerfile: services/web/Dockerfile
+      args:
+        VITE_GATEWAY_URL: ${WEB_GATEWAY_URL:-http://localhost:8080}
+    ports:
+      - "127.0.0.1:3000:80"
+    restart: unless-stopped
+
 volumes:
   nats-data:
   redis-data:

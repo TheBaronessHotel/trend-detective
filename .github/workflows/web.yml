@@ -1,0 +1,25 @@
+name: web
+
+on:
+  pull_request:
+    paths: ["services/web/**", "gen/ts/**", "package.json", "bun.lock", "bunfig.toml", ".github/workflows/web.yml"]
+  push:
+    branches: [main]
+    paths: ["services/web/**", "gen/ts/**", "package.json", "bun.lock", "bunfig.toml", ".github/workflows/web.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      # Type check, unit tests and the production build, which also checks
+      # the app still fits the generated client in gen/ts.
+      - run: make web-check
