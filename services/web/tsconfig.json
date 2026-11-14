@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": false,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["vite/client", "bun"],
+    // The generated client lives in gen/ts at the repo root. The root
+    // package.json makes this app a workspace, so its node_modules sit at the
+    // root too and the generated files find @bufbuild/protobuf from there.
+    "paths": {
+      "@gen/*": ["../../gen/ts/trenddetective/*"]
+    }
+  },
+  "include": ["src", "test", "vite.config.ts"]
+}
