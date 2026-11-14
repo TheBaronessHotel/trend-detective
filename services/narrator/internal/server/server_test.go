@@ -20,6 +20,7 @@ import (
 	"github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/narrator/v1/narratorv1connect"
 	"github.com/TheBaronessHotel/trend-detective/internal/blob"
 	"github.com/TheBaronessHotel/trend-detective/services/narrator/internal/llm"
+	"github.com/TheBaronessHotel/trend-detective/services/narrator/internal/overview"
 	"github.com/TheBaronessHotel/trend-detective/services/narrator/internal/prompt"
 	"github.com/lein3000zzz/the-watchers/pkg/observability/logging"
 	"google.golang.org/protobuf/proto"
@@ -441,14 +442,37 @@ func TestNarrateErrors(t *testing.T) {
 			key: secretKey, want: connect.CodeInvalidArgument, noLLMCall: true,
 		},
 		{
-			name:  "no key for public endpoint",
-			setup: func(*env, *narratorv1.NarrateRequest) {},
-			key:   "", want: connect.CodeUnauthenticated, noLLMCall: true,
+			name:  "question without key for public endpoint",
+			setup: func(_ *env, r *narratorv1.NarrateRequest) { r.Question = "Why did it rise?" },
+			key:   "", want: connect.CodeUnauthenticated, noLLMCall: true, wantInError: "Add an LLM key to ask questions",
 		},
 		{
-			name:  "no key for public base url",
-			setup: func(_ *env, r *narratorv1.NarrateRequest) { r.Llm.BaseUrl = "https://openrouter.ai/api/v1" },
-			key:   "", want: connect.CodeUnauthenticated, noLLMCall: true,
+			name: "question without key for public base url",
+			setup: func(_ *env, r *narratorv1.NarrateRequest) {
+				r.Question = "Why did it rise?"
+				r.Llm.BaseUrl = "https://openrouter.ai/api/v1"
+			},
+			key: "", want: connect.CodeUnauthenticated, noLLMCall: true, wantInError: "Add an LLM key to ask questions",
+		},
+		{
+			name: "question without key and without llm config",
+			setup: func(_ *env, r *narratorv1.NarrateRequest) {
+				r.Question = "Why did it rise?"
+				r.Llm = nil
+			},
+			key: "", want: connect.CodeInvalidArgument, noLLMCall: true, wantInError: "llm is required",
+		},
+		{
+			name:  "overview without key, series missing",
+			setup: func(e *env, _ *narratorv1.NarrateRequest) { delete(e.loader.docs, seriesKey) },
+			key:   "", want: connect.CodeNotFound, noLLMCall: true,
+		},
+		{
+			name: "overview without key, object store down",
+			setup: func(e *env, _ *narratorv1.NarrateRequest) {
+				e.loader.errs[seriesKey] = &StorageError{Err: errors.New("connection refused")}
+			},
+			key: "", want: connect.CodeUnavailable, noLLMCall: true,
 		},
 		{
 			name:  "series missing",
@@ -579,6 +603,80 @@ func TestNarrateErrors(t *testing.T) {
 			}
 			if logs := e.logs.text(); strings.Contains(logs, secretKey) {
 				t.Errorf("the API key leaked into the logs:\n%s", logs)
+			}
+		})
+	}
+}
+
+func TestNarrateWithoutKeyStreamsTemplateOverview(t *testing.T) {
+	series := &analysisv1.SeriesAnalysis{
+		VariableId: "gpm_precip", Units: "mm/day", Alpha: 0.05, NValid: 240, NTotal: 240,
+		Regression: &analysisv1.RegressionResult{
+			SlopePerDecade: 0.42, SlopeCiLow: 0.1, SlopeCiHigh: 0.74, PValue: 0.003, Significant: true,
+		},
+		Warnings: []string{"Only 20 years of data"},
+	}
+	grid := &analysisv1.GridAnalysis{Layers: []*analysisv1.GridLayer{{
+		SlopesPerDecade: []float64{0.1, 0.2}, Significant: []bool{true, false},
+	}}}
+	tests := []struct {
+		name  string
+		setup func(*env, *narratorv1.NarrateRequest)
+		// noGrid means the grid is left out of the overview.
+		noGrid bool
+	}{
+		{name: "provider default endpoint", setup: func(*env, *narratorv1.NarrateRequest) {}},
+		{name: "no llm config at all", setup: func(_ *env, r *narratorv1.NarrateRequest) { r.Llm = nil }},
+		{name: "unspecified provider and model", setup: func(_ *env, r *narratorv1.NarrateRequest) {
+			r.Llm = &narratorv1.LlmConfig{}
+		}},
+		{name: "public base url", setup: func(_ *env, r *narratorv1.NarrateRequest) {
+			r.Llm.BaseUrl = "https://openrouter.ai/api/v1"
+		}},
+		{name: "base url outside the allowlist calls nothing", setup: func(e *env, r *narratorv1.NarrateRequest) {
+			e.allowlist = []string{"localhost"}
+			r.Llm.BaseUrl = "https://evil.example.com/v1"
+		}},
+		{name: "blank question counts as overview", setup: func(_ *env, r *narratorv1.NarrateRequest) {
+			r.Question = "  \n"
+		}},
+		{name: "grid unreadable", noGrid: true, setup: func(e *env, _ *narratorv1.NarrateRequest) {
+			e.loader.errs[gridKey] = errors.New("decode: bad json")
+		}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newEnv(t)
+			e.loader.docs[seriesKey] = series
+			e.loader.docs[gridKey] = grid
+			req := baseRequest()
+			req.Dates = &commonv1.DateRange{Start: &commonv1.Date{Year: 2001, Month: 1}, End: &commonv1.Date{Year: 2020, Month: 12}}
+			tc.setup(e, req)
+			e.start(t)
+
+			r := e.call(t, t.Context(), req, "")
+			if r.err != nil {
+				t.Fatalf("Narrate: %v", r.err)
+			}
+			wantGrid := grid
+			if tc.noGrid {
+				wantGrid = nil
+			}
+			want := overview.Build(series, wantGrid, req.GetVariable(), req.GetDates())
+			if got := strings.Join(r.texts, ""); got != want {
+				t.Fatalf("text = %q\nwant %q", got, want)
+			}
+			if wantOrder := strings.Repeat("t", len(overview.Sentences(want))) + "d"; r.order != wantOrder || len(r.texts) < 3 {
+				t.Errorf("event order = %q, want %q (one delta per sentence)", r.order, wantOrder)
+			}
+			if r.done.GetModel() != "template" || len(r.done.GetUnverifiedNumbers()) != 0 {
+				t.Errorf("done = %v, want model template and no unverified numbers", r.done)
+			}
+			if e.factory.calls != 0 || e.builder.got != nil {
+				t.Errorf("the LLM path ran: factory calls %d, builder input %v", e.factory.calls, e.builder.got)
+			}
+			if logs := e.logs.text(); !strings.Contains(logs, "narrated") || !strings.Contains(logs, "template") {
+				t.Errorf("want a narrated log record with model template, got:\n%s", logs)
 			}
 		})
 	}

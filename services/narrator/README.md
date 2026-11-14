@@ -8,18 +8,22 @@ See the Narrator section of [ARCHITECTURE.md](../../ARCHITECTURE.md).
 
 `NarratorService.Narrate` is a server stream. For each call the narrator:
 
-1. Validates the request: `result.series` is set, `llm.provider` and `llm.model` are set, `llm.base_url` is http(s) and its host passes `NARRATOR_LLM_BASE_URL_ALLOWLIST`, and the question and history fit the limits (4000 characters, 40 messages, 64000 characters of history).
-2. Reads the key from the `x-llm-api-key` header. It may be empty only when `llm.base_url` is local: localhost, a loopback or private IP, `host.docker.internal`, or a single-label host like `ollama`. The key stays in memory for the call and is never logged or echoed in an error.
+1. Validates the request: `result.series` is set and the question and history fit the limits (4000 characters, 40 messages, 64000 characters of history).
+2. Reads the key from the `x-llm-api-key` header. The key stays in memory for the call and is never logged or echoed in an error. With no key, an empty question and a `llm.base_url` that isn't local, it skips the LLM and streams the template overview (see below). Otherwise it checks that `llm.provider` and `llm.model` are set and `llm.base_url` is http(s) with a host that passes `NARRATOR_LLM_BASE_URL_ALLOWLIST`. The key may be empty only when `llm.base_url` is local: localhost, a loopback or private IP, `host.docker.internal`, or a single-label host like `ollama`. A question without a key gets `unauthenticated`.
 3. Loads the `SeriesAnalysis`, and the `GridAnalysis` when `result.grid` is set, from the `analysis` bucket. Refs to any other bucket are refused. A missing or broken grid only drops the spatial part.
 4. Builds the LLM request with `prompt.Builder`, picks an `llm.Client` for the provider and streams the answer as `text_delta` events.
 5. Ends with `done`: the model that answered, plus `unverified_numbers` from `verify.Verifier` over the full answer.
 
 If the stream fails after some text was sent, it ends with the error and no `done`.
 
+### Without a key
+
+The app works without an LLM key. For an overview request (empty question) with no key and a non-local `llm.base_url`, `internal/overview` writes 3 to 5 plain sentences from the results alone: direction and rate per decade with the confidence interval, significance (p-value against alpha, and whether Mann-Kendall agrees), record length, the main warnings and a significant Pettitt change point, and a reminder that a trend is not proof of a cause. It streams one sentence per `text_delta`, then `done` with `model: "template"` and no `unverified_numbers`. The `llm` config may be missing and isn't checked, since nothing is called.
+
 | Failure | Connect code |
 |---|---|
 | Bad request, bad model or base URL (`llm.ErrBadRequest`) | `invalid_argument` |
-| No key for a public endpoint, key rejected (`llm.ErrUnauthorized`) | `unauthenticated` |
+| A question with no key for a public endpoint, key rejected (`llm.ErrUnauthorized`) | `unauthenticated` |
 | Provider rate limit (`llm.ErrRateLimited`) | `resource_exhausted` |
 | Provider down or failing (`llm.ErrUpstream`) | `unavailable` |
 | `llm.base_url` host not in `NARRATOR_LLM_BASE_URL_ALLOWLIST` | `permission_denied` |
@@ -33,6 +37,7 @@ Layout:
 cmd/narrator/main.go     config, obs, Connect server with h2c, /healthz, graceful shutdown
 cmd/narrator/wiring.go   wires prompt.NewBuilder, verify.NewVerifier and llm.New (no redirects)
 internal/server          the Narrate handler, request checks, error mapping
+internal/overview        the template overview used without a key
 internal/llm             LLM client contract and adapters
 internal/prompt          builds the LLM request from the results
 internal/verify          finds numbers in the answer that aren't in the results

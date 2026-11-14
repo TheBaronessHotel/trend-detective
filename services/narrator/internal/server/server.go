@@ -3,6 +3,10 @@
 // and ends with a NarrateDone that lists numbers verify.Verifier couldn't
 // trace back to the results.
 //
+// Without a key, an overview request (empty question) for a non-local
+// base_url gets a fixed-text overview from package overview instead, so the
+// app explains results for everyone. Questions still need a key.
+//
 // The user's API key arrives in the x-llm-api-key header. It lives in memory
 // for the call only and is never logged or echoed in an error.
 package server
@@ -22,6 +26,7 @@ import (
 	narratorv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/narrator/v1"
 	"github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/narrator/v1/narratorv1connect"
 	"github.com/TheBaronessHotel/trend-detective/services/narrator/internal/llm"
+	"github.com/TheBaronessHotel/trend-detective/services/narrator/internal/overview"
 	"github.com/TheBaronessHotel/trend-detective/services/narrator/internal/prompt"
 	"github.com/TheBaronessHotel/trend-detective/services/narrator/internal/verify"
 	"github.com/lein3000zzz/the-watchers/pkg/observability/logging"
@@ -127,35 +132,33 @@ type outcome struct {
 	unverified int
 }
 
+// msgNeedKey answers a question sent without a key to a non-local endpoint.
+const msgNeedKey = "Add an LLM key to ask questions. The overview works without one, and so does a local base_url like an Ollama server."
+
 func (s *Server) narrate(ctx context.Context, req *narratorv1.NarrateRequest, apiKey string, stream narratorv1connect.NarratorServiceNarrateServerStream) (outcome, error) {
 	if err := validate(req); err != nil {
 		return outcome{}, err
 	}
 	cfg := req.GetLlm()
+	if apiKey == "" && strings.TrimSpace(req.GetQuestion()) == "" && !isLocalBaseURL(cfg.GetBaseUrl()) {
+		// No LLM is called, so the llm config doesn't matter here.
+		return s.narrateTemplate(ctx, req, stream)
+	}
+	if err := validateLLM(cfg); err != nil {
+		return outcome{}, err
+	}
 	if !hostAllowed(cfg.GetBaseUrl(), s.allowlist) {
 		return outcome{}, connect.NewError(connect.CodePermissionDenied,
 			"This server doesn't allow that llm.base_url host. Ask the operator to add it to NARRATOR_LLM_BASE_URL_ALLOWLIST.")
 	}
 	if apiKey == "" && !isLocalBaseURL(cfg.GetBaseUrl()) {
-		return outcome{}, connect.NewError(connect.CodeUnauthenticated,
-			"Add your API key. Only a local base_url, like an Ollama server, works without one.")
+		return outcome{}, connect.NewError(connect.CodeUnauthenticated, msgNeedKey)
 	}
 
-	in := prompt.Input{Req: req}
-	in.Series = &analysisv1.SeriesAnalysis{}
-	if err := s.loader.Load(ctx, req.GetResult().GetSeries(), in.Series); err != nil {
-		return outcome{}, fmt.Errorf("load series analysis: %w", err)
+	in, err := s.load(ctx, req, apiKey)
+	if err != nil {
+		return outcome{}, err
 	}
-	if ref := req.GetResult().GetGrid(); ref.GetKey() != "" {
-		grid := &analysisv1.GridAnalysis{}
-		if err := s.loader.Load(ctx, ref, grid); err != nil {
-			// The grid only adds spatial context. Explain the series without it.
-			s.log.Warn(ctx, "grid analysis unavailable, narrating the series only", "key", ref.GetKey(), "error", redact(err.Error(), apiKey))
-		} else {
-			in.Grid = grid
-		}
-	}
-
 	llmReq, facts, err := s.builder.Build(in)
 	if err != nil {
 		return outcome{}, fmt.Errorf("build prompt: %w", err)
@@ -209,34 +212,63 @@ func (s *Server) narrate(ctx context.Context, req *narratorv1.NarrateRequest, ap
 	return outcome{model: model, chars: answer.Len(), unverified: len(unverified)}, nil
 }
 
+// load reads the series results, and the grid results when there are any.
+// A grid that can't be read is logged and left out.
+func (s *Server) load(ctx context.Context, req *narratorv1.NarrateRequest, apiKey string) (prompt.Input, error) {
+	in := prompt.Input{Req: req}
+	in.Series = &analysisv1.SeriesAnalysis{}
+	if err := s.loader.Load(ctx, req.GetResult().GetSeries(), in.Series); err != nil {
+		return prompt.Input{}, fmt.Errorf("load series analysis: %w", err)
+	}
+	if ref := req.GetResult().GetGrid(); ref.GetKey() != "" {
+		grid := &analysisv1.GridAnalysis{}
+		if err := s.loader.Load(ctx, ref, grid); err != nil {
+			// The grid only adds spatial context. Explain the series without it.
+			s.log.Warn(ctx, "grid analysis unavailable, narrating the series only", "key", ref.GetKey(), "error", redact(err.Error(), apiKey))
+		} else {
+			in.Grid = grid
+		}
+	}
+	return in, nil
+}
+
+// narrateTemplate streams the fixed-text overview one sentence per
+// text_delta, then a NarrateDone with model "template". Every number in it
+// comes from the results, so nothing is unverified.
+func (s *Server) narrateTemplate(ctx context.Context, req *narratorv1.NarrateRequest, stream narratorv1connect.NarratorServiceNarrateServerStream) (outcome, error) {
+	in, err := s.load(ctx, req, "")
+	if err != nil {
+		return outcome{}, err
+	}
+	text := overview.Build(in.Series, in.Grid, req.GetVariable(), req.GetDates())
+	for _, sentence := range overview.Sentences(text) {
+		if err := ctx.Err(); err != nil {
+			return outcome{}, err
+		}
+		if err := stream.Send(textDelta(sentence)); err != nil {
+			return outcome{}, err
+		}
+	}
+	done := &narratorv1.NarrateResponse{Event: &narratorv1.NarrateEvent{
+		Event: &narratorv1.NarrateEvent_Done{Done: &narratorv1.NarrateDone{UnverifiedNumbers: []string{}, Model: overview.Model}},
+	}}
+	if err := stream.Send(done); err != nil {
+		return outcome{}, err
+	}
+	return outcome{model: overview.Model, chars: len(text)}, nil
+}
+
 func textDelta(text string) *narratorv1.NarrateResponse {
 	return &narratorv1.NarrateResponse{Event: &narratorv1.NarrateEvent{
 		Event: &narratorv1.NarrateEvent_TextDelta{TextDelta: text},
 	}}
 }
 
-// validate checks everything that doesn't need I/O.
+// validate checks everything that doesn't need I/O, except the llm config,
+// which only matters when an LLM is called. See validateLLM.
 func validate(req *narratorv1.NarrateRequest) error {
 	if req.GetResult().GetSeries().GetKey() == "" {
 		return invalid("result.series is required. Narrate only after the analysis has finished.")
-	}
-	cfg := req.GetLlm()
-	if cfg == nil {
-		return invalid("llm is required")
-	}
-	switch cfg.GetProvider() {
-	case narratorv1.Provider_PROVIDER_OPENAI_CHAT, narratorv1.Provider_PROVIDER_ANTHROPIC_MESSAGES:
-	default:
-		return invalid("llm.provider must be PROVIDER_OPENAI_CHAT or PROVIDER_ANTHROPIC_MESSAGES")
-	}
-	if strings.TrimSpace(cfg.GetModel()) == "" {
-		return invalid("llm.model is required, for example gpt-5.5 or claude-sonnet-5-5")
-	}
-	if b := cfg.GetBaseUrl(); b != "" {
-		u, err := url.Parse(b)
-		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-			return invalid("llm.base_url must be an http or https URL, like http://localhost:11434/v1")
-		}
 	}
 	if n := utf8.RuneCountInString(req.GetQuestion()); n > MaxQuestionChars {
 		return invalid(fmt.Sprintf("question is %d characters, the limit is %d", n, MaxQuestionChars))
@@ -253,6 +285,28 @@ func validate(req *narratorv1.NarrateRequest) error {
 	}
 	if total > MaxHistoryChars {
 		return invalid(fmt.Sprintf("history is %d characters, the limit is %d. Start a new chat.", total, MaxHistoryChars))
+	}
+	return nil
+}
+
+// validateLLM checks the llm config before an LLM call.
+func validateLLM(cfg *narratorv1.LlmConfig) error {
+	if cfg == nil {
+		return invalid("llm is required")
+	}
+	switch cfg.GetProvider() {
+	case narratorv1.Provider_PROVIDER_OPENAI_CHAT, narratorv1.Provider_PROVIDER_ANTHROPIC_MESSAGES:
+	default:
+		return invalid("llm.provider must be PROVIDER_OPENAI_CHAT or PROVIDER_ANTHROPIC_MESSAGES")
+	}
+	if strings.TrimSpace(cfg.GetModel()) == "" {
+		return invalid("llm.model is required, for example gpt-5.5 or claude-sonnet-5-5")
+	}
+	if b := cfg.GetBaseUrl(); b != "" {
+		u, err := url.Parse(b)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return invalid("llm.base_url must be an http or https URL, like http://localhost:11434/v1")
+		}
 	}
 	return nil
 }
