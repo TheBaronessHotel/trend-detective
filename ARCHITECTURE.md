@@ -147,7 +147,7 @@ Each source is an ingest adapter, chosen per request. Each catalog entry sets it
 | `harmony-subset` | NetCDF grids for a rectangle, dates and variables | HOSS service. Verified for GPM_3IMERGM, M2TMNXSLV, GLDAS_NOAH025_M, OMNO2d and GRACEDADM. Returns one file per granule because there's no concatenation. Also accepts polygons |
 | `giovanni-area` | Area-averaged CSV | Harmony plus Giovanni averaging. Uses the monthly Giovanni quota. Not available for MERRA-2 monthly or OMNO2d |
 | `giovanni-point` | Point CSV | `api.giovanni.earthdata.nasa.gov/timeseries` |
-| `power` | Point JSON | NASA POWER, no login |
+| `power` | Point JSON | NASA POWER, no login. The gateway sets the point to the middle of the rectangle |
 | `csv-upload` | User CSV | Exports from Giovanni, Hydrology Time Series and AppEEARS |
 | `bundle` | Files shipped with the app | Offline demos and the video recording |
 | `appeears` | MODIS NDVI and land surface temperature | Later |
@@ -241,6 +241,7 @@ Settings are env vars per service, set in `compose.yaml` and read from `.env`. T
 | `INGEST_ACK_WAIT` | `2m`. Ingest sends a heartbeat every third of this while a task runs |
 | `HTTP_ADDR` | `:8080`. The gateway's Connect API |
 | `HARMONY_URL`, `CMR_URL` | `https://harmony.earthdata.nasa.gov`, `https://cmr.earthdata.nasa.gov` |
+| `POWER_URL` | `https://power.larc.nasa.gov` |
 | `CORS_ORIGINS` | `*`. Comma-separated origins allowed to call the gateway from a browser |
 
 ## Repository
@@ -274,6 +275,7 @@ One public monorepo, [TheBaronessHotel/trend-detective](https://github.com/TheBa
 | `make test` | Runs the Go unit tests |
 | `make smoke` | Runs end-to-end checks against the running stack |
 | `make smoke-harmony` | Runs a real GPM job through Harmony. Needs `EARTHDATA_TOKEN`, so CI skips it |
+| `make smoke-power` | Runs a real job through NASA POWER. No token, but CI skips it |
 | `make gen` | Regenerates `gen/` from `proto/` |
 | `make lint` | Lints and format-checks the protos |
 

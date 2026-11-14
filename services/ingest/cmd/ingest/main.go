@@ -16,6 +16,7 @@ import (
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/bundle"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/core"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/harmony"
+	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/power"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/worker"
 	"github.com/lein3000zzz/the-watchers/pkg/observability/metrics/redkit"
 	"github.com/nats-io/nats.go"
@@ -88,7 +89,8 @@ func run() error {
 	if os.Getenv("EARTHDATA_TOKEN") == "" {
 		util.Logger.Warn(ctx, "EARTHDATA_TOKEN is empty, so Harmony tasks fail unless the user gives a token")
 	}
-	svc := core.New(store.Bucket("raw"), bundles, harmonyAdapter)
+	powerAdapter := power.New(envx.String("POWER_URL", "https://power.larc.nasa.gov"))
+	svc := core.New(store.Bucket("raw"), bundles, harmonyAdapter, powerAdapter)
 
 	nc, err := nats.Connect(env["NATS_URL"], nats.Name("ingest"), nats.MaxReconnects(-1))
 	if err != nil {

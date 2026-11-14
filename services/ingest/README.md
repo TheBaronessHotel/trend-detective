@@ -13,6 +13,7 @@ The service is hexagonal: the core knows nothing about NATS or S3, and each side
 | `internal/worker` | The JetStream consumer that drives the core |
 | `internal/bundle` | The `bundle` adapter |
 | `internal/harmony` | The `harmony-subset` adapter |
+| `internal/power` | The `power` adapter |
 | `bundle/` | Datasets shipped with the app. See [bundle/README.md](bundle/README.md) |
 
 To add a source, write a `core.Adapter` and pass it to `core.New` in `cmd/ingest`. An adapter:
@@ -57,6 +58,15 @@ Redis keys:
 | `td:ingest:harmony:slots:<token hash>` | A sorted set of the jobs running on one token. Slots older than 6 hours are freed |
 | `td:ingest:failures:<task ID>` | Failed attempts, see below |
 
+## power
+
+Fetches NASA POWER monthly means for one point, with no login. The gateway sets the point to the middle of the rectangle.
+
+- It makes one request to `/api/temporal/monthly/point` and stores the response as `power.json`, the same format as the Delhi bundle.
+- The monthly endpoint takes whole years, so preprocess trims the file to the task's dates.
+- Every complete year has a 13th "month" holding the annual mean, and missing values are `-999`.
+- POWER explains a 422 in plain English, for example "The data is available to 2026/11/30.", so that text goes to the user as `INVALID_REQUEST`. A 429 or a 5xx is transient.
+
 ## Failures
 
 - A transient error, like a network failure or a NASA 5xx, NAKs the message with a 10 second backoff, then 1 minute. After 3 failed attempts in total, the task is reported failed.
@@ -73,6 +83,7 @@ Redis keys:
 | `HARMONY_CONCURRENCY` | 4 | Harmony jobs in flight per token |
 | `HARMONY_URL` | `https://harmony.earthdata.nasa.gov` | |
 | `CMR_URL` | `https://cmr.earthdata.nasa.gov` | |
+| `POWER_URL` | `https://power.larc.nasa.gov` | |
 | `BUNDLE_DIR` | `/bundle` | Compose mounts `services/ingest/bundle` here |
 | `INGEST_CONCURRENCY` | 4 | Tasks in flight at once |
 | `INGEST_ACK_WAIT` | `2m` | How long JetStream waits for a heartbeat before it redelivers |
@@ -83,4 +94,5 @@ Redis keys:
 
 - `make test` runs the unit tests.
 - `make smoke`, with the stack up, publishes a real task for the `power-delhi-monthly` bundle and checks the `StageDone` and the files in the bucket.
+- `make smoke-power` runs a real job through NASA POWER at a point near Lisbon. It needs no token, but CI skips it so CI doesn't depend on NASA.
 - `make smoke-harmony` runs a real GPM job through the gateway and Harmony. It needs `EARTHDATA_TOKEN` in `.env`, so CI doesn't run it.

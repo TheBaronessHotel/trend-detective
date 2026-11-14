@@ -126,6 +126,13 @@ func (o *Orchestrator) CreateJob(ctx context.Context, spec *gatewayv1.JobSpec, e
 	if c := ingest.GetCsvUpload(); c != nil {
 		c.Upload = resolved.GetUpload()
 	}
+	// Point sources sample the middle of the rectangle.
+	if p := ingest.GetPower(); p != nil {
+		p.Point = center(resolved.GetBbox())
+	}
+	if g := ingest.GetGiovanniPoint(); g != nil {
+		g.Point = center(resolved.GetBbox())
+	}
 	if earthdataToken != "" {
 		key, err := o.store.saveEarthdataToken(ctx, id, earthdataToken)
 		if err != nil {
@@ -371,6 +378,10 @@ func (o *Orchestrator) resolve(spec *gatewayv1.JobSpec) (*gatewayv1.JobSpec, *ca
 		r.Aggregation.MaxGrid = o.limits.MaxGrid
 	}
 	return r, entry, nil
+}
+
+func center(b *commonv1.BBox) *commonv1.LatLon {
+	return &commonv1.LatLon{Lat: (b.GetSouth() + b.GetNorth()) / 2, Lon: (b.GetWest() + b.GetEast()) / 2}
 }
 
 func checkBBox(b *commonv1.BBox) error {

@@ -31,15 +31,15 @@ variables:
       weather models.
     units: °C
     step: monthly
-    available: { start: 1981-01-01, end: 2024-12-31 }
+    available: { start: 1981-01-01, end: 2025-12-31 }
     grid: false
     domain: land
-    # The bundle covers one point in Delhi. Switch to power once the POWER
-    # adapter (ING-4) exists, and it will serve any point.
-    default_source: bundle
+    # power samples the middle of any rectangle. bundle is a copy for one
+    # point in Delhi, 1981 to 2024, for offline demos.
+    default_source: power
     sources:
-      bundle: { name: power-delhi-monthly, variables: [T2M] }
       power: { parameters: [T2M], community: AG }
+      bundle: { name: power-delhi-monthly, variables: [T2M] }
     source_units: °C
     filters:
       ops:
@@ -106,13 +106,13 @@ variables:
       with weather models.
     units: mm/day
     step: monthly
-    available: { start: 1981-01-01, end: 2024-12-31 }
+    available: { start: 1981-01-01, end: 2025-12-31 }
     grid: false
     domain: land
-    default_source: bundle
+    default_source: power
     sources:
-      bundle: { name: power-delhi-monthly, variables: [PRECTOTCORR] }
       power: { parameters: [PRECTOTCORR], community: AG }
+      bundle: { name: power-delhi-monthly, variables: [PRECTOTCORR] }
     source_units: mm/day
     filters:
       ops:
