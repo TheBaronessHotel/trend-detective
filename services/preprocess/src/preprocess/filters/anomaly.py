@@ -14,6 +14,15 @@ region's normals in Series.normals follow the same rules as the pixels':
   it appears in.
 - **Method.** The mean of each calendar month, or a fit of ``harmonics``
   sine and cosine pairs (default 2), which is steadier for short records.
+- **Trend.** Either way a straight-line trend is fitted along with the
+  seasons, and the normals are the seasons at the baseline's mean time. A
+  plain mean of each calendar month would take in the trend's rise within
+  the year, because December comes later than January, and the anomalies
+  would keep only a staircase from year to year: a trend comes out low by
+  about 1 / Y^2 for Y years, 2% over 7, and a strong one leaves a sawtooth
+  in the residuals. Analysis checks this against NOAA's published CO2
+  growth. For the monthly means, the normal of month m is its mean minus
+  b (mean time of month m - mean time), with b the trend within the months.
 - **Kind.**
   - Absolute: value minus normal.
   - Percent: the difference as a percentage of the normal. A month whose
@@ -90,6 +99,7 @@ def normals(values: np.ndarray, times: np.ndarray, op: preprocess_pb2.Anomaly, b
     idx = pd.DatetimeIndex(times)
     months = np.asarray(idx.month)
     in_base = np.asarray((idx.year >= base[0]) & (idx.year <= base[1]))
+    t = _years(times)
     p = values.shape[1]
     mean = np.full((12, p), np.nan)
     sd = np.full((12, p), np.nan)
@@ -109,7 +119,9 @@ def normals(values: np.ndarray, times: np.ndarray, op: preprocess_pb2.Anomaly, b
                 sd[m - 1] = np.nanstd(x, axis=0, ddof=1) if x.shape[0] > 1 else np.nan
 
     if op.method == data_pb2.CLIMATOLOGY_METHOD_HARMONIC:
-        mean, sd = _harmonic(values, months, in_base, op.harmonics or DEFAULT_HARMONICS, mean, sd)
+        mean, sd = _harmonic(values, months, in_base, t, op.harmonics or DEFAULT_HARMONICS, mean, sd)
+    else:
+        mean = mean - _rise_within_year(values, months, in_base, t)
 
     usable = (years >= need[:, None]) & ~np.isnan(mean)
     if op.kind == data_pb2.ANOMALY_KIND_PERCENT:
@@ -124,9 +136,47 @@ def normals(values: np.ndarray, times: np.ndarray, op: preprocess_pb2.Anomaly, b
     return Normals(mean=mean, sd=sd, years=years, usable=usable)
 
 
-def _harmonic(values, months, in_base, harmonics, mean, sd):
-    """Replaces the monthly means with a smooth fit of the seasonal cycle, and
-    the deviations with those of the residuals from it."""
+def _years(times: np.ndarray) -> np.ndarray:
+    """Time in years of 365.25 days since 1970."""
+    seconds = np.asarray(times).astype("datetime64[s]").astype("int64")
+    return seconds / (365.25 * 86400)
+
+
+def _rise_within_year(values, months, in_base, t):
+    """For each calendar month (axis 0) and pixel (axis 1), how far a
+    straight-line trend has moved that month's mean: b (t_m - t_all), where
+    t_m is the mean time of the month's baseline values, t_all that of all of
+    them, and b the slope fitted within the months, the trend of a fit with
+    one constant per calendar month. Subtracted from the monthly means, it
+    leaves the normals at the baseline's mean time. 0 where there's no data
+    or no trend to fit."""
+    ok = in_base[:, None] & ~np.isnan(values)
+    w = ok.astype("float64")
+    y = np.where(ok, values, 0.0)
+    tt = np.broadcast_to(t[:, None], values.shape)
+    sxy = np.zeros(values.shape[1])
+    sxx = np.zeros(values.shape[1])
+    t_month = np.full((12, values.shape[1]), np.nan)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        t_all = (w * tt).sum(axis=0) / w.sum(axis=0)
+        for m in range(12):
+            sel = months == m + 1
+            wm, ym, tm = w[sel], y[sel], tt[sel]
+            n = wm.sum(axis=0)
+            t_month[m] = (wm * tm).sum(axis=0) / n
+            y_month = (wm * ym).sum(axis=0) / n
+            dt = np.where(wm > 0, tm - t_month[m], 0.0)
+            dy = np.where(wm > 0, ym - y_month, 0.0)
+            sxy += np.nan_to_num((dt * dy).sum(axis=0))
+            sxx += np.nan_to_num((dt * dt).sum(axis=0))
+        b = np.where(sxx > 0, sxy / np.where(sxx > 0, sxx, 1.0), 0.0)
+        return np.nan_to_num(b * (t_month - t_all))
+
+
+def _harmonic(values, months, in_base, t, harmonics, mean, sd):
+    """Replaces the monthly means with a smooth fit of the seasonal cycle and a
+    straight-line trend, evaluated at the mean time of the baseline values,
+    and the deviations with those of the residuals from the fit."""
     phase = 2 * np.pi * (months - 1) / 12.0
     cols = [np.ones_like(phase)]
     for k in range(1, harmonics + 1):
@@ -140,11 +190,15 @@ def _harmonic(values, months, in_base, harmonics, mean, sd):
     fit_sd = np.full_like(sd, np.nan)
     for j in range(values.shape[1]):
         ok = in_base & ~np.isnan(values[:, j])
-        if ok.sum() < design.shape[1] + 1:
+        # One more term than the cycle, for the trend.
+        if ok.sum() < design.shape[1] + 2:
             continue
-        coef, *_ = np.linalg.lstsq(design[ok], values[ok, j], rcond=None)
-        fit_mean[:, j] = month_design @ coef
-        resid = values[:, j] - design @ coef
+        trend = t - t[ok].mean()
+        full = np.column_stack([design, trend])
+        coef, *_ = np.linalg.lstsq(full[ok], values[ok, j], rcond=None)
+        # The trend term is 0 at the mean time, so the normal is the cycle.
+        fit_mean[:, j] = month_design @ coef[:-1]
+        resid = values[:, j] - full @ coef
         for m in range(12):
             r = resid[ok & (months == m + 1)]
             fit_sd[m, j] = np.std(r, ddof=1) if r.size > 1 else np.nan

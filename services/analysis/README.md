@@ -30,13 +30,15 @@ Skipped tests leave their fields unset, so the web app and the narrator should c
 | `src/analysis/extras.py` | The shuffle test, the trend triangle, the monthly trends and the years to significance |
 | `src/analysis/diagnostics.py` | The Pettitt test, the residual checks and the robust z-scores for outliers |
 | `src/analysis/storage.py` | S3 through boto3, plus an in-memory store for tests |
+| `scripts/validate_noaa_co2.py` | Compares our trends with NOAA's published CO2 growth, see Validation |
+| `tests/data/` | A small NOAA fixture for the offline validation tests |
 
 ## What the tests run on
 
-- **Monthly values only.** A daily or weekly `Series` fails with `INVALID_REQUEST`, because the tests, the seasonal cycle and the autocorrelation corrections all assume months. Daily sources become monthly once preprocess runs `monthly_mean` (PRE-2).
+- **Monthly values only.** A daily or weekly `Series` fails with `INVALID_REQUEST`, because the tests, the seasonal cycle and the autocorrelation corrections all assume months. Preprocess's `monthly_mean` step makes daily sources monthly.
 - **A regular calendar.** The values go onto one slot per month from the first step to the last. A month missing from `Series.times` counts as missing, the same as a NaN. `n_total` is the number of slots and `n_valid` the slots with a value.
 - **Anomalies by default.** `TestPlan.field` unset means `SERIES_FIELD_ANOMALIES`. When the `Series` has anomalies, the tests use them, and `units` becomes `%` for percent anomalies or `standard deviations` for standardized ones.
-- **Anomalies made here when preprocess has none.** Until PRE-2 brings the `anomaly` step, every `Series` arrives without anomalies. Analysis then subtracts each calendar month's mean over the whole record, which needs that month in at least 2 years, and says so in `warnings`. These are always absolute anomalies, whatever the catalog's anomaly kind is. Once preprocess sends anomalies, they're used instead and the caveat goes away.
+- **Anomalies made here when preprocess has none.** Preprocess sends anomalies when the job's filter chain has an `anomaly` step, as every catalog entry does. Without one, analysis subtracts each calendar month's normal itself and says so in `warnings`. A month needs values in at least 2 years for a normal. The normals come from a fit with one constant per calendar month and a straight-line trend, the same as preprocess's, so the anomalies keep the whole trend: see Validation. These are always absolute anomalies.
 - **Seasonal Kendall runs on the tested field too**, although the proto says it uses the raw values. It compares each calendar month only with itself, and an anomaly is its value shifted or scaled by that month's normal, which keeps the order within a month. So S, z and p are the same either way, and with absolute anomalies so is the slope. With percent or standardized anomalies the slope comes out in their units, like every other slope in the document. The comment on `MANN_KENDALL_VARIANT_SEASONAL` should say so the next time the protos are regenerated.
 - **Enough data.** At least 12 values spread over 2 years, or the task fails with `NO_DATA`.
 
@@ -110,7 +112,7 @@ Plain sentences for the user and the narrator. The caveats about the data come f
 
 | When | Text, roughly |
 |---|---|
-| Analysis made the anomalies | Each value was compared with the average for its month of the year... |
+| Analysis made the anomalies | Each value was compared with the usual value for its month of the year... |
 | `field` is `VALUES` | The tests ran on the raw values, so the seasons are still in them |
 | Under 10 years from the first value to the last | Only N years of data. A trend in a record this short is uncertain |
 | Over 20% of the months missing | N% of the months have no value |
@@ -127,6 +129,28 @@ Plain sentences for the user and the narrator. The caveats about the data come f
 | Residuals not normal | The scatter around the trend line isn't bell-shaped, so the Mann-Kendall test... is the safer guide. Without Mann-Kendall: ...so the regression's p-value is only rough |
 
 Two tests that both find nothing get no caveat, even when their small slopes point different ways.
+
+## Validation
+
+ANA-5 checks our numbers against a published result: the trend of Mauna Loa CO2 against the annual increase NOAA publishes for it, the CO2 rise from Jan 1 to Dec 31 of each year. CO2 has a strong, smooth trend and an authoritative answer, and it's one of the demo cases. `scripts/validate_noaa_co2.py` runs the comparison on NOAA's current files, and `tests/test_validation.py` runs it offline on a 3.7 KB fixture of 2010-2021 in `tests/data/`. KNMI Climate Explorer is a website to click through, so NOAA's published numbers serve instead.
+
+All in ppm a year:
+
+| Window | NOAA's mean annual increase | Line through NOAA's deseasonalized values | Line through our anomalies | Line with plain monthly normals | Expected for plain normals | Seasonal Kendall |
+|---|---|---|---|---|---|---|
+| 2010-2019 | 2.425 | 2.428 | 2.429 | 2.404 | 2.404 | 2.431 |
+| 2015-2021 | 2.553 | 2.522 | 2.525 | 2.474 | 2.471 | 2.517 |
+| 2015-2024 | 2.636 | 2.508 | 2.506 | 2.481 | 2.483 | 2.500 |
+| 2000-2024 | 2.284 | 2.265 | 2.265 | 2.262 | 2.262 | 2.258 |
+| 1981-2024 | 1.968 | 1.929 | 1.929 | 1.928 | 1.928 | 1.936 |
+
+What it shows:
+
+- **The statistics are right.** Given NOAA's own deseasonalized values, the regression matches NOAA's growth over the steady 2010s within 0.003 ppm a year. Where growth speeds up toward the end of a window, like 3.3 ppm in both 2023 and 2024, a straight line comes out below the mean of the yearly increases, because it weighs the middle of the window most. That's what a line does, not an error.
+- **Plain monthly normals lost part of a trend, so the normals now come with one.** Before ANA-5, each calendar month's normal was its mean over the record, in analysis's own anomalies and in preprocess's `anomaly` step alike. That mean also takes in the trend's rise within the year, because December comes later than January, so the anomalies kept only a staircase from year to year. Its slope is the true one times `144 (Y^2 - 1) / (144 Y^2 - 1)`, about `1 - 1 / Y^2` for Y years: 2% low over 7 years, the CO2 demo's length, 1% over 10, and nothing to speak of over 25. The plain normals match the formula within 0.003 ppm a year.
+- **For a strong, smooth trend the staircase cost more than the slope.** Over 2015-2021 the residuals scattered twice as much as around NOAA's deseasonalized values (0.84 against 0.41 ppm), the slope's interval was 1.7 times as wide, and the years to significance came out half as long again (1.7 against 1.1). Noisy variables like rain or temperature barely notice.
+- **Now the normals come from a fit with one constant per calendar month and a straight-line trend**, taken at the mean time, here and in preprocess. Our anomalies give NOAA's line within 0.003 ppm a year, with the same scatter around it.
+- **Seasonal Kendall was never affected.** It compares each month only with the same month in other years.
 
 ## Where files go
 
@@ -165,4 +189,5 @@ Logs are `key=value` lines with `time`, `level` and `msg`, plus `job_id`, `task_
 - `make test-analysis` runs what CI's `analysis` workflow runs, in a few seconds: the lockfile check, ruff with bug rules only, and the unit tests. It needs uv.
 - pymannkendall is a dev dependency only. The service doesn't import it.
 - A calibration test runs the shuffle test on 100 trendless autocorrelated series and expects about 5% false alarms. The same series give a plain t-test about 21%.
+- The validation tests check the trends against NOAA's published CO2 growth, offline. `uv run python scripts/validate_noaa_co2.py` repeats it on NOAA's current files, or with `--from` on files downloaded already.
 - `make smoke`, with the stack up, runs the Delhi bundle through every stage and checks the trend analysis has the regression, Mann-Kendall, extras and diagnostics results.

@@ -38,7 +38,7 @@ MANY_MISSING = 0.2
 MIN_VALUES_PER_MONTH = 2
 
 OWN_ANOMALIES = (
-    "Each value was compared with the average for its month of the year, worked out from this series, "
+    "Each value was compared with the usual value for its month of the year, worked out from this series, "
     "because the prepared data came without anomalies."
 )
 RAW_VALUES = "The tests ran on the raw values, so the seasons are still in them."
@@ -171,14 +171,35 @@ def prepare(series: data_pb2.Series, field_choice: int) -> Monthly:
 
 
 def own_anomalies(values: np.ndarray, calendar: np.ndarray) -> np.ndarray:
-    """Each value minus the mean of its calendar month over the whole record."""
+    """Each value minus its calendar month's normal, for values on a regular
+    monthly calendar.
+
+    The normals come from a fit with one constant per calendar month and a
+    straight-line trend, taken at the mean time, the same as preprocess's
+    anomaly step. A plain mean of each calendar month would take in the
+    trend's rise within the year and leave only a staircase from year to year,
+    a trend 2% low over 7 years: see Validation in the README. The normal of
+    month m is its mean minus b (mean time of month m - mean time), with b the
+    trend within the months.
+    """
+    t = np.arange(values.size) / 12.0
+    ok = np.isfinite(values)
+    months = [m for m in range(12) if (ok & (calendar == m)).sum() >= MIN_VALUES_PER_MONTH]
+    sxy = sxx = 0.0
+    means: dict[int, tuple[float, float]] = {}
+    for m in months:
+        sel = ok & (calendar == m)
+        tm, ym = t[sel], values[sel]
+        means[m] = (float(tm.mean()), float(ym.mean()))
+        sxy += float((tm - tm.mean()) @ (ym - ym.mean()))
+        sxx += float((tm - tm.mean()) @ (tm - tm.mean()))
+    trend = sxy / sxx if sxx > 0 else 0.0
+    t_all = float(t[ok & np.isin(calendar, months)].mean()) if months else 0.0
     out = np.full_like(values, np.nan)
-    for month in range(12):
-        sel = calendar == month
-        v = values[sel]
-        ok = np.isfinite(v)
-        if ok.sum() >= MIN_VALUES_PER_MONTH:
-            out[sel] = v - v[ok].mean()
+    for m in months:
+        t_month, y_month = means[m]
+        sel = calendar == m
+        out[sel] = values[sel] - (y_month - trend * (t_month - t_all))
     return out
 
 
