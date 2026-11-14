@@ -12,6 +12,7 @@ import { type StageView, stageViews } from "../lib/job";
 import { formatLabel, sourceLabel, stepLabel } from "../lib/sources";
 import { SeriesChart } from "./SeriesChart";
 import { HeatmapLegend } from "./HeatmapLegend";
+import { NarratePanel } from "./NarratePanel";
 import { VerdictPanel } from "./VerdictPanel";
 
 export type Phase = "uploading" | "creating" | "watching" | "done";
@@ -163,12 +164,14 @@ function Alert({ children }: { children: React.ReactNode }) {
 
 /** The series chart, and the same numbers as a CSV file. */
 function Results({
+  jobId,
   series,
   analysis,
   heatmap,
   title,
   onSaveCsv,
 }: {
+  jobId: string;
   series: Series;
   analysis: SeriesAnalysis | undefined;
   heatmap: Heatmap | undefined;
@@ -205,6 +208,7 @@ function Results({
         }
       />
       {saveError && <Alert>{saveError}</Alert>}
+      {analysis && <NarratePanel jobId={jobId} />}
     </div>
   );
 }
@@ -264,6 +268,7 @@ export function JobPanel({ run, stopAfter, seriesTitle, onSaveCsv, onStop }: Pro
       </div>
       {run.series && (
         <Results
+          jobId={run.job?.id ?? ""}
           series={run.series}
           analysis={run.analysis}
           heatmap={run.heatmap}
