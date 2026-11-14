@@ -70,6 +70,22 @@ if [ "$status" != 200 ] || ! grep -q stage_done_events /tmp/smoke-debug.json; th
   exit 1
 fi
 
+echo "Checking that a job that stopped after ingest has no time series"
+notready=$(call GetResultURL "{\"jobId\": \"$id\", \"artifact\": \"ARTIFACT_SERIES\"}")
+case "$notready" in *failed_precondition*) ;; *) echo "FAIL: GetResultURL should say there's no series: $notready"; exit 1 ;; esac
+
+echo "Uploading a CSV through a signed URL"
+printf 'date,value\n2001-01,3.5\n' > /tmp/smoke-upload.csv
+upload=$(call CreateUploadURL "{\"filename\": \"smoke.csv\", \"sizeBytes\": $(wc -c < /tmp/smoke-upload.csv | tr -d ' ')}")
+put_url=$(printf '%s' "$upload" | field url)
+key=$(printf '%s' "$upload" | field upload.key)
+status=$(curl -s -o /dev/null -w '%{http_code}' -X PUT --data-binary @/tmp/smoke-upload.csv "$put_url")
+if [ "$status" != 200 ] || ! curl -s "http://127.0.0.1:8888/buckets/uploads/$key" | grep -q 2001-01; then
+  echo "FAIL: upload through the signed URL answered $status"
+  exit 1
+fi
+curl -s -o /dev/null -X DELETE "http://127.0.0.1:8888/buckets/uploads/$key"
+
 echo "Checking that a bad request is refused"
 bad=$(call CreateJob '{"spec": {"variableId": "nope"}}')
 case "$bad" in *invalid_argument*) ;; *) echo "FAIL: unknown variable wasn't refused: $bad"; exit 1 ;; esac

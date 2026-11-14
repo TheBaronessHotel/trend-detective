@@ -12,7 +12,9 @@ import (
 	"github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/gateway/v1/gatewayv1connect"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/catalog"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/jobs"
+	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/results"
 	"github.com/lein3000zzz/the-watchers/pkg/observability/logging"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // EarthdataTokenHeader carries a user's own Earthdata token on CreateJob.
@@ -22,14 +24,15 @@ const EarthdataTokenHeader = "X-Earthdata-Token"
 // return Unimplemented.
 type Server struct {
 	gatewayv1connect.UnimplementedGatewayServiceHandler
-	cat  *catalog.Catalog
-	jobs *jobs.Orchestrator
-	log  logging.Logger
+	cat     *catalog.Catalog
+	jobs    *jobs.Orchestrator
+	results *results.Service
+	log     logging.Logger
 }
 
 // New returns a Server.
-func New(cat *catalog.Catalog, orch *jobs.Orchestrator, log logging.Logger) *Server {
-	return &Server{cat: cat, jobs: orch, log: log.With("component", "api")}
+func New(cat *catalog.Catalog, orch *jobs.Orchestrator, res *results.Service, log logging.Logger) *Server {
+	return &Server{cat: cat, jobs: orch, results: res, log: log.With("component", "api")}
 }
 
 // ListVariables implements GatewayService.
@@ -77,13 +80,40 @@ func (s *Server) WatchJob(ctx context.Context, req *gatewayv1.WatchJobRequest, s
 	return nil
 }
 
+// GetResultURL implements GatewayService.
+func (s *Server) GetResultURL(ctx context.Context, req *gatewayv1.GetResultURLRequest) (*gatewayv1.GetResultURLResponse, error) {
+	if req.GetJobId() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, "job_id is required")
+	}
+	link, err := s.results.ResultURL(ctx, req.GetJobId(), req.GetArtifact())
+	if err != nil {
+		return nil, s.toConnect(ctx, err)
+	}
+	return &gatewayv1.GetResultURLResponse{Url: link.URL, DataUrl: link.DataURL, ExpiresAt: timestamppb.New(link.ExpiresAt)}, nil
+}
+
+// CreateUploadURL implements GatewayService.
+func (s *Server) CreateUploadURL(ctx context.Context, req *gatewayv1.CreateUploadURLRequest) (*gatewayv1.CreateUploadURLResponse, error) {
+	up, err := s.results.UploadURL(ctx, req.GetFilename(), req.GetSizeBytes())
+	if err != nil {
+		return nil, s.toConnect(ctx, err)
+	}
+	return &gatewayv1.CreateUploadURLResponse{Url: up.URL, Upload: up.Ref, ExpiresAt: timestamppb.New(up.ExpiresAt)}, nil
+}
+
 // toConnect maps an error to a Connect error. Unexpected errors get a generic
 // message, and the detail goes to the log only.
 func (s *Server) toConnect(ctx context.Context, err error) error {
 	var inv *jobs.InvalidError
+	var badResult *results.InvalidError
+	var notReady *results.NotReadyError
 	switch {
 	case errors.As(err, &inv):
 		return connect.NewError(connect.CodeInvalidArgument, inv.Error())
+	case errors.As(err, &badResult):
+		return connect.NewError(connect.CodeInvalidArgument, badResult.Error())
+	case errors.As(err, &notReady):
+		return connect.NewError(connect.CodeFailedPrecondition, notReady.Error())
 	case errors.Is(err, jobs.ErrNotFound):
 		return connect.NewError(connect.CodeNotFound, "No job with that ID. Jobs are kept for 7 days.")
 	case errors.Is(err, jobs.ErrUnavailable):

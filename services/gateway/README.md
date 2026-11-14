@@ -15,7 +15,7 @@ Go. The public Connect API on port 8080, and the orchestrator of every job. It p
 
 ## API
 
-So far: `ListVariables`, `CreateJob`, `GetJob` and `WatchJob`. The rest return `unimplemented` until their own tasks: `GetResultURL` and `CreateUploadURL` (GW-5), `Narrate` (GW-6), and `GetQuota`.
+So far: `ListVariables`, `CreateJob`, `GetJob`, `WatchJob`, `GetResultURL` and `CreateUploadURL`. `Narrate` (GW-6) and `GetQuota` still return `unimplemented`.
 
 `WatchJob` sends the job right away and again after every change, then ends the stream once the job succeeds or fails. Every write to a job wakes its watchers at once, and they also re-read the job every 5 seconds in case a wake-up was missed. In the browser, connect-es handles the stream. `deploy/smoke/watch.py` is a small client that uses only the Python standard library.
 
@@ -48,6 +48,18 @@ Only `variableId`, `bbox` and `dates` are required. The gateway fills in the res
 
 Task IDs are predictable, like `<job>-preprocess-0`. If the gateway crashes halfway through starting a stage, the redelivered event starts it again with the same IDs, and JetStream drops the repeated publishes by `Nats-Msg-Id`.
 
+## Downloads and uploads
+
+Files go straight between the browser and SeaweedFS through presigned URLs, so they never pass through the gateway.
+
+- **`GetResultURL(job_id, artifact)`** signs a download for one output: the series, the series CSV, a value or anomaly cube, or the series or grid analysis.
+  - For a cube, `data_url` is the cube's binary data. The gateway reads the cube header to find it.
+  - An output the job doesn't have yet gets `failed_precondition`, with a message like "The trend analysis isn't ready yet."
+  - Only the prep and analysis buckets are ever signed.
+- **`CreateUploadURL(filename, size_bytes)`** signs a PUT for a CSV of up to `MAX_UPLOAD_MB`, at `uploads/<uuid>/<cleaned-up name>`. Pass the returned `upload` as `JobSpec.upload`. A presigned PUT can't enforce the size, so the csv-upload adapter checks it again when reading.
+
+URLs are signed for `S3_PUBLIC_ENDPOINT`, the address the browser uses, and work for `PRESIGN_TTL`. The signature covers the host, so a URL signed for the internal `seaweedfs:8333` would fail in the browser. SeaweedFS answers the browser's CORS preflight itself, using `S3_ALLOWED_ORIGINS`.
+
 ## When a stage never reports
 
 If a stage crashes on every attempt, it never sends a `StageDone`. Once its message runs out of deliveries, NATS publishes a max-deliveries advisory, and the ADVISORIES stream keeps it. The gateway then:
@@ -79,7 +91,10 @@ Add an entry to `catalog.yaml` and run `make test`. The catalog test fails on un
 
 | Variable | Default | |
 |---|---|---|
-| `NATS_URL`, `REDIS_URL` | required | Set by compose |
+| `NATS_URL`, `REDIS_URL`, `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | required | Set by compose |
+| `S3_PUBLIC_ENDPOINT` | `http://localhost:8333` | The S3 address the browser uses. URLs are signed for it |
+| `PRESIGN_TTL` | `15m` | How long signed URLs work |
+| `MAX_UPLOAD_MB` | 20 | Largest CSV upload |
 | `HTTP_ADDR` | `:8080` | |
 | `CORS_ORIGINS` | `*` | Comma-separated origins allowed to call the API from a browser |
 | `SUBREGION_N` | 8 | Default sub-regions per side |
@@ -89,5 +104,5 @@ Add an entry to `catalog.yaml` and run `make test`. The catalog test fails on un
 
 ## Testing
 
-- `make test` covers the catalog, and the orchestrator against an in-memory Redis: every stage, duplicates, late duplicates, failures, `stop_after`, the token handling, `WatchJob`, the advisory mapping and the debug page.
-- `make smoke`, with the stack up, creates a real job that stops after ingest, follows it with `WatchJob` until it succeeds, and checks `/debug/jobs`.
+- `make test` covers the catalog, and the orchestrator against an in-memory Redis: every stage, duplicates, late duplicates, failures, `stop_after`, the token handling, `WatchJob`, the advisory mapping, the debug page, signed downloads and uploads.
+- `make smoke`, with the stack up, creates a real job that stops after ingest, follows it with `WatchJob` until it succeeds, and checks `/debug/jobs`. It also checks that the job has no series, and uploads a CSV through a signed URL.
