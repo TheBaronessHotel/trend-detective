@@ -121,7 +121,7 @@ class MonthlyNormal(_message.Message):
     def __init__(self, month: _Optional[int] = ..., mean: _Optional[float] = ..., sd: _Optional[float] = ..., years: _Optional[int] = ..., usable: _Optional[bool] = ...) -> None: ...
 
 class Grid(_message.Message):
-    __slots__ = ("variable_id", "units", "bbox", "rows", "cols", "lats", "lons", "step", "times", "values", "anomalies")
+    __slots__ = ("variable_id", "units", "bbox", "rows", "cols", "lats", "lons", "step", "times", "values", "anomalies", "block_pixels", "cell_pixels", "lat_edges", "lon_edges")
     VARIABLE_ID_FIELD_NUMBER: _ClassVar[int]
     UNITS_FIELD_NUMBER: _ClassVar[int]
     BBOX_FIELD_NUMBER: _ClassVar[int]
@@ -133,6 +133,10 @@ class Grid(_message.Message):
     TIMES_FIELD_NUMBER: _ClassVar[int]
     VALUES_FIELD_NUMBER: _ClassVar[int]
     ANOMALIES_FIELD_NUMBER: _ClassVar[int]
+    BLOCK_PIXELS_FIELD_NUMBER: _ClassVar[int]
+    CELL_PIXELS_FIELD_NUMBER: _ClassVar[int]
+    LAT_EDGES_FIELD_NUMBER: _ClassVar[int]
+    LON_EDGES_FIELD_NUMBER: _ClassVar[int]
     variable_id: str
     units: str
     bbox: _common_pb2.BBox
@@ -144,7 +148,11 @@ class Grid(_message.Message):
     times: _containers.RepeatedCompositeFieldContainer[_timestamp_pb2.Timestamp]
     values: _common_pb2.BlobRef
     anomalies: _common_pb2.BlobRef
-    def __init__(self, variable_id: _Optional[str] = ..., units: _Optional[str] = ..., bbox: _Optional[_Union[_common_pb2.BBox, _Mapping]] = ..., rows: _Optional[int] = ..., cols: _Optional[int] = ..., lats: _Optional[_Iterable[float]] = ..., lons: _Optional[_Iterable[float]] = ..., step: _Optional[_Union[_common_pb2.TimeStep, str]] = ..., times: _Optional[_Iterable[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]]] = ..., values: _Optional[_Union[_common_pb2.BlobRef, _Mapping]] = ..., anomalies: _Optional[_Union[_common_pb2.BlobRef, _Mapping]] = ...) -> None: ...
+    block_pixels: int
+    cell_pixels: _containers.RepeatedScalarFieldContainer[int]
+    lat_edges: _containers.RepeatedScalarFieldContainer[float]
+    lon_edges: _containers.RepeatedScalarFieldContainer[float]
+    def __init__(self, variable_id: _Optional[str] = ..., units: _Optional[str] = ..., bbox: _Optional[_Union[_common_pb2.BBox, _Mapping]] = ..., rows: _Optional[int] = ..., cols: _Optional[int] = ..., lats: _Optional[_Iterable[float]] = ..., lons: _Optional[_Iterable[float]] = ..., step: _Optional[_Union[_common_pb2.TimeStep, str]] = ..., times: _Optional[_Iterable[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]]] = ..., values: _Optional[_Union[_common_pb2.BlobRef, _Mapping]] = ..., anomalies: _Optional[_Union[_common_pb2.BlobRef, _Mapping]] = ..., block_pixels: _Optional[int] = ..., cell_pixels: _Optional[_Iterable[int]] = ..., lat_edges: _Optional[_Iterable[float]] = ..., lon_edges: _Optional[_Iterable[float]] = ...) -> None: ...
 
 class CubeHeader(_message.Message):
     __slots__ = ("variable_id", "units", "kind", "bbox", "rows", "cols", "lats", "lons", "step", "times", "scale", "offset", "missing_value", "color_min", "color_max", "diverging", "data")

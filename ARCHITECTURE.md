@@ -166,12 +166,16 @@ The region is the unit of analysis everywhere. Pixels only feed aggregation.
 
 1. The user selects a rectangle. `harmony-subset` fetches every pixel inside it in one request.
 2. Preprocess builds the region-average series with latitude weighting and per-pixel anomalies averaged afterward, and tracks the valid-pixel fraction for each month.
-3. Preprocess also aggregates pixels into a configurable `N x N` grid of sub-regions. The default `N` is 8, and setting `N` to the native resolution gives plain pixels.
-4. The slider and the heatmap both show those sub-regions.
+3. Preprocess also builds a `Grid` of cells for per-cell analysis, the slider and the heatmap. Each cell is a square block of `k x k` native pixels, built like the region series: latitude-weighted, per-pixel anomalies, and its own coverage rule. Partial blocks along the bottom and right edges keep their real pixels. Cells are never a fixed `N x N` split of the rectangle, which would stretch them on a non-square one.
+   - `k` is the job's `block_pixels`, else the variable's catalog default (1 for MERRA-2, 2 for GLDAS, 4 for IMERG), else `ceil(longer side / SUBREGION_N)`, else 1 for native pixels.
+   - Preprocess then lowers `k` to leave at least 3 cells on the shorter side, and raises it to keep both sides within `MAX_GRID`; `MAX_GRID` wins.
+   - The `Grid` records the `k` it used, how many pixels in each cell ever have data, and the cell edges.
+   - Why blocks and not pixels or a fixed split: a synthetic test found the best cell size follows the size of the feature, not the rectangle, and square cells beat stretched ones of the same area for compact features. See Decisions › Region model.
+4. The slider and the heatmap both show those cells. A different block size reruns only preprocess and analysis, because ingest's cache doesn't depend on it.
 
 Size guards, all configurable:
 - `MAX_GRANULES`, checked with CMR before submitting.
-- `MAX_GRID`. Larger grids are block-averaged down, and the UI shows the resulting resolution.
+- `MAX_GRID`. Larger grids get bigger blocks, and the UI shows the resulting cell size.
 - Daily products become monthly values in preprocess, using a minimum-valid-days rule.
 
 **Slider cube.** One compact binary file per cube: 16-bit values with a scale, offset and missing-data mask. A JSON header gives the axes, units and color range. There's one cube for raw values and one for anomalies. The browser downloads it once and draws any month locally.
@@ -183,7 +187,7 @@ The filter chain is an ordered list of named operations, kept in a registry insi
 - `monthly_mean{min_valid_days}`
 - `anomaly{kind: absolute|percent|standardized, baseline}`
 - `log10`
-- `coarsen`
+- `coarsen`, deprecated for grids: it averages before the region series, unweighted
 - `gap_fill_display{max_gap}`
 
 Rules:

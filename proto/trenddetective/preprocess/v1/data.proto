@@ -124,6 +124,18 @@ message Grid {
   trenddetective.common.v1.BlobRef values = 10;
   // Anomalies in the same layout. Unset without an anomaly step.
   trenddetective.common.v1.BlobRef anomalies = 11;
+  // Native pixels per side of each cell: the k from Aggregation, after the
+  // max_grid cap and the 3-cell floor. 1 means native pixels.
+  int32 block_pixels = 12;
+  // For each cell, row-major, how many native pixels ever have data. Edge
+  // cells hold fewer than k x k pixels, and a cell of 0 (all ocean in a land
+  // product, say) is NaN throughout.
+  repeated int32 cell_pixels = 13;
+  // Cell edges in degrees: rows + 1 latitudes, north first, and cols + 1
+  // longitudes, west first. Edge cells can be narrower than the rest, so draw
+  // cells from these rather than from lats and lons.
+  repeated double lat_edges = 14;
+  repeated double lon_edges = 15;
 }
 
 // Which data a slider cube holds.

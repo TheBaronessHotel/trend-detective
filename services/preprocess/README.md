@@ -8,7 +8,9 @@ See the Preprocessing and Regions and grids sections of [ARCHITECTURE.md](../../
 
 PRE-1 (decoders) and PRE-2 (the filter chain) are in. Still to come:
 
-- **PRE-3, aggregation.** A grid becomes a region series by a cos(latitude)-weighted mean of its valid pixels, for values and anomalies separately, so the region anomaly is already the mean of the per-pixel anomalies. The N×N sub-regions come with PRE-3; until then the Grid stays at native resolution, capped at `max_grid`.
+- **PRE-3, aggregation.** A grid becomes a region series by a cos(latitude)-weighted mean of its valid pixels, for values and anomalies separately, so the region anomaly is already the mean of the per-pixel anomalies.
+  - The `Grid` averages square blocks of `k x k` native pixels the same way: weighted, per-pixel anomalies, and a cell is NaN when fewer than `min_valid_fraction` of its pixels that ever have data are valid. `output.block_size` picks `k`: `block_pixels`, else `ceil(longer side / subregion_n)`, else 1, then at least 3 cells on the shorter side and at most `max_grid` per side. Blocks at the bottom and right edges keep only their real pixels.
+  - `Grid.block_pixels` is the `k` used, `cell_pixels` counts each cell's pixels that ever have data (0 for an all-ocean cell), and `lat_edges` and `lon_edges` give each cell's exact extent. The region series doesn't depend on `k`.
   - Coverage counts only pixels that have data at least once in the record, so ocean in a land-only product like GLDAS works as a mask instead of failing every month of a coastal rectangle.
   - `Grid.bbox` is the requested rectangle, the same as `Series.bbox`.
 - **PRE-4, the slider cubes.** `value_cube` and `anomaly_cube` stay unset.
@@ -53,7 +55,7 @@ The catalog gives each variable an ordered list of steps, and the gateway copies
 | `linear{scale, offset, units}` | `value × scale + offset`, then renames the units. An unset scale means 1 | |
 | `monthly_mean{min_valid_days}` | The mean of each month's valid days. A weekly value counts as 7 days. Monthly data passes through | `TOO_FEW_DAYS` |
 | `log10` | Units become `log₁₀(<units>)`, as the catalog writes them | `NOT_POSITIVE` |
-| `coarsen{factor}` | Averages blocks of pixels. Point data passes through | |
+| `coarsen{factor}` | Deprecated for grids: it averages blocks before the region series and the anomaly step, unweighted. The `Grid`'s blocks replace it. Point data passes through | |
 | `anomaly{kind, baseline, min_baseline_coverage, method, harmonics}` | The difference from each calendar month's normal, per pixel | |
 | `gap_fill_display{max_gap}` | Draws straight lines across gaps of up to `max_gap` steps (default 2), never at the ends | |
 

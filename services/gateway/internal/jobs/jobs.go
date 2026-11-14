@@ -445,17 +445,56 @@ func (o *Orchestrator) resolve(spec *gatewayv1.JobSpec) (*gatewayv1.JobSpec, *ca
 	if r.Tests == nil {
 		r.Tests = entry.Tests()
 	}
-	if r.Aggregation == nil {
-		r.Aggregation = entry.Aggregation()
+	agg, err := o.aggregation(entry, r.GetAggregation())
+	if err != nil {
+		return nil, nil, err
 	}
-	if r.Aggregation == nil {
-		r.Aggregation = &preprocessv1.Aggregation{SubregionN: o.limits.SubregionN, MinValidFraction: 0.5}
+	r.Aggregation = agg
+	return r, entry, nil
+}
+
+// Largest Grid block a job may ask for, in native pixels per side.
+const maxBlockPixels = 64
+
+// aggregation lays a request's settings over the variable's, field by field,
+// so a job that only picks a block size keeps the catalog's other settings.
+// Unset fields fall back to the gateway's defaults.
+func (o *Orchestrator) aggregation(entry *catalog.Entry, req *preprocessv1.Aggregation) (*preprocessv1.Aggregation, error) {
+	a := entry.Aggregation()
+	if a == nil {
+		a = &preprocessv1.Aggregation{}
+	}
+	if req != nil {
+		if req.BlockPixels != nil {
+			if b := req.GetBlockPixels(); b < 1 || b > maxBlockPixels {
+				return nil, invalid("Pick a cell size from 1 to %d pixels.", maxBlockPixels)
+			}
+			a.BlockPixels = proto.Int32(req.GetBlockPixels())
+		}
+		if req.GetSubregionN() < 0 || req.GetMinValidFraction() < 0 || req.GetMinValidFraction() > 1 {
+			return nil, invalid("The grid settings are out of range.")
+		}
+		if req.GetSubregionN() > 0 {
+			a.SubregionN = req.GetSubregionN()
+		}
+		if req.GetMinValidFraction() > 0 {
+			a.MinValidFraction = req.GetMinValidFraction()
+		}
+		if req.GetMaxGrid() > 0 {
+			a.MaxGrid = req.GetMaxGrid()
+		}
+	}
+	if a.GetSubregionN() == 0 {
+		a.SubregionN = o.limits.SubregionN
+	}
+	if a.GetMinValidFraction() == 0 {
+		a.MinValidFraction = 0.5
 	}
 	// MAX_GRID is a guard, so a request can lower it but not raise it.
-	if g := r.Aggregation.GetMaxGrid(); g <= 0 || g > o.limits.MaxGrid {
-		r.Aggregation.MaxGrid = o.limits.MaxGrid
+	if g := a.GetMaxGrid(); g <= 0 || g > o.limits.MaxGrid {
+		a.MaxGrid = o.limits.MaxGrid
 	}
-	return r, entry, nil
+	return a, nil
 }
 
 func center(b *commonv1.BBox) *commonv1.LatLon {

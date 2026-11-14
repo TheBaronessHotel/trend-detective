@@ -586,7 +586,19 @@ type Grid struct {
 	// numpy reads it with np.fromfile(f, "<f4").reshape(times, rows, cols).
 	Values *v1.BlobRef `protobuf:"bytes,10,opt,name=values,proto3" json:"values,omitempty"`
 	// Anomalies in the same layout. Unset without an anomaly step.
-	Anomalies     *v1.BlobRef `protobuf:"bytes,11,opt,name=anomalies,proto3" json:"anomalies,omitempty"`
+	Anomalies *v1.BlobRef `protobuf:"bytes,11,opt,name=anomalies,proto3" json:"anomalies,omitempty"`
+	// Native pixels per side of each cell: the k from Aggregation, after the
+	// max_grid cap and the 3-cell floor. 1 means native pixels.
+	BlockPixels int32 `protobuf:"varint,12,opt,name=block_pixels,json=blockPixels,proto3" json:"block_pixels,omitempty"`
+	// For each cell, row-major, how many native pixels ever have data. Edge
+	// cells hold fewer than k x k pixels, and a cell of 0 (all ocean in a land
+	// product, say) is NaN throughout.
+	CellPixels []int32 `protobuf:"varint,13,rep,packed,name=cell_pixels,json=cellPixels,proto3" json:"cell_pixels,omitempty"`
+	// Cell edges in degrees: rows + 1 latitudes, north first, and cols + 1
+	// longitudes, west first. Edge cells can be narrower than the rest, so draw
+	// cells from these rather than from lats and lons.
+	LatEdges      []float64 `protobuf:"fixed64,14,rep,packed,name=lat_edges,json=latEdges,proto3" json:"lat_edges,omitempty"`
+	LonEdges      []float64 `protobuf:"fixed64,15,rep,packed,name=lon_edges,json=lonEdges,proto3" json:"lon_edges,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -694,6 +706,34 @@ func (x *Grid) GetValues() *v1.BlobRef {
 func (x *Grid) GetAnomalies() *v1.BlobRef {
 	if x != nil {
 		return x.Anomalies
+	}
+	return nil
+}
+
+func (x *Grid) GetBlockPixels() int32 {
+	if x != nil {
+		return x.BlockPixels
+	}
+	return 0
+}
+
+func (x *Grid) GetCellPixels() []int32 {
+	if x != nil {
+		return x.CellPixels
+	}
+	return nil
+}
+
+func (x *Grid) GetLatEdges() []float64 {
+	if x != nil {
+		return x.LatEdges
+	}
+	return nil
+}
+
+func (x *Grid) GetLonEdges() []float64 {
+	if x != nil {
+		return x.LonEdges
 	}
 	return nil
 }
@@ -909,7 +949,7 @@ const file_trenddetective_preprocess_v1_data_proto_rawDesc = "" +
 	"\x04mean\x18\x02 \x01(\x01R\x04mean\x12\x0e\n" +
 	"\x02sd\x18\x03 \x01(\x01R\x02sd\x12\x14\n" +
 	"\x05years\x18\x04 \x01(\x05R\x05years\x12\x16\n" +
-	"\x06usable\x18\x05 \x01(\bR\x06usable\"\xa7\x03\n" +
+	"\x06usable\x18\x05 \x01(\bR\x06usable\"\xa5\x04\n" +
 	"\x04Grid\x12\x1f\n" +
 	"\vvariable_id\x18\x01 \x01(\tR\n" +
 	"variableId\x12\x14\n" +
@@ -923,7 +963,12 @@ const file_trenddetective_preprocess_v1_data_proto_rawDesc = "" +
 	"\x05times\x18\t \x03(\v2\x1a.google.protobuf.TimestampR\x05times\x129\n" +
 	"\x06values\x18\n" +
 	" \x01(\v2!.trenddetective.common.v1.BlobRefR\x06values\x12?\n" +
-	"\tanomalies\x18\v \x01(\v2!.trenddetective.common.v1.BlobRefR\tanomalies\"\xcf\x04\n" +
+	"\tanomalies\x18\v \x01(\v2!.trenddetective.common.v1.BlobRefR\tanomalies\x12!\n" +
+	"\fblock_pixels\x18\f \x01(\x05R\vblockPixels\x12\x1f\n" +
+	"\vcell_pixels\x18\r \x03(\x05R\n" +
+	"cellPixels\x12\x1b\n" +
+	"\tlat_edges\x18\x0e \x03(\x01R\blatEdges\x12\x1b\n" +
+	"\tlon_edges\x18\x0f \x03(\x01R\blonEdges\"\xcf\x04\n" +
 	"\n" +
 	"CubeHeader\x12\x1f\n" +
 	"\vvariable_id\x18\x01 \x01(\tR\n" +

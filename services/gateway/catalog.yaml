@@ -17,7 +17,9 @@
 #                    the series at the rectangle's center, in a few seconds
 #   source_units     units of the raw values, for files that don't say
 #   filters          the default preprocess.v1.FilterChain
-#   aggregation      optional preprocess.v1.Aggregation. Unset uses SUBREGION_N and MAX_GRID
+#   aggregation      optional preprocess.v1.Aggregation; block_pixels sets the grid's
+#                    default cell size. A job's settings go on top, field by field,
+#                    and unset ones use SUBREGION_N, MAX_GRID and 0.5 coverage
 #   tests            the default analysis.v1.TestPlan
 #   llm_hints        extra context for the narrator
 #   dataset_url      the product's page, for citations
@@ -83,6 +85,8 @@ variables:
         variables: [Grid/precipitation]
       giovanni-point: { data_field_id: GPM_3IMERGM_07_precipitation }
     source_units: mm/hr
+    # Grid cells of 4x4 native pixels: IMERG pixels are 0.1°, about 10 km, and noisy. See Decisions > Region model.
+    aggregation: { block_pixels: 4 }
     filters:
       ops:
         - qc_range: { min: 0, max: 100 }
@@ -121,6 +125,8 @@ variables:
         collection_id: C1276812859-GES_DISC
         variables: [T2M]
     source_units: K
+    # Grid cells of 1x1 native pixels: MERRA-2 pixels are already 0.5° by 0.625°. See Decisions > Region model.
+    aggregation: { block_pixels: 1 }
     filters:
       ops:
         - qc_range: { min: 150, max: 350 }
@@ -153,6 +159,8 @@ variables:
         variables: [SoilMoi0_10cm_inst]
       giovanni-point: { data_field_id: GLDAS_NOAH025_M_2_1_SoilMoi0_10cm_inst }
     source_units: kg/m²
+    # Grid cells of 2x2 native pixels: GLDAS pixels are 0.25°. See Decisions > Region model.
+    aggregation: { block_pixels: 2 }
     filters:
       ops:
         - qc_range: { min: 0, max: 100 }
@@ -184,6 +192,8 @@ variables:
         variables: [SWE_inst]
       giovanni-point: { data_field_id: GLDAS_NOAH025_M_2_1_SWE_inst }
     source_units: kg/m²
+    # Grid cells of 2x2 native pixels: GLDAS pixels are 0.25°. See Decisions > Region model.
+    aggregation: { block_pixels: 2 }
     filters:
       ops:
         - qc_range: { min: 0, max: 20000 }
@@ -218,6 +228,8 @@ variables:
         collection_id: C1276812859-GES_DISC
         variables: [TO3]
     source_units: DU
+    # Grid cells of 1x1 native pixels: MERRA-2 pixels are already 0.5° by 0.625°. See Decisions > Region model.
+    aggregation: { block_pixels: 1 }
     filters:
       ops:
         - qc_range: { min: 50, max: 700 }
@@ -252,6 +264,8 @@ variables:
         collection_id: C1276812866-GES_DISC
         variables: [TOTEXTTAU]
     source_units: AOD
+    # Grid cells of 1x1 native pixels: MERRA-2 pixels are already 0.5° by 0.625°. See Decisions > Region model.
+    aggregation: { block_pixels: 1 }
     filters:
       ops:
         - qc_range: { min: 0, max: 10 }
@@ -516,8 +530,9 @@ variables:
       ops:
         - qc_range: { min: 200, max: 360 }
         - linear: { scale: 1, offset: -273.15, units: °C }
-        # 8-day composites, about four a month. Clouds blank some of them.
-        - monthly_mean: { min_valid_days: 2 }
+        # 8-day composites, about four a month, each counted as 7 days, so
+        # 14 asks for at least two of them. Clouds blank some.
+        - monthly_mean: { min_valid_days: 14 }
         - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
         - gap_fill_display: { max_gap: 2 }
     tests: *series-tests

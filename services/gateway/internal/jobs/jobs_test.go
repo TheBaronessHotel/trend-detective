@@ -589,3 +589,60 @@ func TestCancelAnUnknownJob(t *testing.T) {
 		t.Errorf("cancel of an unknown job: %v", err)
 	}
 }
+
+func TestAggregationMergesFieldByField(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+
+	// precipitation-gpm's catalog entry sets block_pixels 4; nothing else.
+	s := spec()
+	s.VariableId, s.Source = "precipitation-gpm", ingestv1.Source_SOURCE_HARMONY_SUBSET
+	job, err := h.o.CreateJob(ctx, s, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := job.GetSpec().GetAggregation()
+	if a.GetBlockPixels() != 4 || a.GetSubregionN() != 8 || a.GetMinValidFraction() != 0.5 || a.GetMaxGrid() != 128 {
+		t.Errorf("catalog default: %v", a)
+	}
+
+	// A job that only picks a block size keeps the rest.
+	s.Aggregation = &preprocessv1.Aggregation{BlockPixels: proto.Int32(2)}
+	job, err = h.o.CreateJob(ctx, s, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a = job.GetSpec().GetAggregation()
+	if a.GetBlockPixels() != 2 || a.GetMinValidFraction() != 0.5 || a.GetMaxGrid() != 128 {
+		t.Errorf("block size only: %v", a)
+	}
+
+	// A variable with no aggregation in the catalog gets the defaults, and
+	// MAX_GRID can be lowered but not raised.
+	s = spec()
+	s.Aggregation = &preprocessv1.Aggregation{MaxGrid: 1000, MinValidFraction: 0.8}
+	job, err = h.o.CreateJob(ctx, s, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a = job.GetSpec().GetAggregation()
+	if a.BlockPixels != nil || a.GetSubregionN() != 8 || a.GetMinValidFraction() != 0.8 || a.GetMaxGrid() != 128 {
+		t.Errorf("defaults: %v", a)
+	}
+}
+
+func TestAggregationRefusesOutOfRange(t *testing.T) {
+	h := newHarness(t)
+	for _, a := range []*preprocessv1.Aggregation{
+		{BlockPixels: proto.Int32(0)},
+		{BlockPixels: proto.Int32(65)},
+		{MinValidFraction: 1.5},
+		{SubregionN: -1},
+	} {
+		s := spec()
+		s.Aggregation = a
+		if _, err := h.o.CreateJob(context.Background(), s, ""); err == nil {
+			t.Errorf("accepted %v", a)
+		}
+	}
+}

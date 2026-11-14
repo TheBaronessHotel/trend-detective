@@ -33,7 +33,7 @@ message FilterOp {
     MonthlyMean monthly_mean = 3;
     Anomaly anomaly = 4;
     Log10 log10 = 5;
-    Coarsen coarsen = 6;
+    Coarsen coarsen = 6 [deprecated = true];
     GapFillDisplay gap_fill_display = 7;
   }
 }
@@ -79,6 +79,9 @@ message Anomaly {
 message Log10 {}
 
 // Block-average pixels by a factor in each direction.
+// Deprecated for gridded data: it averages blocks before the region series
+// and the anomaly step, unweighted, and loses why pixels are missing. The
+// Grid's square blocks (Aggregation.block_pixels) replace it.
 message Coarsen {
   int32 factor = 1;
 }
@@ -91,16 +94,34 @@ message GapFillDisplay {
 }
 
 // How preprocess aggregates pixels.
+// How preprocess builds the Grid for per-cell analysis, the slider and the
+// heatmap. The region series doesn't depend on it: it always uses every valid
+// native pixel.
+//
+// The Grid averages square blocks of k x k native pixels with stride k, never
+// a fixed N x N split of the rectangle, whose cells would stretch on a
+// non-square one. Partial blocks at the edges keep their real pixels. k is:
+//   1. block_pixels, from the job or the catalog's default for the variable;
+//   2. else ceil(longer side / subregion_n);
+//   3. else 1, native pixels.
+// Then k is lowered to leave at least 3 cells on the shorter side, and raised
+// to keep both sides within max_grid; max_grid wins. Grid.block_pixels
+// records the k used. See Decisions > Region model.
 message Aggregation {
-  // Sub-regions per side for the slider and heatmap. Default 8. Zero means
-  // native pixels, still capped by max_grid.
+  // Cells per side, used to pick k only when block_pixels isn't set. The
+  // gateway's default is SUBREGION_N, 8. Zero means native pixels.
   int32 subregion_n = 1;
-  // Largest grid side. Bigger grids are block-averaged down. The gateway sets
-  // it from MAX_GRID.
+  // Largest grid side. The gateway sets it from MAX_GRID; a job can lower it
+  // but not raise it.
   int32 max_grid = 2;
-  // A time step counts only if at least this share of the rectangle's pixels
-  // is valid. Default 0.5.
+  // A time step counts only if at least this share of the pixels that ever
+  // have data is valid, for the region series and for each Grid cell.
+  // Default 0.5.
   double min_valid_fraction = 3;
+  // Native pixels per side of a Grid block, 1 for native resolution. Wins
+  // over subregion_n. The gateway takes it from the job, else from the
+  // catalog, and accepts 1 to 64.
+  optional int32 block_pixels = 4;
 }
 
 // What preprocess wrote to the prep bucket. It reports this in StageDone.
