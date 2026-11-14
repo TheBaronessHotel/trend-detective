@@ -36,6 +36,8 @@ type fakeNASA struct {
 	cmrCalls  int
 	eula      bool
 	login     bool
+	// When set, a failed job reports this error message.
+	failWith string
 }
 
 func newFakeNASA(t *testing.T) *fakeNASA {
@@ -79,6 +81,9 @@ func (f *fakeNASA) serve(w http.ResponseWriter, r *http.Request) {
 				"url":     "https://opendap.example/granule.HDF5",
 				"message": "WorkItem failed: Subsetter failed with error: 403 error retrieving: https://opendap.example/granule.HDF5.dmr.xml",
 			}}
+		}
+		if status == "failed" && f.failWith != "" {
+			resp["errors"] = []map[string]string{{"message": f.failWith}}
 		}
 		if status == "successful" {
 			resp["links"] = []map[string]any{
@@ -327,6 +332,25 @@ func TestRefusedArchiveExplainsHowToFixIt(t *testing.T) {
 	wantCode(t, err, gatewayv1.ErrorCode_ERROR_CODE_UNAUTHENTICATED, false)
 	if msg := core.AsError(err).UserMessage; !strings.Contains(msg, gesdiscApproval) {
 		t.Errorf("user message should link the approval page: %q", msg)
+	}
+}
+
+// Giovanni explains a refused input, like a start before the product's
+// first time step. That's the request's fault, so trying again won't help.
+func TestGiovanniRefusalIsPassedOn(t *testing.T) {
+	h := newHarness(t, Config{})
+	h.a = NewAreaAverage(h.a.cfg, h.a.rdb)
+	h.nasa.statuses = []string{"failed"}
+	h.nasa.failWith = "WorkItem failed: giovanni-averaging-adapter:v1.1.14: One of your inputs in the request is not supported by the Cloud Giovanni Averaging Service: " +
+		"Specified start time must be on or after the product's first time value, 2015-01-01T12:00:00Z.: WorkItem failed: giovanni-averaging-adapter:v1.1.14: the same again"
+	ctx := context.Background()
+	_, err := h.a.Fetch(ctx, areaTask(), newSink())
+	wantPending(t, err)
+	_, err = h.a.Fetch(ctx, areaTask(), newSink())
+	wantCode(t, err, gatewayv1.ErrorCode_ERROR_CODE_INVALID_REQUEST, false)
+	want := "NASA's Giovanni service refused this request: Specified start time must be on or after the product's first time value, 2015-01-01T12:00:00Z."
+	if msg := core.AsError(err).UserMessage; msg != want {
+		t.Errorf("user message %q", msg)
 	}
 }
 

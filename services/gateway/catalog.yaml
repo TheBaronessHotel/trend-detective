@@ -350,7 +350,9 @@ variables:
       filling the gaps between its paths.
     units: ppm
     step: monthly
-    available: { start: 2015-01-01, end: 2022-02-28 }
+    # Each day is stamped at noon, and Giovanni's averaging refuses a start
+    # before 2015-01-01T12:00, so the range starts the day after.
+    available: { start: 2015-01-02, end: 2022-02-28 }
     grid: false
     domain: global
     default_source: giovanni-area
