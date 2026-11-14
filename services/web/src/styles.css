@@ -550,6 +550,11 @@ p {
   letter-spacing: 0;
 }
 
+.stage-note {
+  grid-column: 2 / -1;
+  margin: 0.2rem 0 0;
+}
+
 .alert {
   display: grid;
   grid-template-columns: 1rem minmax(0, 1fr);
@@ -613,4 +618,221 @@ p {
   .main {
     min-height: 80vh;
   }
+}
+
+/* ---- results: the series chart beside the job's stages ---- */
+.job.with-chart {
+  display: grid;
+  grid-template-columns: minmax(16rem, 21rem) minmax(0, 1fr);
+  gap: 2rem;
+  max-height: 60vh;
+}
+
+@media (max-width: 1100px) {
+  .job.with-chart {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.job-chart {
+  min-width: 0;
+}
+
+
+.chart {
+  margin: 0;
+  min-width: 0;
+}
+
+/* Title over its details on the left, buttons on the right. */
+.chart-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.25rem 1rem;
+  margin: 0 0 0.7rem;
+}
+
+.chart-title {
+  font-size: 0.9rem;
+}
+
+.chart-meta {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.chart-actions {
+  display: flex;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  gap: 0.6rem;
+}
+
+.chart-plot {
+  position: relative;
+}
+
+.chart-plot svg {
+  display: block;
+  overflow: visible;
+  font-family: var(--mono);
+  font-size: 10.5px;
+}
+
+.chart-plot svg:focus {
+  outline: none;
+}
+
+.chart-plot svg:focus-visible {
+  outline: 1px solid var(--fg);
+  outline-offset: 6px;
+}
+
+/* Marks wear the ink; everything else stays a step back. */
+.chart .grid {
+  stroke: var(--line);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.chart .zero {
+  stroke: var(--muted);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.chart .axis-text {
+  fill: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart .band {
+  fill: var(--fg);
+  fill-opacity: 0.1;
+}
+
+.chart .line {
+  fill: none;
+  stroke: var(--fg);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart .line.filled {
+  stroke-dasharray: 4 4;
+  stroke-linecap: butt;
+}
+
+.chart .dot {
+  fill: var(--fg);
+  stroke: var(--bg);
+  stroke-width: 2;
+}
+
+.chart .missing {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+.chart .bar {
+  fill: var(--fg);
+  fill-opacity: 0.6;
+}
+
+.chart .crosshair {
+  stroke: var(--muted);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.chart .hit {
+  fill: transparent;
+  cursor: crosshair;
+}
+
+/* Values lead in the readout; their labels follow in gray. */
+.chart-tip {
+  position: absolute;
+  top: 0;
+  z-index: 2;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  font-size: 0.74rem;
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+.chart-tip strong {
+  font-weight: 600;
+}
+
+.tip-muted {
+  color: var(--muted);
+}
+
+.chart-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.4rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.chart-key li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.key-mark {
+  display: block;
+  overflow: visible;
+}
+
+.chart-details {
+  margin: 0.8rem 0 0;
+  font-size: 0.78rem;
+}
+
+.chart-details summary {
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.chart-details summary:hover {
+  color: var(--fg);
+}
+
+.chart-table-wrap {
+  max-height: 16rem;
+  margin: 0.6rem 0 0;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+}
+
+.chart-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-table th,
+.chart-table td {
+  padding: 0.35rem 0.8rem 0.35rem 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-weight: 400;
+}
+
+.chart-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  color: var(--muted);
 }

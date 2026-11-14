@@ -43,6 +43,27 @@ describe("stageViews", () => {
     expect(ingest).toMatchObject({ state: "failed", error: 'Row 3: "abc" isn\'t a number.' });
   });
 
+  // The gateway only hears about a task when it finishes, so queued may
+  // already mean running, as with a Harmony fetch that takes minutes.
+  test("a queued task counts as running, since the job was created", () => {
+    const j = job([{ stage: Stage.INGEST, state: TaskState.QUEUED }]);
+    j.createdAt = timestampFromMs(Date.UTC(2026, 10, 14, 19, 43, 30));
+    const [ingest] = stageViews(j, Stage.PREPROCESS);
+    expect(ingest).toMatchObject({ state: "running", since: Date.UTC(2026, 10, 14, 19, 43, 30) });
+  });
+
+  test("the next stage runs from when the one before finished", () => {
+    const j = job([
+      { stage: Stage.INGEST, state: TaskState.SUCCEEDED },
+      { stage: Stage.PREPROCESS, state: TaskState.QUEUED },
+    ]);
+    const done = j.tasks[0];
+    if (done) done.finishedAt = timestampFromMs(Date.UTC(2026, 10, 14, 19, 50));
+    const views = stageViews(j, Stage.PREPROCESS);
+    expect(views[1]).toMatchObject({ state: "running", since: Date.UTC(2026, 10, 14, 19, 50) });
+    expect(views[0]?.since).toBeUndefined();
+  });
+
   test("some tasks done and some queued is running", () => {
     const views = stageViews(
       job([

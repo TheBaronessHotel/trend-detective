@@ -2,7 +2,8 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { Variable } from "@gen/gateway/v1/gateway_pb";
 import { Stage } from "@gen/gateway/v1/task_pb";
 import { Source } from "@gen/ingest/v1/ingest_pb";
-import { errorMessage, gateway, uploadCsv } from "./api";
+import { JobState } from "@gen/gateway/v1/gateway_pb";
+import { errorMessage, gateway, loadSeries, saveSeriesCsv, uploadCsv } from "./api";
 import { DatesPicker } from "./components/DatesPicker";
 import { JobPanel, type Run } from "./components/JobPanel";
 import { PlaceFields } from "./components/PlaceFields";
@@ -13,9 +14,9 @@ import { type Box, problem } from "./lib/bbox";
 import { type Day, jobRange } from "./lib/dates";
 import { isFinished } from "./lib/job";
 
-// Jobs stop after fetching the data until the preprocess service runs in the
-// stack. A later stage with no worker would leave the job waiting forever.
-const STOP_AFTER = Stage.INGEST;
+// Jobs stop after preprocessing until the analysis service runs in the stack.
+// A later stage with no worker would leave the job waiting forever.
+const STOP_AFTER = Stage.PREPROCESS;
 
 // MapLibre is most of the bundle, so the map loads on its own after the page.
 const MapView = lazy(() => import("./components/MapView").then((m) => ({ default: m.MapView })));
@@ -91,11 +92,28 @@ export function App() {
       }
       // The stream ends when the job finishes. If it broke off early, ask once.
       if (!isFinished(last)) last = (await gateway.getJob({ jobId: job.id }, { signal })).job ?? last;
-      setRun({ phase: "done", job: last });
+      const hasSeries = last.state === JobState.SUCCEEDED && !!last.results?.preprocess?.series;
+      setRun({ phase: "done", job: last, loadingSeries: hasSeries });
+      if (!hasSeries) return;
+      try {
+        const series = await loadSeries(job.id, signal);
+        setRun({ phase: "done", job: last, series });
+      } catch (err) {
+        if (signal.aborted) return;
+        setRun({ phase: "done", job: last, seriesError: `Couldn't load the chart. ${errorMessage(err)}` });
+      }
     } catch (err) {
       if (signal.aborted) return;
-      setRun((r) => ({ ...r, phase: "done", error: errorMessage(err) }));
+      setRun((r) => ({ ...r, phase: "done", loadingSeries: false, error: errorMessage(err) }));
     }
+  }
+
+  const seriesTitle = (id: string) => variables?.find((v) => v.id === id)?.name ?? id;
+
+  function saveCsv() {
+    const job = run?.job;
+    if (!job) return Promise.resolve();
+    return saveSeriesCsv(job.id, `trend-detective-${run?.series?.variableId || "series"}.csv`);
   }
 
   return (
@@ -136,7 +154,7 @@ export function App() {
         <Suspense fallback={<div className="map-wrap" />}>
           <MapView box={box} onBox={setBox} />
         </Suspense>
-        <JobPanel run={run} stopAfter={STOP_AFTER} />
+        <JobPanel run={run} stopAfter={STOP_AFTER} seriesTitle={seriesTitle} onSaveCsv={saveCsv} />
       </main>
     </div>
   );
