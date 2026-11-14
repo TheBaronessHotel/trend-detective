@@ -189,6 +189,49 @@ services:
       - "127.0.0.1:3000:80"
     restart: unless-stopped
 
+  # Streams LLM explanations of finished results, on http://localhost:8081.
+  # The gateway calls it; the user's key arrives per request, never via .env.
+  narrator:
+    build:
+      context: .
+      dockerfile: services/narrator/Dockerfile
+    environment:
+      <<: *infra-env
+      HTTP_ADDR: ":8081"
+      ANALYSIS_BUCKET: analysis
+      NARRATE_TIMEOUT: ${NARRATE_TIMEOUT:-3m}
+      # How long a provider may take before its response headers. Thinking
+      # models can hold them back for minutes. Capped at NARRATE_TIMEOUT.
+      NARRATOR_LLM_HEADER_TIMEOUT: ${NARRATOR_LLM_HEADER_TIMEOUT:-150s}
+      # Comma-separated hosts llm.base_url may use. Empty allows any host
+      # except metadata and the stack's own services.
+      NARRATOR_LLM_BASE_URL_ALLOWLIST: ${NARRATOR_LLM_BASE_URL_ALLOWLIST:-}
+      # Optional outbound proxy for LLM calls, for hosts that reach some
+      # providers only through one, e.g. http://host.docker.internal:3128.
+      # The proxy must listen on the Docker bridge, not only on 127.0.0.1.
+      HTTPS_PROXY: ${NARRATOR_HTTPS_PROXY:-}
+      HTTP_PROXY: ${NARRATOR_HTTP_PROXY:-}
+      NO_PROXY: ${NARRATOR_NO_PROXY:-localhost,127.0.0.1,::1,host.docker.internal,ollama,seaweedfs,nats,redis,gateway,narrator}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "127.0.0.1:8081:8081"
+    # Lets a base_url of http://host.docker.internal:11434/v1 reach Ollama on
+    # the host, on Linux too.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/narrator", "healthcheck"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    # The narrator lets streams finish for 10s after SIGTERM, then closes
+    # them. This leaves it room to exit on its own.
+    stop_grace_period: 15s
+    restart: unless-stopped
+
 volumes:
   nats-data:
   redis-data:
