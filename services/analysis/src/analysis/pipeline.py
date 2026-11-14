@@ -1,5 +1,6 @@
-"""One analysis task, from a prepared series to documents in the analysis
-bucket.
+"""One analysis task, from prepared data to documents in the analysis bucket:
+the series tests on the region series, and the grid tests on every cell when
+the source is gridded and the plan has any.
 
 This module knows nothing about NATS. The worker hands it an AnalysisTask and
 reports whatever it returns or raises.
@@ -9,14 +10,16 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import time
 
+import numpy as np
 from google.protobuf import json_format
 
-from trenddetective.analysis.v1 import analysis_pb2
+from trenddetective.analysis.v1 import analysis_pb2, results_pb2
 from trenddetective.common.v1 import common_pb2
 from trenddetective.preprocess.v1 import data_pb2
 
-from . import errors, suite
+from . import errors, grid, suite
 from .storage import Storage
 
 ANALYSIS_BUCKET = "analysis"
@@ -24,7 +27,7 @@ ANALYSIS_BUCKET = "analysis"
 # Changes whenever the documents this code writes could change for the same
 # task, like a new test or a fixed formula. It is part of the cache key, so
 # bumping it makes every cached result stale at once.
-CODE_VERSION = "4"
+CODE_VERSION = "5"
 KEY_VERSION = "analysis/v1"
 
 RESULT_FILE = "result.json"
@@ -63,6 +66,10 @@ def run(
 
     result = analysis_pb2.AnalysisResult()
     result.series.CopyFrom(_put_json(store, f"{key}/series.json", analysis))
+    # Series-only sources have no grid, and a plan can leave the grid out.
+    if task.input.HasField("grid") and task.tests.grid:
+        cells = _grid_analysis(store, task, analysis, logger)
+        result.grid.CopyFrom(_put_json(store, f"{key}/grid.json", cells))
     # Written last, so its presence means every other file is in.
     _put_json(store, result_key, result)
 
@@ -77,12 +84,60 @@ def run(
 
 
 def load_series(store: Storage, ref: common_pb2.BlobRef) -> data_pb2.Series:
+    return _load_json(store, ref, data_pb2.Series())
+
+
+def load_grid(store: Storage, ref: common_pb2.BlobRef) -> data_pb2.Grid:
+    return _load_json(store, ref, data_pb2.Grid())
+
+
+def load_cube(store: Storage, ref: common_pb2.BlobRef, shape: tuple[int, int, int]) -> np.ndarray:
+    """A little-endian float32 blob in [time][row][col] order, as float64."""
+    data = store.get(ref.bucket, ref.key)
+    cube = np.frombuffer(data, dtype="<f4")
+    if cube.size != shape[0] * shape[1] * shape[2]:
+        raise errors.internal(
+            "The prepared grid is damaged.",
+            f"{ref.bucket}/{ref.key} holds {cube.size} values, want {shape[0]}x{shape[1]}x{shape[2]}",
+        )
+    return cube.reshape(shape).astype("float64")
+
+
+def _grid_analysis(
+    store: Storage,
+    task: analysis_pb2.AnalysisTask,
+    analysis: results_pb2.SeriesAnalysis,
+    logger: logging.LoggerAdapter | logging.Logger,
+) -> results_pb2.GridAnalysis:
+    g = load_grid(store, task.input.grid)
+    shape = (len(g.times), g.rows, g.cols)
+    values = load_cube(store, g.values, shape)
+    anomalies = load_cube(store, g.anomalies, shape) if g.HasField("anomalies") else None
+    started = time.perf_counter()
+    # The series analysis has checked alpha and worked out the tested field's units.
+    cells = grid.run(g, values, anomalies, task.tests, alpha=analysis.alpha, units=analysis.units)
+    logger.info(
+        "tested the grid",
+        extra={
+            "fields": {
+                "cells": g.rows * g.cols,
+                "steps": len(g.times),
+                "layers": len(cells.layers),
+                "seconds": f"{time.perf_counter() - started:.1f}",
+            }
+        },
+    )
+    return cells
+
+
+def _load_json(store: Storage, ref: common_pb2.BlobRef, msg):
     data = store.get(ref.bucket, ref.key)
     try:
-        return json_format.Parse(data, data_pb2.Series(), ignore_unknown_fields=True)
+        return json_format.Parse(data, msg, ignore_unknown_fields=True)
     except json_format.ParseError as err:
+        name = type(msg).__name__
         raise errors.internal(
-            "The prepared data couldn't be read.", f"{ref.bucket}/{ref.key} isn't a Series: {err}"
+            "The prepared data couldn't be read.", f"{ref.bucket}/{ref.key} isn't a {name}: {err}"
         ) from err
 
 

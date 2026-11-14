@@ -103,22 +103,7 @@ def prepare(series: data_pb2.Series, field_choice: int) -> Monthly:
         raise errors.invalid(
             "The prepared data is damaged.", f"Series has {n} times but {len(series.values)} values"
         )
-    if series.step not in (common_pb2.TIME_STEP_MONTHLY, common_pb2.TIME_STEP_UNSPECIFIED):
-        name = _STEP_NAMES.get(series.step, "not monthly")
-        raise errors.invalid(
-            f"The trend tests need monthly values, and this series is {name}.",
-            f"Series.step is {common_pb2.TimeStep.Name(series.step)}; monthly_mean has to run in preprocess first",
-        )
-
-    months = np.array([_month_index(ts) for ts in series.times], dtype="int64")
-    if np.any(np.diff(months) <= 0):
-        raise errors.invalid(
-            "The trend tests need one value per month, and this series has more.",
-            "Series.times aren't one strictly increasing step per month",
-        )
-    first = int(months[0])
-    slots = months - first
-    size = int(slots[-1]) + 1
+    first, slots, size = regular_calendar(series.times, series.step)
 
     values = _on_calendar(series.values, slots, size)
     calendar = (first + np.arange(size)) % 12
@@ -170,9 +155,38 @@ def prepare(series: data_pb2.Series, field_choice: int) -> Monthly:
     )
 
 
+def regular_calendar(times, step: int) -> tuple[int, np.ndarray, int]:
+    """Where a list of monthly timestamps goes on a regular calendar: the
+    month index of the first, each time's slot, and the number of slots.
+
+    Raises a TaskFailure when the times aren't monthly.
+    """
+    if step not in (common_pb2.TIME_STEP_MONTHLY, common_pb2.TIME_STEP_UNSPECIFIED):
+        name = _STEP_NAMES.get(step, "not monthly")
+        raise errors.invalid(
+            f"The trend tests need monthly values, and this series is {name}.",
+            f"step is {common_pb2.TimeStep.Name(step)}; monthly_mean has to run in preprocess first",
+        )
+    months = np.array([_month_index(ts) for ts in times], dtype="int64")
+    if np.any(np.diff(months) <= 0):
+        raise errors.invalid(
+            "The trend tests need one value per month, and this series has more.",
+            "the times aren't one strictly increasing step per month",
+        )
+    first = int(months[0])
+    slots = months - first
+    return first, slots, int(slots[-1]) + 1
+
+
 def own_anomalies(values: np.ndarray, calendar: np.ndarray) -> np.ndarray:
     """Each value minus its calendar month's normal, for values on a regular
-    monthly calendar.
+    monthly calendar. See own_anomalies_cells."""
+    return own_anomalies_cells(values[:, None], calendar)[:, 0]
+
+
+def own_anomalies_cells(values: np.ndarray, calendar: np.ndarray) -> np.ndarray:
+    """Anomalies for each column of values (time, cell) on a regular monthly
+    calendar, each column with normals of its own.
 
     The normals come from a fit with one constant per calendar month and a
     straight-line trend, taken at the mean time, the same as preprocess's
@@ -180,27 +194,36 @@ def own_anomalies(values: np.ndarray, calendar: np.ndarray) -> np.ndarray:
     trend's rise within the year and leave only a staircase from year to year,
     a trend 2% low over 7 years: see Validation in the README. The normal of
     month m is its mean minus b (mean time of month m - mean time), with b the
-    trend within the months.
+    trend within the months. A month seen in fewer than MIN_VALUES_PER_MONTH
+    years has no normal, so no anomalies.
     """
-    t = np.arange(values.size) / 12.0
+    t = (np.arange(values.shape[0]) / 12.0)[:, None]
     ok = np.isfinite(values)
-    months = [m for m in range(12) if (ok & (calendar == m)).sum() >= MIN_VALUES_PER_MONTH]
-    sxy = sxx = 0.0
-    means: dict[int, tuple[float, float]] = {}
-    for m in months:
-        sel = ok & (calendar == m)
-        tm, ym = t[sel], values[sel]
-        means[m] = (float(tm.mean()), float(ym.mean()))
-        sxy += float((tm - tm.mean()) @ (ym - ym.mean()))
-        sxx += float((tm - tm.mean()) @ (tm - tm.mean()))
-    trend = sxy / sxx if sxx > 0 else 0.0
-    t_all = float(t[ok & np.isin(calendar, months)].mean()) if months else 0.0
-    out = np.full_like(values, np.nan)
-    for m in months:
-        t_month, y_month = means[m]
-        sel = calendar == m
-        out[sel] = values[sel] - (y_month - trend * (t_month - t_all))
-    return out
+    month_of = calendar.astype("int64")
+    count = np.stack([(ok & (month_of == m)[:, None]).sum(axis=0) for m in range(12)])
+    has_normal = count >= MIN_VALUES_PER_MONTH  # (month, cell)
+    use = ok & has_normal[month_of]
+    w = use.astype("float64")
+    y = np.where(use, values, 0.0)
+    t_month = np.full(count.shape, np.nan)
+    y_month = np.full(count.shape, np.nan)
+    sxy = np.zeros(values.shape[1])
+    sxx = np.zeros(values.shape[1])
+    with np.errstate(invalid="ignore", divide="ignore"):
+        for m in range(12):
+            sel = month_of == m
+            wm, ym, tm = w[sel], y[sel], t[sel]
+            n = wm.sum(axis=0)
+            t_month[m] = (wm * tm).sum(axis=0) / n
+            y_month[m] = (wm * ym).sum(axis=0) / n
+            dt = np.where(wm > 0, tm - t_month[m], 0.0)
+            dy = np.where(wm > 0, ym - y_month[m], 0.0)
+            sxy += np.nan_to_num((dt * dy).sum(axis=0))
+            sxx += np.nan_to_num((dt * dt).sum(axis=0))
+        trend = np.where(sxx > 0, sxy / np.where(sxx > 0, sxx, 1.0), 0.0)
+        t_all = (w * t).sum(axis=0) / w.sum(axis=0)
+        normal = y_month - trend * (t_month - t_all)
+    return np.where(has_normal[month_of], values - normal[month_of], np.nan)
 
 
 def month_timestamp(month_index: float) -> timestamp_pb2.Timestamp:
