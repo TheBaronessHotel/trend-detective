@@ -1,9 +1,9 @@
 """Runs the series part of a TestPlan and builds the SeriesAnalysis document.
 
-Regression, Mann-Kendall and the agreement check came with ANA-1. The shuffle
-test, the trend triangle, the monthly trends and the years to significance
-come with ANA-4. The diagnostics (ANA-3) and the grid tests (ANA-2) are logged
-and skipped, so their fields stay unset.
+Regression, Mann-Kendall and the agreement check came with ANA-1, the extras
+with ANA-4, and the diagnostics (Pettitt, residual checks, outliers) with
+ANA-3. The grid tests (ANA-2) are logged and skipped, so their field stays
+unset.
 """
 
 from __future__ import annotations
@@ -15,8 +15,8 @@ import numpy as np
 from trenddetective.analysis.v1 import analysis_pb2, results_pb2
 from trenddetective.preprocess.v1 import data_pb2
 
-from . import errors, extras, kendall, regression
-from .series import MIN_YEARS, Monthly, month_timestamp, prepare
+from . import diagnostics, errors, extras, kendall, regression
+from .series import MIN_VALID, MIN_YEARS, Monthly, month_timestamp, prepare
 
 DEFAULT_ALPHA = 0.05
 # Fewer effective values than this get a caveat.
@@ -25,6 +25,24 @@ DEFAULT_PERMUTATIONS = 1000
 MAX_PERMUTATIONS = 10_000
 DEFAULT_BLOCK_LENGTH = 12
 DEFAULT_MIN_YEARS = 10
+DEFAULT_ROBUST_Z = 3.5
+
+PASS = results_pb2.CHECK_STATUS_PASS
+WARN = results_pb2.CHECK_STATUS_WARN
+
+_MONTH_NAMES = (
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+)  # fmt: skip
+
+NOT_BELL_SHAPED_MK = (
+    "The scatter around the trend line isn't bell-shaped, so the Mann-Kendall test, which doesn't need it to be, "
+    "is the safer guide."
+)
+NOT_BELL_SHAPED = "The scatter around the trend line isn't bell-shaped, so the regression's p-value is only rough."
+UNCORRECTED_AUTOCORRELATION = (
+    "Neighboring months are alike, and the regression doesn't allow for that, so its p-value comes out too small."
+)
 
 ONE_TEST_SIGNIFICANT = (
     "Only one of the two tests finds the trend significant, so a few extreme months may be driving it. "
@@ -92,6 +110,12 @@ def run(
             _monthly_trends(out, monthly, alpha, correct)
         elif kind == "years_to_significance":
             _years_to_significance(out, monthly, fit, alpha)
+        elif kind == "pettitt":
+            _pettitt(out, monthly, fit, alpha)
+        elif kind == "residual_checks":
+            _residual_checks(out, monthly, fit, alpha)
+        elif kind == "outliers":
+            _outliers(out, monthly, spec.outliers, fit, alpha, correct)
         else:
             skipped.append(kind)
             continue
@@ -100,6 +124,13 @@ def run(
     if out.HasField("regression") and out.HasField("mann_kendall"):
         out.agreement.CopyFrom(_agreement(out.regression, out.mann_kendall))
         out.warnings.extend(_disagreement(out.regression, out.mann_kendall))
+    # After the loop, because the advice depends on whether Mann-Kendall ran.
+    if out.HasField("residual_checks"):
+        checks = out.residual_checks
+        if checks.autocorrelation == WARN and not correct:
+            out.warnings.append(UNCORRECTED_AUTOCORRELATION)
+        if checks.normality == WARN:
+            out.warnings.append(NOT_BELL_SHAPED_MK if out.HasField("mann_kendall") else NOT_BELL_SHAPED)
 
     if skipped:
         logger.info("skipped tests that aren't built yet", extra={"fields": {"tests": ",".join(skipped)}})
@@ -244,6 +275,98 @@ def _years_to_significance(
             already_significant=fit.p_value < alpha,
         )
     )
+
+
+def _pettitt(out: results_pb2.SeriesAnalysis, m: Monthly, fit: regression.LinearTrend, alpha: float) -> None:
+    # The line's residual sum of squares, to tell a step from a steady change.
+    line_sse = fit.residual_sd**2 * (fit.n - 2)
+    change = diagnostics.pettitt(m.tested, line_sse)
+    significant = change.p_value < alpha
+    out.pettitt.CopyFrom(
+        results_pb2.PettittResult(
+            p_value=change.p_value,
+            significant=significant,
+            mean_before=change.mean_before,
+            mean_after=change.mean_after,
+        )
+    )
+    out.pettitt.change_time.CopyFrom(month_timestamp(m.first_month + change.index))
+    # A steady trend makes Pettitt significant too, at its middle. Only a step
+    # that beats the straight line is worth a caveat.
+    if significant and change.step_fits_better:
+        out.warnings.append(
+            f"The values jump around {_month_name(m.first_month + change.index)} instead of changing steadily. "
+            "A sudden step, like a new sensor or a new dam, can look like a trend."
+        )
+
+
+def _residual_checks(out: results_pb2.SeriesAnalysis, m: Monthly, fit: regression.LinearTrend, alpha: float) -> None:
+    residuals = m.tested - (fit.intercept + fit.slope * m.t)
+    checks = diagnostics.residual_checks(residuals, fit, alpha)
+    out.residual_checks.CopyFrom(
+        results_pb2.ResidualChecksResult(
+            autocorrelation=PASS if checks.autocorrelation_ok else WARN,
+            lag1_autocorrelation=checks.lag1_autocorrelation,
+            normality=PASS if checks.normality_ok else WARN,
+            normality_p_value=checks.normality_p_value,
+        )
+    )
+
+
+def _outliers(
+    out: results_pb2.SeriesAnalysis,
+    m: Monthly,
+    spec: analysis_pb2.Outliers,
+    fit: regression.LinearTrend,
+    alpha: float,
+    correct: bool,
+) -> None:
+    threshold = spec.robust_z_threshold or DEFAULT_ROBUST_Z
+    if not threshold > 0:
+        raise errors.invalid(
+            "The outlier threshold has to be above 0.", f"Outliers.robust_z_threshold is {threshold}"
+        )
+    z = diagnostics.seasonal_robust_z(m.tested, m.calendar_month)
+    flagged = np.flatnonzero(np.abs(np.nan_to_num(z)) > threshold)
+    result = results_pb2.OutliersResult(robust_z_threshold=threshold)
+    result.outliers.extend(_outlier(m, z, i) for i in flagged)
+    # The months furthest above and below normal, with anomalies.
+    result.highest.CopyFrom(_outlier(m, z, int(np.nanargmax(m.tested))))
+    result.lowest.CopyFrom(_outlier(m, z, int(np.nanargmin(m.tested))))
+    out.outliers.CopyFrom(result)
+
+    # Outliers stay in every test. The caveat says when they decide the
+    # regression's verdict, as single flood months did in the SeaWiFS paper.
+    if flagged.size == 0:
+        return
+    kept = m.tested.copy()
+    kept[flagged] = np.nan
+    if np.isfinite(kept).sum() < MIN_VALID:
+        return
+    without = regression.fit(m.t, kept, alpha=alpha, correct_autocorrelation=correct)
+    if (without.p_value < alpha) == (fit.p_value < alpha):
+        return
+    one = flagged.size == 1
+    months = "one unusual month" if one else f"{flagged.size} unusual months"
+    them = "it" if one else "them"
+    if fit.p_value < alpha:
+        out.warnings.append(f"The trend rests on {months}: without {them}, the trend isn't significant.")
+    else:
+        verb = "hides" if one else "hide"
+        out.warnings.append(
+            f"{months[0].upper()}{months[1:]} {verb} the trend: without {them}, the trend would be significant."
+        )
+
+
+def _outlier(m: Monthly, z: np.ndarray, index: int) -> results_pb2.Outlier:
+    o = results_pb2.Outlier(value=float(m.tested[index]), robust_z=float(z[index]))
+    o.time.CopyFrom(month_timestamp(m.first_month + index))
+    return o
+
+
+def _month_name(month_index: int) -> str:
+    year, month0 = divmod(month_index, 12)
+    return f"{_MONTH_NAMES[month0]} {year}"
 
 
 def _agreement(reg: results_pb2.RegressionResult, mk: results_pb2.MannKendallResult) -> results_pb2.Agreement:

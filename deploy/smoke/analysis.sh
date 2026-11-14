@@ -2,8 +2,8 @@
 # Smoke test for analysis, run by `make smoke` against a running stack. It
 # runs a whole job for the power-delhi-monthly bundle, through ingest,
 # preprocess and analysis, waits for it to succeed, then downloads the trend
-# analysis through a signed URL and checks the regression, Mann-Kendall and
-# extras results are in it.
+# analysis through a signed URL and checks the regression, Mann-Kendall,
+# extras and diagnostics results are in it.
 set -eu
 
 api=http://127.0.0.1:8080/trenddetective.gateway.v1.GatewayService
@@ -63,9 +63,16 @@ assert sh["permutations"] == len(sh["shuffledSlopesPerDecade"]) == 1000, "shuffl
 assert len(tri["slopesPerDecade"]) == len(tri["startYears"]) * len(tri["endYears"]), "trend triangle"
 assert [m["month"] for m in a["monthlyTrends"]] == list(range(1, 13)), "monthly trends"
 assert float(ys["yearsSoFar"]) == 44, ys
-print("%+.3f %s per decade, regression p %.2g, Mann-Kendall p %.2g, shuffle p %.2g, %.0f years to significance" % (
+# The diagnostics.
+pt, rc, ol = a["pettitt"], a["residualChecks"], a["outliers"]
+assert "changeTime" in pt, "pettitt"
+statuses = ("CHECK_STATUS_PASS", "CHECK_STATUS_WARN")
+assert rc.get("autocorrelation") in statuses and rc.get("normality") in statuses, rc
+assert float(ol["robustZThreshold"]) == 3.5 and "highest" in ol and "lowest" in ol, "outliers"
+print("%+.3f %s per decade, regression p %.2g, Mann-Kendall p %.2g, shuffle p %.2g, %.0f years to significance, "
+      "Pettitt change %s" % (
     float(reg.get("slopePerDecade", 0)), a.get("units", ""), float(reg.get("pValue", 0)), float(mk.get("pValue", 0)),
-    float(sh.get("pValue", 0)), float(ys.get("yearsNeeded", 0))))
+    float(sh.get("pValue", 0)), float(ys.get("yearsNeeded", 0)), pt["changeTime"][:7]))
 ')
 
 echo "OK: job $id went through every stage: $summary"
