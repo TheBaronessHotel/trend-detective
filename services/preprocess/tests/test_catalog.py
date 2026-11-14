@@ -104,8 +104,10 @@ def test_delhi_bundle_through_its_catalog_chain(delhi_bytes):
 
     series = json_format.Parse(store.get("prep", result.series.key), data_pb2.Series())
     a = np.array(series.anomalies).reshape(44, 12)
-    # Over the whole-record baseline, each calendar month's anomalies average zero.
-    assert np.abs(np.nanmean(a, axis=0)).max() < 1e-9
+    # Over the whole-record baseline, each calendar month's anomalies average
+    # zero, up to the trend's rise within the year, a few thousandths of a
+    # degree for Delhi.
+    assert np.abs(np.nanmean(a, axis=0)).max() < 0.01
     assert (series.baseline.start_year, series.baseline.end_year) == (1981, 2024)
     assert all(n.usable and n.years == 44 for n in series.normals)
     # Delhi: May and June are the hottest months, January the coolest.

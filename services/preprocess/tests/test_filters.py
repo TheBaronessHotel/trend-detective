@@ -157,15 +157,45 @@ def test_percent_anomaly_on_temperature_is_refused():
 # Anomalies
 
 
-def test_absolute_anomalies_average_zero_per_calendar_month():
+def years_of(dec: Decoded) -> np.ndarray:
+    seconds = dec.data["time"].values.astype("datetime64[s]").astype("int64")
+    return seconds / (365.25 * 86400)
+
+
+def joint_normals(v: np.ndarray, t: np.ndarray) -> tuple[np.ndarray, float]:
+    """The normals and trend of a least-squares fit with one constant per
+    calendar month and a straight line, the seasons taken at the mean time."""
+    ok = ~np.isnan(v)
+    months = np.arange(v.size) % 12
+    design = np.column_stack([months == m for m in range(12)] + [t - t[ok].mean()]).astype(float)
+    coef, *_ = np.linalg.lstsq(design[ok], v[ok], rcond=None)
+    return coef[:12], coef[12]
+
+
+def test_absolute_anomalies_are_the_values_less_the_seasons():
     dec = point(seasonal(10, trend_per_year=0.3) + np.random.default_rng(1).normal(0, 1, 120))
+    v = dec.values.values.copy()
     filters.apply(dec, chain({"anomaly": {"kind": data_pb2.ANOMALY_KIND_ABSOLUTE}}))
 
-    a = dec.anomalies.values.reshape(10, 12)
-    assert np.abs(a.mean(axis=0)).max() < 1e-9
+    normals, trend = joint_normals(v, years_of(dec))
+    assert trend == pytest.approx(0.3, abs=0.1)
+    assert dec.anomalies.values == pytest.approx(v - normals[np.arange(120) % 12], abs=1e-9)
     assert dec.anomaly.baseline.start_year == 2000 and dec.anomaly.baseline.end_year == 2009
     # The values themselves are kept.
     assert dec.values.values[0] == pytest.approx(seasonal(10, 0.3)[0], abs=5)
+
+
+@pytest.mark.parametrize("method", [data_pb2.CLIMATOLOGY_METHOD_MONTHLY_MEANS, data_pb2.CLIMATOLOGY_METHOD_HARMONIC])
+def test_anomalies_keep_the_whole_trend(method):
+    # A strong, smooth trend like CO2's over 7 years. Normals that took in the
+    # trend's rise within each year would leave a staircase: a slope 2% low
+    # and a sawtooth of about 1 ppm around it.
+    dec = point(seasonal(7, trend_per_year=2.5, amplitude=3.0, base=400.0), units="ppm")
+    filters.apply(dec, chain({"anomaly": {"method": method, "harmonics": 1}}))
+    t = years_of(dec)
+    line = 2.5 * (t - t.mean())
+    assert np.abs(dec.anomalies.values - line).max() < 0.02
+    assert np.polyfit(t, dec.anomalies.values, 1)[0] == pytest.approx(2.5, rel=0.002)
 
 
 def test_baseline_limits_the_years_normals_come_from():
@@ -194,7 +224,10 @@ def test_percent_anomaly_skips_near_zero_normals():
     filters.apply(dec, chain({"anomaly": {"kind": data_pb2.ANOMALY_KIND_PERCENT}}))
     june = dec.anomalies.values[5::12]
     assert np.isnan(june).all()
-    assert dec.anomalies.values[0] == pytest.approx(-100 * 0.2 / 1.2)
+    # The values grow 10% a year, so January's normal is its value at the
+    # middle of the record, not its plain mean.
+    january = joint_normals(v, years_of(dec))[0][0]
+    assert dec.anomalies.values[0] == pytest.approx((100 - january) / january * 100)
 
 
 def test_standardized_anomaly_skips_months_without_spread():

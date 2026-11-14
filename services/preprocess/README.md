@@ -60,6 +60,7 @@ The catalog gives each variable an ordered list of steps, and the gateway copies
 Anomalies:
 - **Baseline:** the step's years, or the whole record, clipped to the data. `Series.baseline` says which were used.
 - **Normals:** the mean of each calendar month, or a fit of `harmonics` sine and cosine pairs (default 2). A month's normal counts only with data in at least `min_baseline_coverage` (default 0.7) of the baseline years it appears in.
+- **Trend:** either way a straight-line trend is fitted along with the seasons over the baseline, and the normals are the seasons at the baseline's mean time. A plain mean of each calendar month would take in the trend's rise within the year, since December comes later than January, and leave the anomalies a staircase from year to year: a trend about `1 / Y^2` low over Y years, 2% over 7, and for a strong trend like CO2 twice the scatter around it. Analysis checked this against NOAA's published CO2 growth, see Validation in [its README](../analysis/README.md). The deviations behind standardized anomalies stay the plain spread of each calendar month.
 - **Kinds:** absolute (the default); percent, skipped where a normal is under 1% of that pixel's largest monthly normal and refused for temperatures; standardized, skipped where a month's deviation is zero.
 - **Missing anomalies:** a step whose value is missing has no anomaly. A missing anomaly next to a present value always means that calendar month has `usable: false` in `Series.normals`.
 
