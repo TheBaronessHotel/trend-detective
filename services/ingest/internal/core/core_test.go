@@ -193,9 +193,3 @@ func TestCacheKey(t *testing.T) {
 		t.Error("a different fingerprint gave the same cache key")
 	}
 }
-
-func TestAdapterName(t *testing.T) {
-	if got := AdapterName(ingestv1.Source_SOURCE_HARMONY_SUBSET); got != "harmony-subset" {
-		t.Errorf("got %q", got)
-	}
-}

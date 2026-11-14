@@ -72,12 +72,21 @@ func WithTask(ctx context.Context, jobID, taskID string) context.Context {
 	return context.WithValue(ctx, taskKey{}, taskIDs{job: jobID, task: taskID})
 }
 
+// WithJob returns a context whose log records carry job_id.
+func WithJob(ctx context.Context, jobID string) context.Context {
+	return WithTask(ctx, jobID, "")
+}
+
 func taskAttrs(ctx context.Context) []logging.Attr {
 	ids, ok := ctx.Value(taskKey{}).(taskIDs)
 	if !ok {
 		return nil
 	}
-	return []logging.Attr{{Key: "job_id", Value: ids.job}, {Key: "task_id", Value: ids.task}}
+	attrs := []logging.Attr{{Key: "job_id", Value: ids.job}}
+	if ids.task != "" {
+		attrs = append(attrs, logging.Attr{Key: "task_id", Value: ids.task})
+	}
+	return attrs
 }
 
 func parseLevel(s string) (logging.Level, error) {

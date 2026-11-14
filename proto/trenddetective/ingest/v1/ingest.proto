@@ -110,6 +110,9 @@ message CsvUpload {
 message Bundle {
   // Name of a dataset shipped with the app.
   string name = 1;
+  // Which of the bundle's variables this task wants, for example "T2M".
+  // They become RawDataset.variables. Empty means all of them.
+  repeated string variables = 2;
 }
 
 // Settings for SOURCE_APPEEARS.

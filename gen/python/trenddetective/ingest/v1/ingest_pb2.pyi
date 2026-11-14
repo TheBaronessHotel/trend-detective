@@ -112,10 +112,12 @@ class CsvUpload(_message.Message):
     def __init__(self, upload: _Optional[_Union[_common_pb2.BlobRef, _Mapping]] = ...) -> None: ...
 
 class Bundle(_message.Message):
-    __slots__ = ("name",)
+    __slots__ = ("name", "variables")
     NAME_FIELD_NUMBER: _ClassVar[int]
+    VARIABLES_FIELD_NUMBER: _ClassVar[int]
     name: str
-    def __init__(self, name: _Optional[str] = ...) -> None: ...
+    variables: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, name: _Optional[str] = ..., variables: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class Appeears(_message.Message):
     __slots__ = ("product", "layers")

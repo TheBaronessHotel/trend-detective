@@ -100,6 +100,33 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  # The public Connect API, on http://localhost:8080.
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    environment:
+      <<: *infra-env
+      HTTP_ADDR: ":8080"
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      SUBREGION_N: ${SUBREGION_N:-8}
+      MAX_GRID: ${MAX_GRID:-128}
+      MAX_GRANULES: ${MAX_GRANULES:-1000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/gateway", "healthcheck"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
 volumes:
   nats-data:
   redis-data:

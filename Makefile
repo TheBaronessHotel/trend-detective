@@ -34,6 +34,7 @@ clean:
 # End-to-end checks against the running stack. Run `make up` first.
 smoke:
 	sh deploy/smoke/ingest.sh
+	sh deploy/smoke/gateway.sh
 
 # Go unit tests.
 test:

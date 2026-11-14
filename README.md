@@ -37,7 +37,7 @@ make up
 
 The first run copies `.env.example` to `.env`. Put your Earthdata token in it as `EARTHDATA_TOKEN`. You get one at [urs.earthdata.nasa.gov](https://urs.earthdata.nasa.gov) under "Generate Token".
 
-So far `make up` starts NATS, Redis and SeaweedFS, runs bootstrap to create the JetStream streams and the S3 buckets, and starts ingest. The other services join compose as they get built. Other targets:
+So far `make up` starts NATS, Redis and SeaweedFS, runs bootstrap to create the JetStream streams and the S3 buckets, and starts ingest and the gateway. The other services join compose as they get built. To try the API with curl, see [services/gateway/README.md](services/gateway/README.md). Other targets:
 
 | Target | What it does |
 |---|---|
@@ -52,6 +52,7 @@ The ports listen on 127.0.0.1 only:
 - NATS: 4222, and 8222 for monitoring.
 - Redis: 6379.
 - SeaweedFS: 8333 for S3, 9333 for the master UI, and 8888 for the filer UI.
+- Gateway: 8080, the Connect API.
 
 ## Working here
 

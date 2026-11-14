@@ -644,7 +644,10 @@ func (x *CsvUpload) GetUpload() *v1.BlobRef {
 type Bundle struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Name of a dataset shipped with the app.
-	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Which of the bundle's variables this task wants, for example "T2M".
+	// They become RawDataset.variables. Empty means all of them.
+	Variables     []string `protobuf:"bytes,2,rep,name=variables,proto3" json:"variables,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -684,6 +687,13 @@ func (x *Bundle) GetName() string {
 		return x.Name
 	}
 	return ""
+}
+
+func (x *Bundle) GetVariables() []string {
+	if x != nil {
+		return x.Variables
+	}
+	return nil
 }
 
 // Settings for SOURCE_APPEEARS.
@@ -947,9 +957,10 @@ const file_trenddetective_ingest_v1_ingest_proto_rawDesc = "" +
 	"\tcommunity\x18\x02 \x01(\tR\tcommunity\x126\n" +
 	"\x05point\x18\x03 \x01(\v2 .trenddetective.common.v1.LatLonR\x05point\"F\n" +
 	"\tCsvUpload\x129\n" +
-	"\x06upload\x18\x01 \x01(\v2!.trenddetective.common.v1.BlobRefR\x06upload\"\x1c\n" +
+	"\x06upload\x18\x01 \x01(\v2!.trenddetective.common.v1.BlobRefR\x06upload\":\n" +
 	"\x06Bundle\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"<\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1c\n" +
+	"\tvariables\x18\x02 \x03(\tR\tvariables\"<\n" +
 	"\bAppeears\x12\x18\n" +
 	"\aproduct\x18\x01 \x01(\tR\aproduct\x12\x16\n" +
 	"\x06layers\x18\x02 \x03(\tR\x06layers\"\xda\x03\n" +

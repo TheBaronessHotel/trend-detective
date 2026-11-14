@@ -157,3 +157,28 @@ func TestShippedBundlesAreValid(t *testing.T) {
 		})
 	}
 }
+
+func TestFetchNarrowsToTheRequestedVariables(t *testing.T) {
+	two := `{"format": "FORMAT_POWER_JSON", "variables": ["T2M", "PRECTOTCORR"], "files": [{"blob": {"key": "power.json"}}]}`
+	dir := writeBundle(t, map[string]string{"delhi/manifest.json": two, "delhi/power.json": "{}"})
+	a, err := New(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := func(vars ...string) *ingestv1.IngestTask {
+		return &ingestv1.IngestTask{Adapter: &ingestv1.IngestTask_Bundle{Bundle: &ingestv1.Bundle{Name: "delhi", Variables: vars}}}
+	}
+
+	got, err := a.Fetch(context.Background(), want("T2M"), &recordingSink{files: map[string]string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Variables) != 1 || got.Variables[0] != "T2M" {
+		t.Errorf("variables: %v", got.Variables)
+	}
+
+	_, err = a.Fetch(context.Background(), want("NO2"), &recordingSink{files: map[string]string{}})
+	if e := core.AsError(err); e.Code != gatewayv1.ErrorCode_ERROR_CODE_INVALID_REQUEST || e.Transient {
+		t.Errorf("unknown variable: got %v transient=%v", e.Code, e.Transient)
+	}
+}

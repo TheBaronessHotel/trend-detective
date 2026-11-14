@@ -12,6 +12,7 @@ import (
 	ingestv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/ingest/v1"
 	"github.com/TheBaronessHotel/trend-detective/internal/natsx"
 	"github.com/TheBaronessHotel/trend-detective/internal/obs"
+	"github.com/TheBaronessHotel/trend-detective/internal/sources"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/core"
 	"github.com/lein3000zzz/the-watchers/pkg/observability"
 	"github.com/lein3000zzz/the-watchers/pkg/observability/logging"
@@ -131,7 +132,7 @@ func (w *Worker) handle(ctx context.Context, msg jetstream.Msg) {
 	}
 	meta := task.GetMeta()
 	ctx = obs.WithTask(ctx, meta.GetJobId(), meta.GetTaskId())
-	operation := core.AdapterName(core.SourceOf(task.GetIngest()))
+	operation := sources.Name(core.SourceOf(task.GetIngest()))
 
 	_ = w.scope.Manager.WithSpan(ctx, w.scope.TracerName, "ingest "+operation, func(ctx context.Context, span trace.Span) (err error) {
 		span.SetAttributes(

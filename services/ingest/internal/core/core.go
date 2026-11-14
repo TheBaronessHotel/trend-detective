@@ -21,6 +21,7 @@ import (
 	gatewayv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/gateway/v1"
 	ingestv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/ingest/v1"
 	"github.com/TheBaronessHotel/trend-detective/internal/blob"
+	"github.com/TheBaronessHotel/trend-detective/internal/sources"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -107,7 +108,7 @@ func (s *Service) Ingest(ctx context.Context, task *ingestv1.IngestTask) (ds *in
 	if err != nil {
 		return nil, false, err
 	}
-	prefix := AdapterName(source) + "/" + key
+	prefix := sources.Name(source) + "/" + key
 	manifestKey := prefix + "/dataset.json"
 
 	cached := &ingestv1.RawDataset{}
@@ -169,12 +170,6 @@ func SourceOf(task *ingestv1.IngestTask) ingestv1.Source {
 		return ingestv1.Source_SOURCE_APPEEARS
 	}
 	return ingestv1.Source_SOURCE_UNSPECIFIED
-}
-
-// AdapterName turns SOURCE_HARMONY_SUBSET into "harmony-subset", the name the
-// catalog and the bucket layout use.
-func AdapterName(s ingestv1.Source) string {
-	return strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(s.String(), "SOURCE_")), "_", "-")
 }
 
 type sink struct {
