@@ -72,6 +72,8 @@ Asks Harmony's Giovanni averaging service for the average over the rectangle, on
 - The task needs Giovanni's own variable ID, from `api.giovanni.earthdata.nasa.gov/configured-variables/`, plus the CMR collection ID, which Harmony needs in the URL. The averaging service refuses the variable's path inside the file.
 - The CSV has a few header lines, a blank line, then `time,mean_<id>` with one row per day. Days without data have an empty value, and their timestamp can use a space instead of `T`.
 - It uses the Giovanni quota. The gateway's preflight refuses new jobs once `QUOTA_CUTOFF` is reached.
+- When the averaging service refuses an input, it says why, for example "Specified start time must be on or after the product's first time value, 2015-01-01T12:00:00Z." The task then fails with `INVALID_REQUEST` and that reason, because running it again can't help. OCO-2 stamps its days at noon, which is why the catalog starts CO2 on 2015-01-02.
+- The service can also stall. One job sat at 0% for 15 minutes before failing with "unable to automatically determine why", and the same request resubmitted finished in 20 seconds. That failure stays `UPSTREAM`, so the app says to try again.
 - A year of daily NO2 takes about 4 minutes on NASA's side, and two years of groundwater well under a minute.
 
 ## giovanni-point

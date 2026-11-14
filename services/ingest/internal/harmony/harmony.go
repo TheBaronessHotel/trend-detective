@@ -209,9 +209,21 @@ func failure(j *job, collection string) error {
 		return core.Errorf(gatewayv1.ErrorCode_ERROR_CODE_UNAUTHENTICATED, false, msg,
 			"Harmony job %s %s, granules failed with 403: %s", j.JobID, j.Status, e.Message)
 	}
+	// Giovanni's averaging service says why it refused an input, for example
+	// a start before the product's first time step. Trying again won't help,
+	// so the reason goes to the user.
+	if _, reason, ok := strings.Cut(detail, giovanniRefusal); ok {
+		reason, _, _ = strings.Cut(reason, ": WorkItem failed")
+		return core.Errorf(gatewayv1.ErrorCode_ERROR_CODE_INVALID_REQUEST, false,
+			"NASA's Giovanni service refused this request: "+reason, "Harmony job %s %s: %s", j.JobID, j.Status, detail)
+	}
 	return core.Errorf(gatewayv1.ErrorCode_ERROR_CODE_UPSTREAM, false,
 		"NASA's Harmony service couldn't process this request.", "Harmony job %s %s: %s", j.JobID, j.Status, detail)
 }
+
+// What Giovanni's averaging service writes before the reason it refused an
+// input.
+const giovanniRefusal = "is not supported by the Cloud Giovanni Averaging Service: "
 
 // start counts granules, takes a slot and submits the job. Area averages
 // skip the count: Giovanni reads the granules itself and returns one file.
