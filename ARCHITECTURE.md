@@ -96,6 +96,8 @@ A one-shot Go program in `deploy/bootstrap`. It runs on every `make up`, creates
    - Giovanni quota compared with `QUOTA_CUTOFF`, when a Giovanni service is used.
    - The task cap.
 
+   Dates partly outside the variable's available range are clamped to it, and dates entirely outside are refused. The NASA checks fail open: if NASA can't answer within 5 seconds, the job goes ahead, and ingest's own checks apply.
+
    The gateway then writes the job and its tasks to Redis and publishes `tasks.ingest`.
 2. **Ingest.** It checks the cache, then calls the adapter. For Harmony, it counts granules in CMR, submits the job, sends itself delayed rechecks with `NakWithDelay` instead of making a worker wait, downloads the output files into `raw`, and publishes `StageDone` with a `RawDataset` reference. Those rechecks are JetStream deliveries too, so ingest counts failed attempts in Redis, and the consumer's delivery limit is only a high ceiling.
 3. The gateway publishes `tasks.preprocess` with the filter chain.
@@ -242,6 +244,7 @@ Settings are env vars per service, set in `compose.yaml` and read from `.env`. T
 | `HTTP_ADDR` | `:8080`. The gateway's Connect API |
 | `HARMONY_URL`, `CMR_URL` | `https://harmony.earthdata.nasa.gov`, `https://cmr.earthdata.nasa.gov` |
 | `POWER_URL` | `https://power.larc.nasa.gov` |
+| `GIOVANNI_URL` | `https://api.giovanni.earthdata.nasa.gov`. For the gateway's quota check |
 | `CORS_ORIGINS` | `*`. Comma-separated origins allowed to call the gateway from a browser |
 
 ## Repository

@@ -118,6 +118,9 @@ services:
       SUBREGION_N: ${SUBREGION_N:-8}
       MAX_GRID: ${MAX_GRID:-128}
       MAX_GRANULES: ${MAX_GRANULES:-1000}
+      TASK_CAP: ${TASK_CAP:-256}
+      QUOTA_CUTOFF: ${QUOTA_CUTOFF:-0.9}
+      EARTHDATA_TOKEN: ${EARTHDATA_TOKEN:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
       - "127.0.0.1:8080:8080"
