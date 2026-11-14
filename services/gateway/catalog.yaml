@@ -161,6 +161,77 @@ variables:
       empty.
     dataset_url: https://disc.gsfc.nasa.gov/datasets/GLDAS_NOAH025_M_2.1/summary
 
+  # Area averages from Giovanni, through Harmony. These are series for the
+  # whole rectangle, with no map, because the daily records have thousands of
+  # files. Giovanni wants its own variable ID, from
+  # api.giovanni.earthdata.nasa.gov/configured-variables/.
+  - id: no2-omi
+    name: Air pollution, NO2 (area average)
+    definition: >-
+      How much nitrogen dioxide is in the lowest layer of the atmosphere,
+      averaged over the rectangle and over each month. Most of it comes from
+      car engines, power plants and factories. The OMI instrument on NASA's
+      Aura satellite measures it on days that aren't too cloudy.
+    units: 10¹⁵ molecules/cm²
+    step: monthly
+    available: { start: 2004-10-01, end: 2026-09-30 }
+    grid: false
+    domain: global
+    default_source: giovanni-area
+    sources:
+      giovanni-area:
+        data_field_id: OMNO2d_003_ColumnAmountNO2TropCloudScreened
+        collection_id: C1266136111-GES_DISC
+    source_units: molecules/cm²
+    filters:
+      ops:
+        - qc_range: { min: -1.0e16, max: 1.0e18 }
+        - linear: { scale: 1.0e-15, offset: 0, units: 10¹⁵ molecules/cm² }
+        # The data is daily, and cloudy days are missing.
+        - monthly_mean: { min_valid_days: 10 }
+        - anomaly: { kind: ANOMALY_KIND_PERCENT }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *series-tests
+    llm_hints: >-
+      OMI only sees through gaps in the clouds, so cloudy months rest on fewer
+      days. NO2 lasts only hours in the air, so it stays close to where it is
+      emitted, and changes in traffic, industry or emission rules show up
+      directly.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/OMNO2d_003/summary
+
+  - id: groundwater-gldas
+    name: Groundwater (area average)
+    definition: >-
+      How much water is stored underground, in millimeters of water, averaged
+      over the rectangle and over each month. It comes from a NASA land model
+      that is corrected with the GRACE satellites, which measure tiny changes
+      in Earth's gravity caused by water moving underground.
+    units: mm
+    step: monthly
+    available: { start: 2003-02-01, end: 2026-09-30 }
+    grid: false
+    domain: land
+    default_source: giovanni-area
+    sources:
+      giovanni-area:
+        data_field_id: GLDAS_CLSM025_DA1_D_2_2_GWS_tavg
+        collection_id: C1700900796-GES_DISC
+    source_units: mm
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 10000 }
+        # The data is daily.
+        - monthly_mean: { min_valid_days: 20 }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *series-tests
+    llm_hints: >-
+      This is model output corrected by GRACE, not a direct measurement.
+      GRACE only resolves features a few hundred kilometers across, so small
+      rectangles mostly reflect the model. Heavy pumping for irrigation, as
+      in northwest India, shows up as a steady decline.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/GLDAS_CLSM025_DA1_D_2.2/summary
+
   - id: precipitation-power
     name: Rain and snow (one point)
     definition: >-

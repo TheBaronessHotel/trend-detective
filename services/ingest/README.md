@@ -12,7 +12,7 @@ The service is hexagonal: the core knows nothing about NATS or S3, and each side
 | `internal/core` | The domain. Picks the adapter, checks the cache, writes files and the manifest, and maps errors to `TaskError` |
 | `internal/worker` | The JetStream consumer that drives the core |
 | `internal/bundle` | The `bundle` adapter |
-| `internal/harmony` | The `harmony-subset` adapter |
+| `internal/harmony` | The `harmony-subset` and `giovanni-area` adapters, which share Harmony's job flow |
 | `internal/power` | The `power` adapter |
 | `bundle/` | Datasets shipped with the app. See [bundle/README.md](bundle/README.md) |
 
@@ -57,6 +57,19 @@ Redis keys:
 | `td:ingest:harmony:job:<cache key>` | The Harmony job ID, for 24 hours. A restart, or a second task for the same data, picks up the same job |
 | `td:ingest:harmony:slots:<token hash>` | A sorted set of the jobs running on one token. Slots older than 6 hours are freed |
 | `td:ingest:failures:<task ID>` | Failed attempts, see below |
+
+## giovanni-area
+
+Asks Harmony's Giovanni averaging service for the average over the rectangle, one value per time step, as a single CSV. It's for daily products with too many files to fetch as maps, like OMI NO2 and groundwater.
+
+- It shares everything with `harmony-subset`: the token, the per-token slots, polling with `NakWithDelay`, and the failure messages. The differences:
+  - it adds `average=area` to the request;
+  - it skips the CMR granule count, because Giovanni reads the granules itself;
+  - it stores the result as `text/csv` with `FORMAT_GIOVANNI_CSV`.
+- The task needs Giovanni's own variable ID, from `api.giovanni.earthdata.nasa.gov/configured-variables/`, plus the CMR collection ID, which Harmony needs in the URL. The averaging service refuses the variable's path inside the file.
+- The CSV has a few header lines, a blank line, then `time,mean_<id>` with one row per day. Days without data have an empty value, and their timestamp can use a space instead of `T`.
+- It uses the Giovanni quota. The gateway's preflight refuses new jobs once `QUOTA_CUTOFF` is reached.
+- A year of daily NO2 takes about 4 minutes on NASA's side, and two years of groundwater well under a minute.
 
 ## power
 

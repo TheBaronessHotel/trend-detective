@@ -147,7 +147,7 @@ Each source is an ingest adapter, chosen per request. Each catalog entry sets it
 | Adapter | What it returns | Notes |
 |---|---|---|
 | `harmony-subset` | NetCDF grids for a rectangle, dates and variables | HOSS service. Verified for GPM_3IMERGM, M2TMNXSLV, GLDAS_NOAH025_M, OMNO2d and GRACEDADM. Returns one file per granule because there's no concatenation. Also accepts polygons |
-| `giovanni-area` | Area-averaged CSV | Harmony plus Giovanni averaging. Uses the monthly Giovanni quota. Not available for MERRA-2 monthly or OMNO2d |
+| `giovanni-area` | Area-averaged CSV | Harmony plus Giovanni averaging, with Giovanni's own variable IDs. Uses the monthly Giovanni quota. Serves OMI NO2 and groundwater in mm |
 | `giovanni-point` | Point CSV | `api.giovanni.earthdata.nasa.gov/timeseries` |
 | `power` | Point JSON | NASA POWER, no login. The gateway sets the point to the middle of the rectangle |
 | `csv-upload` | User CSV | Exports from Giovanni, Hydrology Time Series and AppEEARS |

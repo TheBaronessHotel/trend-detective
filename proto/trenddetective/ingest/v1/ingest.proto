@@ -76,10 +76,18 @@ message HarmonySubset {
   int32 max_granules = 3;
 }
 
-// Settings for SOURCE_GIOVANNI_AREA.
+// Settings for SOURCE_GIOVANNI_AREA. Ingest asks Harmony's Giovanni
+// averaging service for the area average of the rectangle, one value per
+// time step, as CSV.
 message GiovanniArea {
-  // Giovanni variable ID, for example "GPM_3IMERGM_07_precipitation".
+  // Giovanni variable ID, for example
+  // "OMNO2d_003_ColumnAmountNO2TropCloudScreened". The list is at
+  // api.giovanni.earthdata.nasa.gov/configured-variables/. The averaging
+  // service refuses the variable's path inside the file.
   string data_field_id = 1;
+  // CMR collection concept ID, for example "C1266136111-GES_DISC". Harmony
+  // needs it in the request URL.
+  string collection_id = 2;
 }
 
 // Settings for SOURCE_GIOVANNI_POINT.
