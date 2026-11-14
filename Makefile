@@ -36,6 +36,7 @@ smoke:
 	sh deploy/smoke/ingest.sh
 	sh deploy/smoke/gateway.sh
 	sh deploy/smoke/preprocess.sh
+	sh deploy/smoke/analysis.sh
 
 # Live check against real NASA services. Needs EARTHDATA_TOKEN in .env.
 smoke-harmony:
@@ -67,6 +68,10 @@ test:
 # The preprocess checks CI runs: lockfile, lint and unit tests. Needs uv.
 test-preprocess:
 	cd services/preprocess && uv lock --check && uv run --frozen ruff check . && uv run --frozen pytest -q
+
+# The analysis checks CI runs: lockfile, lint and unit tests. Needs uv.
+test-analysis:
+	cd services/analysis && uv lock --check && uv run --frozen ruff check . && uv run --frozen pytest -q
 
 .env:
 	cp .env.example .env

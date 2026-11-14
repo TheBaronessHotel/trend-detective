@@ -47,7 +47,8 @@ So far `make up` starts NATS, Redis and SeaweedFS, runs bootstrap to create the 
 | `make ps` | Lists the containers |
 | `make clean` | Stops everything and deletes all data |
 | `make test` | Runs the Go unit tests |
-| `make smoke` | With the stack up, publishes a real ingest task and checks the result |
+| `make test-preprocess`, `make test-analysis` | Runs a Python service's lockfile check, lint and unit tests. Needs uv |
+| `make smoke` | With the stack up, runs the Delhi bundle through each stage and checks the results |
 | `make smoke-harmony` | Runs a real GPM job through NASA Harmony. Needs `EARTHDATA_TOKEN` in `.env` |
 | `make smoke-power` | Runs a real job through NASA POWER. Needs no token |
 | `make smoke-giovanni` | Runs a real point job through NASA Giovanni. Needs `EARTHDATA_TOKEN` in `.env` |
