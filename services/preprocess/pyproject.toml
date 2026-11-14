@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8.4"]
+dev = ["pytest>=8.4", "ruff>=0.17"]
 
 [project.scripts]
 preprocess = "preprocess.__main__:main"
@@ -33,3 +33,12 @@ packages = ["src/preprocess"]
 # own, so it goes on the path the same way the Dockerfile's PYTHONPATH does.
 pythonpath = ["src", "../../gen/python"]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+# Only rules that point at real bugs: syntax errors, undefined names, unused
+# imports and variables, and common Python pitfalls. No style rules.
+select = ["E9", "F", "B", "PLE"]

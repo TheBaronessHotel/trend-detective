@@ -44,7 +44,8 @@ After decoding, the pipeline keeps the steps inside the requested dates and the 
 | `FORMAT_POWER_JSON` | `power`, `bundle` | Drops the 13th "month", the annual mean. `-999` is missing |
 | `FORMAT_NETCDF4` | `harmony-subset` | `Grid/precipitation` means group `Grid`, variable `precipitation`. Handles `(time, lon, lat)` storage, 0-360 longitudes, fill values and packing |
 | `FORMAT_USER_CSV` | `csv-upload` | The first column of dates and the first mostly-numeric column. Comma, semicolon or tab |
-| `FORMAT_GIOVANNI_CSV` | `giovanni-area`, `giovanni-point` | Metadata lines, then a table starting at `time` or `Timestamp`. Written from NASA's notebooks, not yet checked against our own adapters, which aren't built |
+| `FORMAT_GIOVANNI_CSV` | `giovanni-area` | `key:,value` lines, a blank line, then `time,mean_<id>`. Empty values are missing, and timestamps may use a space instead of `T` |
+| `FORMAT_GIOVANNI_POINT_CSV` | `giovanni-point` | `key,value` lines, a blank line, then `Timestamp (UTC),Data`. The header's `undef` value, like `-9999` or `-1.26765e+30`, is missing. The header's `lat` and `lon` give the grid cell |
 | `FORMAT_GEOTIFF` | `appeears` | Not yet. Fails with `UNSUPPORTED` |
 
 ## Where files go
@@ -86,5 +87,6 @@ Logs are `key=value` lines with `time`, `level` and `msg`, plus `job_id`, `task_
 
 ## Testing
 
-- `make test-preprocess` runs the unit tests with uv. Or, from this folder, `uv run pytest`.
+- `make test-preprocess` runs what CI's `preprocess` workflow runs, in a few seconds: the lockfile check, ruff with bug rules only, and the unit tests. It needs uv.
+- The unit tests also import the worker and every module in `gen/python`, and check that each `ingest.v1.Format` an adapter can produce has a decoder. A new format in the proto fails that test until it has one.
 - `make smoke`, with the stack up, runs the Delhi bundle through the gateway, ingest and preprocess, then downloads the series and checks it has 528 months.

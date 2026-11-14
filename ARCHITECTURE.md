@@ -278,7 +278,7 @@ One public monorepo, [TheBaronessHotel/trend-detective](https://github.com/TheBa
 | `make ps` | Lists containers, including bootstrap after it exits |
 | `make clean` | Stops everything and deletes all data |
 | `make test` | Runs the Go unit tests |
-| `make test-preprocess` | Runs the preprocess Python tests. Needs uv |
+| `make test-preprocess` | Runs the preprocess checks CI runs: lockfile, lint and unit tests. Needs uv |
 | `make smoke` | Runs end-to-end checks against the running stack |
 | `make smoke-harmony` | Runs a real GPM job through Harmony. Needs `EARTHDATA_TOKEN`, so CI skips it |
 | `make smoke-power` | Runs a real job through NASA POWER. No token, but CI skips it |
