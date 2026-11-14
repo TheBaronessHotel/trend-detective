@@ -345,7 +345,8 @@ func (*Task_Analysis) isTask_Spec() {}
 type StageDone struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Meta  *TaskMeta              `protobuf:"bytes,1,opt,name=meta,proto3" json:"meta,omitempty"`
-	// JetStream delivery count of the attempt that finished, starting at 1.
+	// Which attempt finished, starting at 1. Only failed attempts count, so
+	// polls of a long-running source like Harmony don't raise it.
 	Attempt int32 `protobuf:"varint,2,opt,name=attempt,proto3" json:"attempt,omitempty"`
 	// True when the output already existed under its content-hash key.
 	CacheHit   bool                   `protobuf:"varint,3,opt,name=cache_hit,json=cacheHit,proto3" json:"cache_hit,omitempty"`

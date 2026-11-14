@@ -97,7 +97,7 @@ A one-shot Go program in `deploy/bootstrap`. It runs on every `make up`, creates
    - The task cap.
 
    The gateway then writes the job and its tasks to Redis and publishes `tasks.ingest`.
-2. **Ingest.** It checks the cache, then calls the adapter. For Harmony, it submits the job, sends itself delayed rechecks with `NakWithDelay` instead of making a worker wait, downloads the output files into `raw`, and publishes `StageDone` with a `RawDataset` reference.
+2. **Ingest.** It checks the cache, then calls the adapter. For Harmony, it counts granules in CMR, submits the job, sends itself delayed rechecks with `NakWithDelay` instead of making a worker wait, downloads the output files into `raw`, and publishes `StageDone` with a `RawDataset` reference. Those rechecks are JetStream deliveries too, so ingest counts failed attempts in Redis, and the consumer's delivery limit is only a high ceiling.
 3. The gateway publishes `tasks.preprocess` with the filter chain.
 4. **Preprocess.** It decodes the files, runs the chain, aggregates regions and writes `Series` and `Grid` documents plus the slider cubes to `prep`. Then it publishes `StageDone`.
 5. The gateway publishes `tasks.analysis` with the test list.
@@ -219,7 +219,7 @@ Settings are env vars per service, set in `compose.yaml` and read from `.env`. T
 | Variable | Default |
 |---|---|
 | `TASK_CAP` | 256 |
-| `HARMONY_CONCURRENCY` | 4 |
+| `HARMONY_CONCURRENCY` | 4. Harmony jobs in flight per Earthdata token |
 | `QUOTA_CUTOFF` | 0.9 |
 | `MAX_GRANULES` | 1000 |
 | `MAX_GRID` | 128 |
@@ -238,6 +238,7 @@ Settings are env vars per service, set in `compose.yaml` and read from `.env`. T
 | `INGEST_CONCURRENCY` | 4 |
 | `INGEST_ACK_WAIT` | `2m`. Ingest sends a heartbeat every third of this while a task runs |
 | `HTTP_ADDR` | `:8080`. The gateway's Connect API |
+| `HARMONY_URL`, `CMR_URL` | `https://harmony.earthdata.nasa.gov`, `https://cmr.earthdata.nasa.gov` |
 | `CORS_ORIGINS` | `*`. Comma-separated origins allowed to call the gateway from a browser |
 
 ## Repository
@@ -270,6 +271,7 @@ One public monorepo, [TheBaronessHotel/trend-detective](https://github.com/TheBa
 | `make clean` | Stops everything and deletes all data |
 | `make test` | Runs the Go unit tests |
 | `make smoke` | Runs end-to-end checks against the running stack |
+| `make smoke-harmony` | Runs a real GPM job through Harmony. Needs `EARTHDATA_TOKEN`, so CI skips it |
 | `make gen` | Regenerates `gen/` from `proto/` |
 | `make lint` | Lints and format-checks the protos |
 

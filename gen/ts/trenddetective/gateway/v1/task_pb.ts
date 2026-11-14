@@ -117,7 +117,8 @@ export type StageDone = Message<"trenddetective.gateway.v1.StageDone"> & {
   meta?: TaskMeta | undefined;
 
   /**
-   * JetStream delivery count of the attempt that finished, starting at 1.
+   * Which attempt finished, starting at 1. Only failed attempts count, so
+   * polls of a long-running source like Harmony don't raise it.
    *
    * @generated from field: int32 attempt = 2;
    */

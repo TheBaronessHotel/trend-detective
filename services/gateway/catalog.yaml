@@ -63,6 +63,41 @@ variables:
       weather station.
     dataset_url: https://power.larc.nasa.gov/
 
+  - id: precipitation-gpm
+    name: Rain and snow (satellites)
+    definition: >-
+      How much rain and snow falls, in millimeters per day, averaged over each
+      month. It comes from GPM IMERG, which merges measurements from a fleet
+      of satellites with rain gauges on the ground.
+    units: mm/day
+    step: monthly
+    available: { start: 1998-01-01, end: 2025-09-30 }
+    grid: true
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C2723754851-GES_DISC
+        variables: [Grid/precipitation]
+    source_units: mm/hr
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 100 }
+        - linear: { scale: 24, offset: 0, units: mm/day }
+        - anomaly: { kind: ANOMALY_KIND_PERCENT }
+        - gap_fill_display: { max_gap: 2 }
+    tests:
+      <<: *series-tests
+      grid:
+        - regression: { correct_autocorrelation: true }
+        - mann_kendall: { variant: MANN_KENDALL_VARIANT_HAMED_RAO }
+      fdr_q: 0.05
+    llm_hints: >-
+      IMERG is a 0.1 degree grid, about 10 km. Over land, rain gauges correct
+      the satellite estimate. Monthly totals are much more reliable than any
+      single day.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/GPM_3IMERGM_07/summary
+
   - id: precipitation-power
     name: Rain and snow
     definition: >-

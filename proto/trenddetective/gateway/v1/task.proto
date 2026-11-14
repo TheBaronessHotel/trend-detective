@@ -48,7 +48,8 @@ message Task {
 // advisory instead.
 message StageDone {
   TaskMeta meta = 1;
-  // JetStream delivery count of the attempt that finished, starting at 1.
+  // Which attempt finished, starting at 1. Only failed attempts count, so
+  // polls of a long-running source like Harmony don't raise it.
   int32 attempt = 2;
   // True when the output already existed under its content-hash key.
   bool cache_hit = 3;
