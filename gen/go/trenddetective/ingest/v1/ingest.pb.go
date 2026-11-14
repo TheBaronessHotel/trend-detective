@@ -105,7 +105,9 @@ const (
 	Format_FORMAT_UNSPECIFIED Format = 0
 	// NetCDF-4. Harmony HOSS writes one file per granule.
 	Format_FORMAT_NETCDF4 Format = 1
-	// Giovanni time-series CSV, including its comment header.
+	// Giovanni area-average CSV, from giovanni-area. A few "key:,value" header
+	// lines, a blank line, then "time,mean_<id>" with one row per time step.
+	// Missing steps have an empty value.
 	Format_FORMAT_GIOVANNI_CSV Format = 2
 	// NASA POWER JSON.
 	Format_FORMAT_POWER_JSON Format = 3
@@ -113,6 +115,11 @@ const (
 	Format_FORMAT_USER_CSV Format = 4
 	// GeoTIFF, from AppEEARS area requests.
 	Format_FORMAT_GEOTIFF Format = 5
+	// Giovanni point time-series CSV, from giovanni-point. "key,value" header
+	// lines (unit, undef, lat, lon and more), a blank line, then
+	// "Timestamp (UTC),Data" with one row per time step. Missing steps hold the
+	// header's undef value, for example -9999.
+	Format_FORMAT_GIOVANNI_POINT_CSV Format = 6
 )
 
 // Enum value maps for Format.
@@ -124,14 +131,16 @@ var (
 		3: "FORMAT_POWER_JSON",
 		4: "FORMAT_USER_CSV",
 		5: "FORMAT_GEOTIFF",
+		6: "FORMAT_GIOVANNI_POINT_CSV",
 	}
 	Format_value = map[string]int32{
-		"FORMAT_UNSPECIFIED":  0,
-		"FORMAT_NETCDF4":      1,
-		"FORMAT_GIOVANNI_CSV": 2,
-		"FORMAT_POWER_JSON":   3,
-		"FORMAT_USER_CSV":     4,
-		"FORMAT_GEOTIFF":      5,
+		"FORMAT_UNSPECIFIED":        0,
+		"FORMAT_NETCDF4":            1,
+		"FORMAT_GIOVANNI_CSV":       2,
+		"FORMAT_POWER_JSON":         3,
+		"FORMAT_USER_CSV":           4,
+		"FORMAT_GEOTIFF":            5,
+		"FORMAT_GIOVANNI_POINT_CSV": 6,
 	}
 )
 
@@ -429,11 +438,19 @@ func (x *HarmonySubset) GetMaxGranules() int32 {
 	return 0
 }
 
-// Settings for SOURCE_GIOVANNI_AREA.
+// Settings for SOURCE_GIOVANNI_AREA. Ingest asks Harmony's Giovanni
+// averaging service for the area average of the rectangle, one value per
+// time step, as CSV.
 type GiovanniArea struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Giovanni variable ID, for example "GPM_3IMERGM_07_precipitation".
-	DataFieldId   string `protobuf:"bytes,1,opt,name=data_field_id,json=dataFieldId,proto3" json:"data_field_id,omitempty"`
+	// Giovanni variable ID, for example
+	// "OMNO2d_003_ColumnAmountNO2TropCloudScreened". The list is at
+	// api.giovanni.earthdata.nasa.gov/configured-variables/. The averaging
+	// service refuses the variable's path inside the file.
+	DataFieldId string `protobuf:"bytes,1,opt,name=data_field_id,json=dataFieldId,proto3" json:"data_field_id,omitempty"`
+	// CMR collection concept ID, for example "C1266136111-GES_DISC". Harmony
+	// needs it in the request URL.
+	CollectionId  string `protobuf:"bytes,2,opt,name=collection_id,json=collectionId,proto3" json:"collection_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -475,12 +492,23 @@ func (x *GiovanniArea) GetDataFieldId() string {
 	return ""
 }
 
-// Settings for SOURCE_GIOVANNI_POINT.
+func (x *GiovanniArea) GetCollectionId() string {
+	if x != nil {
+		return x.CollectionId
+	}
+	return ""
+}
+
+// Settings for SOURCE_GIOVANNI_POINT. Ingest asks Giovanni's time-series API
+// for the values at one point, as CSV.
 type GiovanniPoint struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Giovanni variable ID, for example "GLDAS_NOAH025_M_2_1_SoilMoi0_10cm_inst".
+	// The same IDs as GiovanniArea.
 	DataFieldId string `protobuf:"bytes,1,opt,name=data_field_id,json=dataFieldId,proto3" json:"data_field_id,omitempty"`
-	// The gateway uses the center of the rectangle.
+	// The gateway uses the center of the rectangle. Giovanni answers for the
+	// grid cell the point falls in, and RawDataset.point records that cell's
+	// center.
 	Point         *v1.LatLon `protobuf:"bytes,2,opt,name=point,proto3" json:"point,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -944,9 +972,10 @@ const file_trenddetective_ingest_v1_ingest_proto_rawDesc = "" +
 	"\rHarmonySubset\x12#\n" +
 	"\rcollection_id\x18\x01 \x01(\tR\fcollectionId\x12\x1c\n" +
 	"\tvariables\x18\x02 \x03(\tR\tvariables\x12!\n" +
-	"\fmax_granules\x18\x03 \x01(\x05R\vmaxGranules\"2\n" +
+	"\fmax_granules\x18\x03 \x01(\x05R\vmaxGranules\"W\n" +
 	"\fGiovanniArea\x12\"\n" +
-	"\rdata_field_id\x18\x01 \x01(\tR\vdataFieldId\"k\n" +
+	"\rdata_field_id\x18\x01 \x01(\tR\vdataFieldId\x12#\n" +
+	"\rcollection_id\x18\x02 \x01(\tR\fcollectionId\"k\n" +
 	"\rGiovanniPoint\x12\"\n" +
 	"\rdata_field_id\x18\x01 \x01(\tR\vdataFieldId\x126\n" +
 	"\x05point\x18\x02 \x01(\v2 .trenddetective.common.v1.LatLonR\x05point\"}\n" +
@@ -988,14 +1017,15 @@ const file_trenddetective_ingest_v1_ingest_proto_rawDesc = "" +
 	"\fSOURCE_POWER\x10\x04\x12\x15\n" +
 	"\x11SOURCE_CSV_UPLOAD\x10\x05\x12\x11\n" +
 	"\rSOURCE_BUNDLE\x10\x06\x12\x13\n" +
-	"\x0fSOURCE_APPEEARS\x10\a*\x8d\x01\n" +
+	"\x0fSOURCE_APPEEARS\x10\a*\xac\x01\n" +
 	"\x06Format\x12\x16\n" +
 	"\x12FORMAT_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eFORMAT_NETCDF4\x10\x01\x12\x17\n" +
 	"\x13FORMAT_GIOVANNI_CSV\x10\x02\x12\x15\n" +
 	"\x11FORMAT_POWER_JSON\x10\x03\x12\x13\n" +
 	"\x0fFORMAT_USER_CSV\x10\x04\x12\x12\n" +
-	"\x0eFORMAT_GEOTIFF\x10\x05B\x83\x02\n" +
+	"\x0eFORMAT_GEOTIFF\x10\x05\x12\x1d\n" +
+	"\x19FORMAT_GIOVANNI_POINT_CSV\x10\x06B\x83\x02\n" +
 	"\x1ccom.trenddetective.ingest.v1B\vIngestProtoP\x01ZTgithub.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/ingest/v1;ingestv1\xa2\x02\x03TIX\xaa\x02\x18Trenddetective.Ingest.V1\xca\x02\x18Trenddetective\\Ingest\\V1\xe2\x02$Trenddetective\\Ingest\\V1\\GPBMetadata\xea\x02\x1aTrenddetective::Ingest::V1b\x06proto3"
 
 var (

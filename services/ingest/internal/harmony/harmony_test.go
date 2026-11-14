@@ -16,6 +16,7 @@ import (
 	gatewayv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/gateway/v1"
 	ingestv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/ingest/v1"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/core"
+	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/earthdata"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 )
@@ -32,6 +33,7 @@ type fakeNASA struct {
 	lastQuery url.Values
 	lastAuth  string
 	fail5xx   bool
+	cmrCalls  int
 	eula      bool
 	login     bool
 }
@@ -61,6 +63,7 @@ func (f *fakeNASA) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	switch {
 	case r.URL.Path == "/search/granules.json":
+		f.cmrCalls++
 		w.Header().Set("CMR-Hits", fmt.Sprint(f.hits))
 		_, _ = w.Write([]byte(`{"feed":{"entry":[]}}`))
 	case strings.HasSuffix(r.URL.Path, "/coverage/rangeset"):
@@ -236,7 +239,7 @@ func TestGranuleChecks(t *testing.T) {
 func TestTokens(t *testing.T) {
 	t.Run("no token at all", func(t *testing.T) {
 		h := newHarness(t, Config{})
-		h.a.cfg.TeamToken = ""
+		h.a.tokens = earthdata.NewTokens(h.a.rdb, "")
 		_, err := h.a.Fetch(context.Background(), task(77), newSink())
 		wantCode(t, err, gatewayv1.ErrorCode_ERROR_CODE_UNAUTHENTICATED, false)
 	})
@@ -325,4 +328,71 @@ func TestRefusedArchiveExplainsHowToFixIt(t *testing.T) {
 	if msg := core.AsError(err).UserMessage; !strings.Contains(msg, gesdiscApproval) {
 		t.Errorf("user message should link the approval page: %q", msg)
 	}
+}
+
+func areaTask() *ingestv1.IngestTask {
+	return &ingestv1.IngestTask{
+		VariableId: "no2-omi",
+		Bbox:       &commonv1.BBox{West: 114, South: 30, East: 120, North: 36},
+		Dates: &commonv1.DateRange{
+			Start: &commonv1.Date{Year: 2010, Month: 1, Day: 1},
+			End:   &commonv1.Date{Year: 2010, Month: 12, Day: 31},
+		},
+		Adapter: &ingestv1.IngestTask_GiovanniArea{GiovanniArea: &ingestv1.GiovanniArea{
+			DataFieldId:  "OMNO2d_003_ColumnAmountNO2TropCloudScreened",
+			CollectionId: "C1266136111-GES_DISC",
+		}},
+	}
+}
+
+func TestAreaAverageMode(t *testing.T) {
+	h := newHarness(t, Config{})
+	h.a = NewAreaAverage(h.a.cfg, h.a.rdb)
+	ctx := context.Background()
+	sink := newSink()
+
+	if h.a.Source() != ingestv1.Source_SOURCE_GIOVANNI_AREA {
+		t.Fatalf("source: %v", h.a.Source())
+	}
+	_, err := h.a.Fetch(ctx, areaTask(), sink)
+	wantPending(t, err)
+	q := h.nasa.lastQuery
+	if q.Get("average") != "area" || q.Get("variable") != "OMNO2d_003_ColumnAmountNO2TropCloudScreened" {
+		t.Errorf("submit query: %v", q)
+	}
+	if h.nasa.cmrCalls != 0 {
+		t.Errorf("area averages shouldn't count granules in CMR, called it %d times", h.nasa.cmrCalls)
+	}
+
+	_, err = h.a.Fetch(ctx, areaTask(), sink) // running
+	wantPending(t, err)
+	got, err := h.a.Fetch(ctx, areaTask(), sink) // successful
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Source != ingestv1.Source_SOURCE_GIOVANNI_AREA || got.Format != ingestv1.Format_FORMAT_GIOVANNI_CSV {
+		t.Errorf("fetched: %+v", got)
+	}
+	for name, f := range sink.files {
+		if f.ContentType != "text/csv" {
+			t.Errorf("%s stored as %q, want text/csv", name, f.ContentType)
+		}
+	}
+
+	// The two modes key their cache differently, so they never share files.
+	if k1, _ := newRequest(areaTask(), areaMode); k1 != nil {
+		k2, _ := newRequest(task(77), subsetMode)
+		if k1.key == k2.key {
+			t.Error("the area and subset modes share a cache key")
+		}
+	}
+}
+
+func TestAreaAverageNeedsTheGiovanniID(t *testing.T) {
+	h := newHarness(t, Config{})
+	h.a = NewAreaAverage(h.a.cfg, h.a.rdb)
+	tk := areaTask()
+	tk.GetGiovanniArea().DataFieldId = ""
+	_, err := h.a.Fetch(context.Background(), tk, newSink())
+	wantCode(t, err, gatewayv1.ErrorCode_ERROR_CODE_INVALID_REQUEST, false)
 }
