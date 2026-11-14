@@ -8,12 +8,16 @@ on:
     paths:
       - "services/preprocess/**"
       - "gen/python/**"
+      # The catalog's filter chains run in tests/test_catalog.py.
+      - "services/gateway/catalog.yaml"
       - ".github/workflows/preprocess.yml"
   push:
     branches: [main]
     paths:
       - "services/preprocess/**"
       - "gen/python/**"
+      # The catalog's filter chains run in tests/test_catalog.py.
+      - "services/gateway/catalog.yaml"
       - ".github/workflows/preprocess.yml"
 
 permissions:
@@ -51,8 +55,8 @@ jobs:
       - name: Lint
         run: uv run --frozen ruff check .
 
-      # Decoders, cache key, output documents, and imports of the worker and
-      # the generated protobuf code, which also checks gen/python against the
-      # pinned protobuf runtime.
+      # Decoders, filter steps, cache key, output documents, every catalog
+      # filter chain, and imports of the worker and the generated protobuf
+      # code, which also checks gen/python against the pinned protobuf runtime.
       - name: Unit tests
         run: uv run --frozen pytest -q

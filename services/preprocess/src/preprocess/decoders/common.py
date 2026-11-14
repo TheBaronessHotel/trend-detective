@@ -26,7 +26,8 @@ _UNIT_ALIASES = {
 }
 
 
-def _norm(units: str) -> str:
+def norm_units(units: str) -> str:
+    """A unit in one spelling, lowercased, so equal units compare equal."""
     u = units.strip().lower()
     return _UNIT_ALIASES.get(u, u)
 
@@ -40,7 +41,7 @@ def resolve_units(declared: str, source_units: str, notes: list[str]) -> str:
     """
     declared = (declared or "").strip()
     if source_units:
-        if declared and _norm(declared) != _norm(source_units):
+        if declared and norm_units(declared) != norm_units(source_units):
             notes.append(f"file says units {declared!r}, task says {source_units!r}; using the task's")
         return source_units
     return declared

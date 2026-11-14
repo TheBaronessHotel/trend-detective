@@ -2,7 +2,8 @@
 # Smoke test for preprocess, run by `make smoke` against a running stack. It
 # creates a job for the power-delhi-monthly bundle that stops after
 # preprocess, waits for it to succeed, then downloads the Series through a
-# signed URL and checks it has every month from 1981 to 2024.
+# signed URL and checks it has every month from 1981 to 2024, with the
+# anomalies, normals and display line the catalog's filter chain asks for.
 set -eu
 
 api=http://127.0.0.1:8080/trenddetective.gateway.v1.GatewayService
@@ -49,9 +50,13 @@ fi
 count=$(curl -s "$url" | python3 -I -c '
 import json, sys
 s = json.load(sys.stdin)
-assert len(s["times"]) == len(s["values"]) == len(s["coverage"]), "arrays differ in length"
+n = len(s["times"])
+for field in ("values", "coverage", "anomalies", "displayValues"):
+    assert len(s.get(field, [])) == n, f"{field} has {len(s.get(field, []))} entries, want {n}"
 assert s["variableId"] == "air-temperature-power", s["variableId"]
-print(len(s["values"]))
+assert s["anomalyKind"] == "ANOMALY_KIND_ABSOLUTE", s.get("anomalyKind")
+assert len(s["normals"]) == 12 and all(x.get("usable") for x in s["normals"]), "want 12 usable normals"
+print(n)
 ')
 if [ "$count" != 528 ]; then
   echo "FAIL: the series has $count values, want 528"
