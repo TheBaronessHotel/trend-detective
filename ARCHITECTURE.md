@@ -232,6 +232,8 @@ Settings are env vars per service, set in `compose.yaml` and read from `.env`. T
 | `S3_SECRET_KEY` | from `.env`. `.env.example` has a local value |
 | `S3_PUBLIC_ENDPOINT` | `http://localhost:8333`. The gateway signs presigned URLs for this host, so it must be what the browser uses |
 | `S3_ALLOWED_ORIGINS` | `*`. Browser origins SeaweedFS accepts for presigned URLs |
+| `PRESIGN_TTL` | `15m`. How long presigned URLs work |
+| `MAX_UPLOAD_MB` | 20. Largest CSV upload |
 | `LOG_LEVEL` | `info`. Go services: trace, debug, info, warn or error |
 | `ADMIN_ADDR` | `:9090`. Go services serve `/metrics` and `/debug/pprof/` here, inside the compose network only |
 | `BUNDLE_DIR` | `/bundle`. Ingest's bundled datasets, mounted from `services/ingest/bundle` |

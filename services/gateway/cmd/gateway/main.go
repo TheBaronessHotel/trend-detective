@@ -21,6 +21,7 @@ import (
 	"connectrpc.com/connect/v2"
 	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/gateway/v1/gatewayv1connect"
+	"github.com/TheBaronessHotel/trend-detective/internal/blob"
 	"github.com/TheBaronessHotel/trend-detective/internal/envx"
 	"github.com/TheBaronessHotel/trend-detective/internal/natsx"
 	"github.com/TheBaronessHotel/trend-detective/internal/obs"
@@ -29,6 +30,7 @@ import (
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/catalog"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/events"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/jobs"
+	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/results"
 	"github.com/lein3000zzz/the-watchers/pkg/observability/logging"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -53,7 +55,7 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	env, err := envx.Required("NATS_URL", "REDIS_URL")
+	env, err := envx.Required("NATS_URL", "REDIS_URL", "S3_ENDPOINT", "S3_ACCESS_KEY", "S3_SECRET_KEY")
 	if err != nil {
 		return err
 	}
@@ -99,8 +101,26 @@ func run() error {
 
 	orch := jobs.New(cat, jobs.NewStore(rdb, jobTTL), natsx.Publisher{JS: js}, limits, log)
 
+	store, err := blob.New(env["S3_ENDPOINT"], env["S3_ACCESS_KEY"], env["S3_SECRET_KEY"])
+	if err != nil {
+		return err
+	}
+	signer, err := blob.NewPresigner(envx.String("S3_PUBLIC_ENDPOINT", "http://localhost:8333"), env["S3_ACCESS_KEY"], env["S3_SECRET_KEY"])
+	if err != nil {
+		return err
+	}
+	presignTTL, err := envx.Duration("PRESIGN_TTL", 15*time.Minute)
+	if err != nil {
+		return err
+	}
+	maxUploadMB, err := envx.Int("MAX_UPLOAD_MB", 20)
+	if err != nil {
+		return err
+	}
+	res := results.New(orch, store.Bucket("prep"), signer, presignTTL, int64(maxUploadMB)<<20)
+
 	connectServer := connect.NewServer()
-	gatewayv1connect.RegisterGatewayServiceHandler(connectServer, api.New(cat, orch, log))
+	gatewayv1connect.RegisterGatewayServiceHandler(connectServer, api.New(cat, orch, res, log))
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, connectServer)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok\n")) })
