@@ -65,6 +65,9 @@ type Orchestrator struct {
 	log    logging.Logger
 	now    func() time.Time
 	newID  func() string
+	hub    *hub
+	// How often Watch re-reads a job when nothing woke it.
+	watchPoll time.Duration
 }
 
 // New returns an Orchestrator.
@@ -77,6 +80,9 @@ func New(cat *catalog.Catalog, store *Store, pub Publisher, limits Limits, log l
 		log:    log.With("component", "jobs"),
 		now:    time.Now,
 		newID:  func() string { return uuid.Must(uuid.NewV7()).String() },
+		hub:    newHub(),
+
+		watchPoll: 5 * time.Second,
 	}
 }
 
@@ -139,6 +145,7 @@ func (o *Orchestrator) CreateJob(ctx context.Context, spec *gatewayv1.JobSpec, e
 	if err := o.pub.Publish(ctx, natsx.SubjectIngest, meta.GetTaskId(), task); err != nil {
 		o.log.Error(ctx, "couldn't publish the ingest task", logging.Err(err))
 		_ = o.store.finish(ctx, id, gatewayv1.JobState_JOB_STATE_FAILED, &gatewayv1.JobResults{}, o.now())
+		o.hub.notify(id)
 		return nil, ErrUnavailable
 	}
 	o.log.Info(ctx, "job created", "variable", resolved.GetVariableId(), "source", sources.Name(resolved.GetSource()))
@@ -156,6 +163,7 @@ func (o *Orchestrator) GetJob(ctx context.Context, id string) (*gatewayv1.Job, e
 // nothing to update and redelivering won't change that.
 func (o *Orchestrator) OnStageDone(ctx context.Context, d *gatewayv1.StageDone) error {
 	meta := d.GetMeta()
+	defer o.hub.notify(meta.GetJobId())
 	status := &gatewayv1.TaskStatus{
 		Meta:       meta,
 		State:      gatewayv1.TaskState_TASK_STATE_SUCCEEDED,

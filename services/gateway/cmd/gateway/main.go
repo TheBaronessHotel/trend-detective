@@ -104,6 +104,7 @@ func run() error {
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, connectServer)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok\n")) })
+	mux.Handle("GET /debug/jobs/{id}", api.DebugJobs(orch))
 
 	protocols := new(http.Protocols)
 	protocols.SetHTTP1(true)
@@ -115,8 +116,9 @@ func run() error {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	errc := make(chan error, 2)
+	errc := make(chan error, 3)
 	go func() { errc <- events.Run(ctx, js, orch, log, 16) }()
+	go func() { errc <- events.RunAdvisories(ctx, js, orch, log) }()
 	go func() {
 		log.Info(ctx, "listening", "addr", srv.Addr, "variables", len(cat.Variables()))
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {

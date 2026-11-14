@@ -62,6 +62,21 @@ func (s *Server) GetJob(ctx context.Context, req *gatewayv1.GetJobRequest) (*gat
 	return &gatewayv1.GetJobResponse{Job: job}, nil
 }
 
+// WatchJob implements GatewayService. It sends the job now and after every
+// change, and ends the stream once the job succeeds or fails.
+func (s *Server) WatchJob(ctx context.Context, req *gatewayv1.WatchJobRequest, stream gatewayv1connect.GatewayServiceWatchJobServerStream) error {
+	if req.GetJobId() == "" {
+		return connect.NewError(connect.CodeInvalidArgument, "job_id is required")
+	}
+	err := s.jobs.Watch(ctx, req.GetJobId(), func(job *gatewayv1.Job) error {
+		return stream.Send(&gatewayv1.WatchJobResponse{Job: job})
+	})
+	if err != nil {
+		return s.toConnect(ctx, err)
+	}
+	return nil
+}
+
 // toConnect maps an error to a Connect error. Unexpected errors get a generic
 // message, and the detail goes to the log only.
 func (s *Server) toConnect(ctx context.Context, err error) error {
