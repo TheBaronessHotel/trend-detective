@@ -1,0 +1,260 @@
+# Trend Detective architecture
+
+Draft from the design session on 2026-11-14, for NASA Space Apps 2026, "Be An Earth System Trend Detective!".
+The hackathon runs Nov 14-15. Submissions are due Nov 15, 23:59 local time.
+
+Still open:
+- The demo cases.
+- The final list of tests, which belongs to the analysts.
+
+## What the user does
+
+1. Zooms the map and selects a rectangle.
+2. Picks a variable from the catalog. Each one comes with a plain-language definition.
+3. Sees the data layer for that rectangle and scrubs through time with a slider.
+4. Sees the region's time series with anomalies, a trend line and a confidence band.
+5. Gets the stats verdict for the series: rate of change, significance, and years to significance.
+6. Sees a trend heatmap of where inside the region things change. It has no time axis, because it summarizes the whole period.
+7. Optionally asks the LLM for an overview or follow-up answers, using their own key.
+
+## Services
+
+| Service | Responsibility | Talks via | Language |
+|---|---|---|---|
+| gateway | Orchestrates jobs, owns job state, the catalog and the browser API, runs preflight checks | Connect to browser and narrator, NATS to stages, Redis | Go |
+| ingest | Fetches raw bytes from sources through hexagonal adapters. Never parses scientific formats | NATS, SeaweedFS, Redis | Go |
+| preprocess | Decodes formats into canonical `Series` and `Grid`, runs filter chains, aggregates regions, computes anomalies, builds slider cubes | NATS, SeaweedFS | team's choice, Python expected |
+| analysis | Runs the full test suite on series and fast per-cell tests on grids | NATS, SeaweedFS | team's choice, Python expected |
+| narrator | Streams the LLM overview and Q&A from finished analysis results | Connect, SeaweedFS | team's choice |
+| web | Map, time slider, charts, heatmap, chat | Connect to gateway, presigned URLs to SeaweedFS | team's choice |
+
+Rules:
+- Stages never call each other. Each one reads its own queue and reports to the gateway. A job can stop after any stage, so preprocessing works on its own.
+- The gateway is the only service that writes job and task state.
+- Narrator isn't a job. It's a direct streaming call, and the gateway only makes it when the analysis is finished. Otherwise it returns `409`.
+
+```
+                  Connect (JSON over HTTP, server streaming)
+  browser  <------------------------------------------>  gateway  ---- Connect stream ---->  narrator
+     |                                                    |   |                               |
+     | presigned GET / PUT                     Redis <----+   |  NATS JetStream               | reads results
+     v                                     (job + task       |                               v
+  SeaweedFS (S3)  <----------------------   state)           +--> tasks.ingest      --> ingest      --+
+     ^                                                        +--> tasks.preprocess  --> preprocess  --+-- write outputs --> SeaweedFS
+     |                                                        +--> tasks.analysis    --> analysis    --+
+     +-------------------------------------------------------- events.stage.done <-- every stage
+```
+
+## Infrastructure
+
+**NATS JetStream**
+- Subjects: `tasks.ingest`, `tasks.preprocess`, `tasks.analysis` and `events.stage.done`.
+- Task subjects use work-queue streams with durable consumers. Each service creates its own consumer at startup with `CreateOrUpdateConsumer`.
+- Delivery is at least once, with a limit of 3 attempts and backoff. When a task hits the limit, NATS publishes an advisory, and the gateway listens for it and marks the task failed.
+- Publishers set `Nats-Msg-Id` so duplicate publishes are dropped.
+- Messages carry references and metadata only. Data lives in SeaweedFS.
+
+**SeaweedFS (S3 API)**
+- Buckets: `raw`, `prep`, `analysis` and `uploads`.
+- The object key is a content hash of the stage's inputs, its settings and its code version, so "is it cached?" is a single HEAD request.
+- The browser downloads results and uploads CSVs through presigned URLs, so those files never pass through the gateway.
+
+**Redis**
+- Job and task state. The gateway is the only writer.
+- AOF persistence is on.
+- Jobs expire after 7 days. Losing job state never loses results, because results are keyed by content hash.
+- Fan-in uses `HINCRBY` counters. A job is done when succeeded plus failed equals total.
+- Ingest keeps a counter of in-flight Harmony jobs per Earthdata token. It needs its own counter because a task waiting on `NakWithDelay` isn't reliably counted as in-flight by JetStream.
+
+**Bootstrap**
+A one-shot container that runs on every `make up` and creates the JetStream streams and the SeaweedFS buckets.
+
+**Observability**
+- Go services use [the-watchers](https://github.com/lein3000zzz/the-watchers): slog logging, Prometheus metrics, OpenTelemetry traces and Pyroscope profiling.
+- `traceparent` travels in NATS headers through a NATS carrier that keeps keys lowercase. OTel's `HeaderCarrier` capitalizes it to `Traceparent`, which Python's extractor won't find.
+- Every log record carries `job_id` and `task_id`, added through `WithContextAttrs`.
+- Python services use the same log field names and metric names.
+- Jaeger, Prometheus, Grafana and Pyroscope run in an opt-in compose profile started with `make up-obs`.
+- The gateway exposes `/debug/jobs/{id}` with each task's stage, attempts and errors.
+
+## Job lifecycle
+
+1. **CreateJob.** The gateway fills in catalog defaults (source, filter chain, tests), so stages get everything explicitly and never read the catalog themselves. Preflight checks then run:
+   - Harmony capabilities for the collection. This endpoint is public.
+   - The CMR granule count compared with `MAX_GRANULES`.
+   - Giovanni quota compared with `QUOTA_CUTOFF`, when a Giovanni service is used.
+   - The task cap.
+
+   The gateway then writes the job and its tasks to Redis and publishes `tasks.ingest`.
+2. **Ingest.** It checks the cache, then calls the adapter. For Harmony, it submits the job, sends itself delayed rechecks with `NakWithDelay` instead of making a worker wait, downloads the output files into `raw`, and publishes `StageDone` with a `RawDataset` reference.
+3. The gateway publishes `tasks.preprocess` with the filter chain.
+4. **Preprocess.** It decodes the files, runs the chain, aggregates regions and writes `Series` and `Grid` documents plus the slider cubes to `prep`. Then it publishes `StageDone`.
+5. The gateway publishes `tasks.analysis` with the test list.
+6. **Analysis.** It writes results to `analysis` and publishes `StageDone`.
+7. The gateway updates Redis at every step and streams progress to the browser through `WatchJob`.
+
+Failures use `TaskError{code, retryable, user_message}`. Messages like "quota exceeded" or "no data in this rectangle" fail immediately with a readable reason. Errors like a Harmony 5xx are retried.
+
+## Contracts
+
+- Protobuf is the single source of truth. Messages travel over NATS as `protojson`, and HTTP APIs use Connect.
+- All protos live in `proto/`, one package per owning service, for example `trenddetective.ingest.v1`.
+- `buf generate` writes Go, Python and TypeScript code into `gen/`. The generated code is committed, so building a service doesn't need buf.
+- Codegen uses remote plugins from the Buf Schema Registry, so nobody installs protoc plugins. We can also push the module to our BSR org for browsable schema docs.
+- CI runs `buf lint` and `buf breaking` against `main`.
+
+| Owner | Messages |
+|---|---|
+| gateway | `TaskMeta{job_id, task_id, attempt}`, `StageDone`, `TaskError`, the public Connect API |
+| ingest | `IngestTask`, `RawDataset` (file refs, format, source, variable, rectangle, dates) |
+| preprocess | `PreprocessTask`, filter-chain ops, `Series`, `Grid`, the slider-cube header |
+| analysis | `AnalysisTask`, test specs, results including fitted model parameters |
+| narrator | the `Narrate` streaming API |
+
+`Series` holds time, value, unit, variable, region, source, quality flag and coverage fraction.
+Each stage's task message embeds `TaskMeta`.
+
+### Gateway API, first version
+
+- `ListVariables`
+- `CreateJob`: variable, rectangle, dates, source, stages to run, filter chain, test list
+- `GetJob`, plus `WatchJob` as a stream
+- `GetResultURL`: presigned JSON or CSV
+- `CreateUploadURL`: presigned PUT for CSV uploads
+- `Narrate`: a stream that takes the job, the question and the chat history
+- `GetQuota`
+
+## Data sources
+
+Each source is an ingest adapter, chosen per request, with the default set in config.
+
+| Adapter | What it returns | Notes |
+|---|---|---|
+| `harmony-subset` | NetCDF grids for a rectangle, dates and variables | HOSS service. Verified for GPM_3IMERGM, M2TMNXSLV, GLDAS_NOAH025_M, OMNO2d and GRACEDADM. Returns one file per granule because there's no concatenation. Also accepts polygons |
+| `giovanni-area` | Area-averaged CSV | Harmony plus Giovanni averaging. Uses the monthly Giovanni quota. Not available for MERRA-2 monthly or OMNO2d |
+| `giovanni-point` | Point CSV | `api.giovanni.earthdata.nasa.gov/timeseries` |
+| `power` | Point JSON | NASA POWER, no login |
+| `csv-upload` | User CSV | Exports from Giovanni, Hydrology Time Series and AppEEARS |
+| `bundle` | Files shipped with the app | Offline demos and the video recording |
+| `appeears` | MODIS NDVI and land surface temperature | Later |
+
+- Earthdata login uses the team's token from an env var by default. Users can paste their own token to use their own quota.
+- Each catalog entry carries `grid: true/false`. Series-only sources hide the slider and heatmap.
+- Each entry also has a plain definition, display units, source and variable ID, dates, valid range, domain, default filter chain, default tests, and hints for the LLM.
+
+## Regions and grids
+
+The region is the unit of analysis everywhere. Pixels only feed aggregation.
+
+1. The user selects a rectangle. `harmony-subset` fetches every pixel inside it in one request.
+2. Preprocess builds the region-average series with latitude weighting and per-pixel anomalies averaged afterward, and tracks the valid-pixel fraction for each month.
+3. Preprocess also aggregates pixels into a configurable `N x N` grid of sub-regions. The default `N` is 8, and setting `N` to the native resolution gives plain pixels.
+4. The slider and the heatmap both show those sub-regions.
+
+Size guards, all configurable:
+- `MAX_GRANULES`, checked with CMR before submitting.
+- `MAX_GRID`. Larger grids are block-averaged down, and the UI shows the resulting resolution.
+- Daily products become monthly values in preprocess, using a minimum-valid-days rule.
+
+**Slider cube.** One compact binary file per cube: 16-bit values with a scale, offset and missing-data mask. A JSON header gives the axes, units and color range. There's one cube for raw values and one for anomalies. The browser downloads it once and draws any month locally.
+
+## Preprocessing
+
+The filter chain is an ordered list of named operations, kept in a registry inside preprocess. Examples:
+- `qc_range`
+- `monthly_mean{min_valid_days}`
+- `anomaly{kind: absolute|percent|standardized, baseline}`
+- `log10`
+- `coarsen`
+- `gap_fill_display{max_gap}`
+
+Rules:
+- Every missing value records why it's missing.
+- Gaps are never filled for statistics.
+- The normal value for a calendar month needs data in a minimum share of baseline years.
+- A month needs a minimum valid-pixel coverage to count.
+- Calendar months whose standard deviation is zero are skipped for standardized anomalies.
+- Percent change for °C is never shown.
+
+## Analysis
+
+The analysts can change this section.
+
+- **Full suite on each region series:**
+  - Regression slope with a 95% confidence interval, corrected for autocorrelation.
+  - Mann-Kendall (Hamed-Rao version) or Seasonal Kendall, with Sen's slope.
+  - A check that regression and Mann-Kendall agree.
+  - Pettitt change-point test, residual checks, and outlier months by robust z-score.
+  - Shuffle test, trend triangle, trend for each calendar month, and years to significance.
+- **Fast tests on each grid cell:** regression with autocorrelation correction and Mann-Kendall with Sen's slope. The FDR correction runs across all cells, and the output is grids of slope, p-value, significance and valid-month count.
+- **Results include the fitted model:** intercept, slope, standard errors, residual spread and lag-1 autocorrelation. These exist for later prediction bands.
+
+## Narrator
+
+- Speaks OpenAI Chat Completions, which also covers Ollama, OpenRouter, vLLM and LM Studio, plus Anthropic Messages.
+- The user's key travels in a request header. It's held in memory only and never logged.
+- Narrator stores nothing between calls. The browser sends the chat history each time.
+- The LLM gets the analysis results as structured data and never computes numbers itself.
+- After streaming, a final message lists any number in the answer that doesn't appear in the results.
+- The app works fully without a key.
+
+## Configuration
+
+Settings are env vars per service, set in `compose.yaml` and read from `.env`. The catalog is a separate file, `services/gateway/catalog.yaml`.
+
+| Variable | Default |
+|---|---|
+| `TASK_CAP` | 256 |
+| `HARMONY_CONCURRENCY` | 4 |
+| `QUOTA_CUTOFF` | 0.9 |
+| `MAX_GRANULES` | 1000 |
+| `MAX_GRID` | 128 |
+| `SUBREGION_N` | 8 |
+| `DEFAULT_SOURCE` | `harmony-subset` |
+| `EARTHDATA_TOKEN` | none, required |
+| `NATS_URL` | none, set in compose |
+| `REDIS_URL` | none, set in compose |
+| `S3_ENDPOINT` | none, set in compose |
+| `S3_ACCESS_KEY` | none, set in compose |
+| `S3_SECRET_KEY` | none, set in compose |
+
+## Repository
+
+One public monorepo, [TheBaronessHotel/trend-detective](https://github.com/TheBaronessHotel/trend-detective). On 2026-11-14 the team switched to it from the first plan of one repo per service.
+
+```
+.
+├── compose.yaml, .env.example, Makefile
+├── buf.yaml, buf.gen.yaml
+├── proto/trenddetective/<service>/v1/   contracts, one package per owning service
+├── gen/                                 generated Go, Python and TS code, committed
+├── deploy/                              NATS, Redis and SeaweedFS configs, bootstrap container
+└── services/
+    ├── gateway/      Go
+    ├── ingest/       Go
+    ├── preprocess/
+    ├── analysis/
+    ├── narrator/
+    └── web/
+```
+
+| Target | What it does |
+|---|---|
+| `make up` | Starts everything, including bootstrap |
+| `make up-obs` | Starts everything plus the observability stack |
+| `make down` | Stops everything |
+| `make logs` | Follows logs |
+| `make gen` | Regenerates `gen/` from `proto/` |
+
+Each service has its own Dockerfile in its folder. Compose builds with the repo root as the context, so every service can use `gen/`.
+
+## Later, not a priority
+
+- Dynamic regression and prediction. The model parameters are already in the results.
+- The AppEEARS adapter for MODIS NDVI and land surface temperature.
+- Polygon regions. HOSS already accepts shapes.
+- Images on GHCR.
+- Demo cases for the video. Candidates:
+  - OMI NO2 over Asia: east China falling, India rising.
+  - GRACE groundwater in northwest India.
+  - GPM rain in a noisy region, as the "not significant yet" case.
