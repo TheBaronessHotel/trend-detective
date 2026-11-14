@@ -111,7 +111,9 @@ const (
 	Format_FORMAT_GIOVANNI_CSV Format = 2
 	// NASA POWER JSON.
 	Format_FORMAT_POWER_JSON Format = 3
-	// A user CSV with a date column and a value column.
+	// A user's CSV, cleaned up by csv-upload: a "date,value" header, then one
+	// row per time step, sorted, with no repeated dates. Dates are YYYY-MM-DD,
+	// and monthly data uses the first of the month. An empty value is missing.
 	Format_FORMAT_USER_CSV Format = 4
 	// GeoTIFF, from AppEEARS area requests.
 	Format_FORMAT_GEOTIFF Format = 5
@@ -622,7 +624,8 @@ func (x *Power) GetPoint() *v1.LatLon {
 	return nil
 }
 
-// Settings for SOURCE_CSV_UPLOAD.
+// Settings for SOURCE_CSV_UPLOAD. Ingest reads the file, checks it, and
+// stores a cleaned-up copy as FORMAT_USER_CSV.
 type CsvUpload struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The file in the uploads bucket, from CreateUploadURL.
@@ -791,10 +794,14 @@ type RawDataset struct {
 	// The rectangle that was requested.
 	Bbox *v1.BBox `protobuf:"bytes,5,opt,name=bbox,proto3" json:"bbox,omitempty"`
 	// The point that was sampled. Set only for point sources.
-	Point         *v1.LatLon             `protobuf:"bytes,6,opt,name=point,proto3" json:"point,omitempty"`
-	Dates         *v1.DateRange          `protobuf:"bytes,7,opt,name=dates,proto3" json:"dates,omitempty"`
-	Files         []*RawFile             `protobuf:"bytes,8,rep,name=files,proto3" json:"files,omitempty"`
-	FetchedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=fetched_at,json=fetchedAt,proto3" json:"fetched_at,omitempty"`
+	Point     *v1.LatLon             `protobuf:"bytes,6,opt,name=point,proto3" json:"point,omitempty"`
+	Dates     *v1.DateRange          `protobuf:"bytes,7,opt,name=dates,proto3" json:"dates,omitempty"`
+	Files     []*RawFile             `protobuf:"bytes,8,rep,name=files,proto3" json:"files,omitempty"`
+	FetchedAt *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=fetched_at,json=fetchedAt,proto3" json:"fetched_at,omitempty"`
+	// The data's time step, when the adapter knows it and the catalog can't.
+	// Set by csv-upload, which reads it from the file's dates, so preprocess
+	// can tell whether daily values still need monthly means.
+	Step          v1.TimeStep `protobuf:"varint,10,opt,name=step,proto3,enum=trenddetective.common.v1.TimeStep" json:"step,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -890,6 +897,13 @@ func (x *RawDataset) GetFetchedAt() *timestamppb.Timestamp {
 		return x.FetchedAt
 	}
 	return nil
+}
+
+func (x *RawDataset) GetStep() v1.TimeStep {
+	if x != nil {
+		return x.Step
+	}
+	return v1.TimeStep(0)
 }
 
 // One file in the raw bucket.
@@ -992,7 +1006,7 @@ const file_trenddetective_ingest_v1_ingest_proto_rawDesc = "" +
 	"\tvariables\x18\x02 \x03(\tR\tvariables\"<\n" +
 	"\bAppeears\x12\x18\n" +
 	"\aproduct\x18\x01 \x01(\tR\aproduct\x12\x16\n" +
-	"\x06layers\x18\x02 \x03(\tR\x06layers\"\xda\x03\n" +
+	"\x06layers\x18\x02 \x03(\tR\x06layers\"\x92\x04\n" +
 	"\n" +
 	"RawDataset\x128\n" +
 	"\x06source\x18\x01 \x01(\x0e2 .trenddetective.ingest.v1.SourceR\x06source\x128\n" +
@@ -1005,7 +1019,9 @@ const file_trenddetective_ingest_v1_ingest_proto_rawDesc = "" +
 	"\x05dates\x18\a \x01(\v2#.trenddetective.common.v1.DateRangeR\x05dates\x127\n" +
 	"\x05files\x18\b \x03(\v2!.trenddetective.ingest.v1.RawFileR\x05files\x129\n" +
 	"\n" +
-	"fetched_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tfetchedAt\"\x81\x01\n" +
+	"fetched_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tfetchedAt\x126\n" +
+	"\x04step\x18\n" +
+	" \x01(\x0e2\".trenddetective.common.v1.TimeStepR\x04step\"\x81\x01\n" +
 	"\aRawFile\x125\n" +
 	"\x04blob\x18\x01 \x01(\v2!.trenddetective.common.v1.BlobRefR\x04blob\x12?\n" +
 	"\bcoverage\x18\x02 \x01(\v2#.trenddetective.common.v1.DateRangeR\bcoverage*\xc1\x01\n" +
@@ -1060,6 +1076,7 @@ var file_trenddetective_ingest_v1_ingest_proto_goTypes = []any{
 	(*v1.LatLon)(nil),             // 14: trenddetective.common.v1.LatLon
 	(*v1.BlobRef)(nil),            // 15: trenddetective.common.v1.BlobRef
 	(*timestamppb.Timestamp)(nil), // 16: google.protobuf.Timestamp
+	(v1.TimeStep)(0),              // 17: trenddetective.common.v1.TimeStep
 }
 var file_trenddetective_ingest_v1_ingest_proto_depIdxs = []int32{
 	12, // 0: trenddetective.ingest.v1.IngestTask.bbox:type_name -> trenddetective.common.v1.BBox
@@ -1081,13 +1098,14 @@ var file_trenddetective_ingest_v1_ingest_proto_depIdxs = []int32{
 	13, // 16: trenddetective.ingest.v1.RawDataset.dates:type_name -> trenddetective.common.v1.DateRange
 	11, // 17: trenddetective.ingest.v1.RawDataset.files:type_name -> trenddetective.ingest.v1.RawFile
 	16, // 18: trenddetective.ingest.v1.RawDataset.fetched_at:type_name -> google.protobuf.Timestamp
-	15, // 19: trenddetective.ingest.v1.RawFile.blob:type_name -> trenddetective.common.v1.BlobRef
-	13, // 20: trenddetective.ingest.v1.RawFile.coverage:type_name -> trenddetective.common.v1.DateRange
-	21, // [21:21] is the sub-list for method output_type
-	21, // [21:21] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	17, // 19: trenddetective.ingest.v1.RawDataset.step:type_name -> trenddetective.common.v1.TimeStep
+	15, // 20: trenddetective.ingest.v1.RawFile.blob:type_name -> trenddetective.common.v1.BlobRef
+	13, // 21: trenddetective.ingest.v1.RawFile.coverage:type_name -> trenddetective.common.v1.DateRange
+	22, // [22:22] is the sub-list for method output_type
+	22, // [22:22] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_trenddetective_ingest_v1_ingest_proto_init() }

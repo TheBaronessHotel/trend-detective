@@ -116,6 +116,7 @@ func (a *Adapter) Fetch(ctx context.Context, task *ingestv1.IngestTask, sink cor
 		Format:    m.GetFormat(),
 		Variables: variables,
 		Point:     m.GetPoint(),
+		Step:      m.GetStep(),
 	}, nil
 }
 

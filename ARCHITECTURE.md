@@ -150,7 +150,7 @@ Each source is an ingest adapter, chosen per request. Each catalog entry sets it
 | `giovanni-area` | Area-averaged CSV | Harmony plus Giovanni averaging, with Giovanni's own variable IDs. Uses the monthly Giovanni quota. Serves OMI NO2 and groundwater in mm |
 | `giovanni-point` | Point CSV | `api.giovanni.earthdata.nasa.gov/timeseries`, with Giovanni's own variable IDs. Answers in seconds, for the grid cell the point falls in. Uses the monthly Giovanni quota. A second source for the variables Giovanni has |
 | `power` | Point JSON | NASA POWER, no login. The gateway sets the point to the middle of the rectangle |
-| `csv-upload` | User CSV | Exports from Giovanni, Hydrology Time Series and AppEEARS |
+| `csv-upload` | User CSV | The user's own data, or exports from Giovanni, Hydrology Time Series and AppEEARS. Ingest checks the file, stores a cleaned-up `date,value` copy and finds the time step. Catalog entry `user-csv` |
 | `bundle` | Files shipped with the app | Offline demos and the video recording |
 | `appeears` | MODIS NDVI and land surface temperature | Later |
 
@@ -235,7 +235,7 @@ Settings are env vars per service, set in `compose.yaml` and read from `.env`. T
 | `S3_PUBLIC_ENDPOINT` | `http://localhost:8333`. The gateway signs presigned URLs for this host, so it must be what the browser uses |
 | `S3_ALLOWED_ORIGINS` | `*`. Browser origins SeaweedFS accepts for presigned URLs |
 | `PRESIGN_TTL` | `15m`. How long presigned URLs work |
-| `MAX_UPLOAD_MB` | 20. Largest CSV upload |
+| `MAX_UPLOAD_MB` | 20. Largest CSV upload. The gateway and ingest both read it |
 | `LOG_LEVEL` | `info`. Go services: trace, debug, info, warn or error |
 | `ADMIN_ADDR` | `:9090`. Go services serve `/metrics` and `/debug/pprof/` here, inside the compose network only |
 | `BUNDLE_DIR` | `/bundle`. Ingest's bundled datasets, mounted from `services/ingest/bundle` |

@@ -166,6 +166,39 @@ func TestCreateJobRejectsBadRequests(t *testing.T) {
 	}
 }
 
+func TestCSVUploadJobs(t *testing.T) {
+	csvSpec := func(up *commonv1.BlobRef) *gatewayv1.JobSpec {
+		s := spec()
+		s.VariableId, s.Upload = "user-csv", up
+		return s
+	}
+	h := newHarness(t)
+	job, err := h.o.CreateJob(context.Background(), csvSpec(&commonv1.BlobRef{Bucket: "uploads", Key: "u-1/rain.csv"}), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if job.GetSpec().GetSource() != ingestv1.Source_SOURCE_CSV_UPLOAD {
+		t.Errorf("default source: %v", job.GetSpec().GetSource())
+	}
+	if up := h.pub.last(t).task.GetIngest().GetCsvUpload().GetUpload(); up.GetBucket() != "uploads" || up.GetKey() != "u-1/rain.csv" {
+		t.Errorf("the ingest task should carry the upload, got %v", up)
+	}
+
+	for name, up := range map[string]*commonv1.BlobRef{
+		"no file":        nil,
+		"another bucket": {Bucket: "raw", Key: "power/abc/dataset.json"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := newHarness(t)
+			_, err := h.o.CreateJob(context.Background(), csvSpec(up), "")
+			var inv *InvalidError
+			if !errors.As(err, &inv) || len(h.pub.msgs) != 0 {
+				t.Errorf("want an InvalidError and nothing published, got %v", err)
+			}
+		})
+	}
+}
+
 func TestMaxGridIsACap(t *testing.T) {
 	h := newHarness(t)
 	s := spec()

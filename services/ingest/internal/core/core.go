@@ -47,6 +47,8 @@ type Fetched struct {
 	Variables []string
 	// Set for point sources.
 	Point *commonv1.LatLon
+	// The data's time step, when the adapter found it in the data itself.
+	Step commonv1.TimeStep
 }
 
 // Sink receives an adapter's files. Put is safe to call from several
@@ -140,6 +142,7 @@ func (s *Service) Ingest(ctx context.Context, task *ingestv1.IngestTask) (ds *in
 		Dates:      task.GetDates(),
 		Files:      files,
 		FetchedAt:  timestamppb.New(s.now()),
+		Step:       fetched.Step,
 	}
 	if ds.Source == ingestv1.Source_SOURCE_UNSPECIFIED {
 		ds.Source = source

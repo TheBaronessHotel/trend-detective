@@ -455,3 +455,33 @@ variables:
       Delhi gets most of its rain in the June to September monsoon, so
       year-to-year noise is large and trends need a long record.
     dataset_url: https://power.larc.nasa.gov/
+
+  # A CSV the user uploads through CreateUploadURL. Ingest checks it, stores
+  # a cleaned-up copy with a date and a value column, and finds the time step
+  # from the dates. The step below is only a placeholder: RawDataset.step has
+  # the real one.
+  - id: user-csv
+    name: Your own data (CSV upload)
+    definition: >-
+      A time series you upload yourself, for example readings from a school
+      weather station. The file needs two columns: the date, written like
+      2010-03-01 or 2010-03, and the value. Daily, weekly and monthly data
+      all work, and a trend needs at least two years.
+    units: your units
+    step: monthly
+    available: { start: 1800-01-01, end: 2100-12-31 }
+    grid: false
+    domain: global
+    default_source: csv-upload
+    sources:
+      csv-upload: {}
+    filters:
+      ops:
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *series-tests
+    llm_hints: >-
+      The user uploaded this data, so where it comes from, what it measures
+      and how good it is are unknown. Call it the user's data, use the name
+      of its value column if it has one, and don't guess at causes beyond
+      what the user says.

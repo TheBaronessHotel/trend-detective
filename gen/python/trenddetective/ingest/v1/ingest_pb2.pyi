@@ -132,7 +132,7 @@ class Appeears(_message.Message):
     def __init__(self, product: _Optional[str] = ..., layers: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class RawDataset(_message.Message):
-    __slots__ = ("source", "format", "variable_id", "variables", "bbox", "point", "dates", "files", "fetched_at")
+    __slots__ = ("source", "format", "variable_id", "variables", "bbox", "point", "dates", "files", "fetched_at", "step")
     SOURCE_FIELD_NUMBER: _ClassVar[int]
     FORMAT_FIELD_NUMBER: _ClassVar[int]
     VARIABLE_ID_FIELD_NUMBER: _ClassVar[int]
@@ -142,6 +142,7 @@ class RawDataset(_message.Message):
     DATES_FIELD_NUMBER: _ClassVar[int]
     FILES_FIELD_NUMBER: _ClassVar[int]
     FETCHED_AT_FIELD_NUMBER: _ClassVar[int]
+    STEP_FIELD_NUMBER: _ClassVar[int]
     source: Source
     format: Format
     variable_id: str
@@ -151,7 +152,8 @@ class RawDataset(_message.Message):
     dates: _common_pb2.DateRange
     files: _containers.RepeatedCompositeFieldContainer[RawFile]
     fetched_at: _timestamp_pb2.Timestamp
-    def __init__(self, source: _Optional[_Union[Source, str]] = ..., format: _Optional[_Union[Format, str]] = ..., variable_id: _Optional[str] = ..., variables: _Optional[_Iterable[str]] = ..., bbox: _Optional[_Union[_common_pb2.BBox, _Mapping]] = ..., point: _Optional[_Union[_common_pb2.LatLon, _Mapping]] = ..., dates: _Optional[_Union[_common_pb2.DateRange, _Mapping]] = ..., files: _Optional[_Iterable[_Union[RawFile, _Mapping]]] = ..., fetched_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    step: _common_pb2.TimeStep
+    def __init__(self, source: _Optional[_Union[Source, str]] = ..., format: _Optional[_Union[Format, str]] = ..., variable_id: _Optional[str] = ..., variables: _Optional[_Iterable[str]] = ..., bbox: _Optional[_Union[_common_pb2.BBox, _Mapping]] = ..., point: _Optional[_Union[_common_pb2.LatLon, _Mapping]] = ..., dates: _Optional[_Union[_common_pb2.DateRange, _Mapping]] = ..., files: _Optional[_Iterable[_Union[RawFile, _Mapping]]] = ..., fetched_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., step: _Optional[_Union[_common_pb2.TimeStep, str]] = ...) -> None: ...
 
 class RawFile(_message.Message):
     __slots__ = ("blob", "coverage")
