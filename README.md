@@ -60,6 +60,7 @@ The ports listen on 127.0.0.1 only:
 - Redis: 6379.
 - SeaweedFS: 8333 for S3, 9333 for the master UI, and 8888 for the filer UI.
 - Gateway: 8080, the Connect API.
+- Narrator: 8081, the Connect stream the gateway proxies.
 - Web app: 3000, and 5173 for `make web-dev`.
 
 ## Working here

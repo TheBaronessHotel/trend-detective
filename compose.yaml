@@ -189,6 +189,36 @@ services:
       - "127.0.0.1:3000:80"
     restart: unless-stopped
 
+  # Streams LLM explanations of finished results, on http://localhost:8081.
+  # The gateway calls it; the user's key arrives per request, never via .env.
+  narrator:
+    build:
+      context: .
+      dockerfile: services/narrator/Dockerfile
+    environment:
+      <<: *infra-env
+      HTTP_ADDR: ":8081"
+      ANALYSIS_BUCKET: analysis
+      NARRATE_TIMEOUT: ${NARRATE_TIMEOUT:-3m}
+      # Comma-separated hosts llm.base_url may use. Empty allows any host.
+      NARRATOR_LLM_BASE_URL_ALLOWLIST: ${NARRATOR_LLM_BASE_URL_ALLOWLIST:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "127.0.0.1:8081:8081"
+    # Lets a base_url of http://host.docker.internal:11434/v1 reach Ollama on
+    # the host, on Linux too.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/narrator", "healthcheck"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
 volumes:
   nats-data:
   redis-data:
