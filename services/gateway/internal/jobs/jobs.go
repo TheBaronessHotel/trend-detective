@@ -186,6 +186,20 @@ func (o *Orchestrator) GetJob(ctx context.Context, id string) (*gatewayv1.Job, e
 	return job, err
 }
 
+// OnTaskProgress records how far a running task has got and tells anyone
+// watching the job. Progress is best effort, so an update for a task that's
+// unknown or already finished changes nothing.
+func (o *Orchestrator) OnTaskProgress(ctx context.Context, p *gatewayv1.TaskProgress) error {
+	changed, err := o.store.recordProgress(ctx, p, o.now())
+	if err != nil {
+		return fmt.Errorf("record TaskProgress: %w", err)
+	}
+	if changed {
+		o.hub.notify(p.GetMeta().GetJobId())
+	}
+	return nil
+}
+
 // OnStageDone records a stage's report and advances the job when the stage
 // is complete. It returns nil for a job that doesn't exist, since there is
 // nothing to update and redelivering won't change that.

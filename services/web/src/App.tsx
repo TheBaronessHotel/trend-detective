@@ -11,7 +11,7 @@ import { SourcePicker } from "./components/SourcePicker";
 import { ThemeButton } from "./components/ThemeButton";
 import { VariablePicker } from "./components/VariablePicker";
 import { type Box, problem } from "./lib/bbox";
-import { type Day, jobRange } from "./lib/dates";
+import { compare, type Day, jobRange } from "./lib/dates";
 import { isFinished } from "./lib/job";
 
 // Jobs stop after preprocessing until the analysis service runs in the stack.
@@ -58,7 +58,9 @@ export function App() {
       ? problem(box)
       : !start || !end
         ? "Pick the dates."
-        : source === Source.CSV_UPLOAD && !file
+        : compare(start, end) > 0
+          ? "The start has to come before the end."
+          : source === Source.CSV_UPLOAD && !file
           ? "Choose your CSV file."
           : undefined;
   const busy = run !== undefined && run.phase !== "done";

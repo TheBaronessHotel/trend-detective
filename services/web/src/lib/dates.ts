@@ -18,22 +18,6 @@ export interface LooseRange {
   end?: Day | undefined;
 }
 
-/** "YYYY-MM", the value of an <input type="month">. */
-export function toMonthInput(d: Day | undefined): string {
-  if (!d) return "";
-  return `${String(d.year).padStart(4, "0")}-${String(d.month).padStart(2, "0")}`;
-}
-
-/** The first day of the month in an "YYYY-MM" input, or undefined. */
-export function fromMonthInput(value: string): Day | undefined {
-  const m = /^(\d{4})-(\d{2})$/.exec(value);
-  if (!m) return undefined;
-  const year = Number(m[1]);
-  const month = Number(m[2]);
-  if (month < 1 || month > 12) return undefined;
-  return { year, month, day: 1 };
-}
-
 export function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
@@ -65,6 +49,33 @@ export function jobRange(startMonth: Day, endMonth: Day, available: LooseRange |
   if (available?.start) start = later(start, available.start);
   if (available?.end) end = earlier(end, available.end);
   return { start, end };
+}
+
+/**
+ * A month moved inside what the variable covers, on the first of the month.
+ * Picking a year can leave the month outside, as with March of a record that
+ * starts in October; the month then snaps to the nearest one covered.
+ */
+export function clampMonth(d: Day, available: LooseRange | undefined): Day {
+  const month: Day = { year: d.year, month: d.month, day: 1 };
+  const first = available?.start && { year: available.start.year, month: available.start.month, day: 1 };
+  const last = available?.end && { year: available.end.year, month: available.end.month, day: 1 };
+  if (first && compare(month, first) < 0) return first;
+  if (last && compare(month, last) > 0) return last;
+  return month;
+}
+
+/**
+ * The last n years of what the variable covers, as whole months, or
+ * undefined when it covers less than that.
+ */
+export function lastYears(available: LooseRange | undefined, n: number): DayRange | undefined {
+  if (!available?.start || !available.end) return undefined;
+  const end: Day = { year: available.end.year, month: available.end.month, day: 1 };
+  // n years of months ending with the end month start the month after, n years back.
+  const start: Day = end.month === 12 ? { year: end.year - n + 1, month: 1, day: 1 } : { year: end.year - n, month: end.month + 1, day: 1 };
+  const first: Day = { year: available.start.year, month: available.start.month, day: 1 };
+  return compare(start, first) < 0 ? undefined : { start, end };
 }
 
 /** Whole years between two days, rounded down, for "a 20-year record". */

@@ -64,6 +64,33 @@ describe("stageViews", () => {
     expect(views[0]?.since).toBeUndefined();
   });
 
+  test("a running task's own start, percent and activity", () => {
+    const j = job([{ stage: Stage.INGEST, state: TaskState.RUNNING }]);
+    j.createdAt = timestampFromMs(Date.UTC(2026, 10, 14, 19, 43, 30));
+    const t = j.tasks[0];
+    if (t) {
+      t.startedAt = timestampFromMs(Date.UTC(2026, 10, 14, 19, 43, 31));
+      t.percent = 35;
+      t.activity = "NASA is cutting the files";
+    }
+    expect(stageViews(j, Stage.INGEST)[0]).toMatchObject({
+      state: "running",
+      since: Date.UTC(2026, 10, 14, 19, 43, 31),
+      percent: 35,
+      activity: "NASA is cutting the files",
+    });
+  });
+
+  test("percent across several tasks counts finished ones as done", () => {
+    const j = job([
+      { stage: Stage.INGEST, state: TaskState.SUCCEEDED },
+      { stage: Stage.INGEST, state: TaskState.RUNNING },
+    ]);
+    const t = j.tasks[1];
+    if (t) t.percent = 50;
+    expect(stageViews(j, Stage.INGEST)[0]?.percent).toBe(75);
+  });
+
   test("some tasks done and some queued is running", () => {
     const views = stageViews(
       job([

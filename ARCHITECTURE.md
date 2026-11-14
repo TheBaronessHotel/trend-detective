@@ -54,7 +54,7 @@ Bootstrap creates three streams. Each keeps messages for 7 days, the same as job
 | Stream | Subjects | Retention | Read by |
 |---|---|---|---|
 | `TASKS` | `tasks.ingest`, `tasks.preprocess`, `tasks.analysis` | Work queue. A task is deleted once it's acked | One durable consumer per stage, filtered to its subject |
-| `EVENTS` | `events.>`, so far only `events.stage.done` | Limits. Events stay after acks, so a job can be replayed | The gateway |
+| `EVENTS` | `events.>`: `events.stage.done`, and `events.task.progress` while a task runs | Limits. Events stay after acks, so a job can be replayed | The gateway |
 | `ADVISORIES` | `$JS.EVENT.ADVISORY.CONSUMER.MAX_DELIVERIES.TASKS.>` | Limits | The gateway |
 
 - `TASKS` lists its subjects one by one, so a publish to a misspelled subject fails instead of sitting in the stream.
@@ -87,6 +87,7 @@ A one-shot Go program in `deploy/bootstrap`. It runs on every `make up`, creates
 - Python services use the same log field names and metric names.
 - Jaeger, Prometheus, Grafana and Pyroscope run in an opt-in compose profile started with `make up-obs`.
 - The gateway exposes `/debug/jobs/{id}` with each task's stage, attempts and errors, plus the raw `StageDone` events.
+- While a task runs, a stage may publish `TaskProgress` on `events.task.progress`: once when it starts, then a percent and a line for people, such as "NASA's Harmony service is cutting the files to your rectangle" or "Downloading the files from NASA, 12 of 60". The gateway marks the task running and keeps the newest percent, so the app can show it. Progress is best effort. The gateway never lets an update overwrite a finished task, and drops one it can't record after three deliveries. Ingest reports it so far; preprocess and analysis can add it the same way.
 
 ## Job lifecycle
 
@@ -118,7 +119,7 @@ Failures use `TaskError{code, retryable, user_message}`. Messages like "quota ex
 
 | Owner | Messages |
 |---|---|
-| gateway | The shared types in `common.v1`: `BBox`, `DateRange`, `BlobRef` and a few more. The `Task` envelope with `TaskMeta{job_id, task_id, stage}`, plus `StageDone`, `TaskError` and the public Connect API |
+| gateway | The shared types in `common.v1`: `BBox`, `DateRange`, `BlobRef` and a few more. The `Task` envelope with `TaskMeta{job_id, task_id, stage}`, plus `StageDone`, `TaskProgress`, `TaskError` and the public Connect API |
 | ingest | `IngestTask` with one settings message per adapter, `RawDataset` (file refs, format, source, variable, rectangle, dates) |
 | preprocess | `PreprocessTask`, filter-chain ops, `PreprocessResult`, and the `Series`, `Grid` and `CubeHeader` documents |
 | analysis | `AnalysisTask`, `TestPlan` and the test specs, `AnalysisResult`, and the `SeriesAnalysis` and `GridAnalysis` documents, including fitted model parameters |

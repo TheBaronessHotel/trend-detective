@@ -23,6 +23,8 @@ const (
 	SubjectPreprocess = "tasks.preprocess"
 	SubjectAnalysis   = "tasks.analysis"
 	SubjectStageDone  = "events.stage.done"
+	// TaskProgress, while a task runs. Best effort; StageDone is what counts.
+	SubjectTaskProgress = "events.task.progress"
 )
 
 // Publish sends msg as protojson. msgID goes in Nats-Msg-Id, so JetStream

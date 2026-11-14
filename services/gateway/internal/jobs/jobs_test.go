@@ -21,6 +21,7 @@ import (
 	"github.com/lein3000zzz/the-watchers/pkg/observability/logging"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type published struct {
@@ -452,5 +453,63 @@ func TestTaskCap(t *testing.T) {
 	s.StopAfter = gatewayv1.Stage_STAGE_INGEST
 	if _, err := h.o.CreateJob(context.Background(), s, ""); err != nil {
 		t.Errorf("a 1-task job under a cap of 2: %v", err)
+	}
+}
+
+// Ingest reports progress while NASA works, so the app can say "35%" rather
+// than leave the task looking queued for minutes.
+func TestProgressShowsARunningTask(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	job, _ := h.o.CreateJob(ctx, spec(), "")
+	meta := h.pub.last(t).task.GetMeta()
+	start := time.Date(2026, 11, 14, 19, 43, 31, 0, time.UTC)
+	pct := int32(35)
+	for _, p := range []*gatewayv1.TaskProgress{
+		{Meta: meta, StartedAt: timestamppb.New(start)},
+		{Meta: meta, Percent: &pct, Activity: "NASA is cutting the files"},
+		// A later start time never replaces the first.
+		{Meta: meta, StartedAt: timestamppb.New(start.Add(time.Minute))},
+	} {
+		if err := h.o.OnTaskProgress(ctx, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, _ := h.o.GetJob(ctx, job.GetId())
+	task := got.GetTasks()[0]
+	if task.GetState() != gatewayv1.TaskState_TASK_STATE_RUNNING || task.GetPercent() != 35 ||
+		task.GetActivity() != "NASA is cutting the files" || !task.GetStartedAt().AsTime().Equal(start) {
+		t.Errorf("task: %v", task)
+	}
+}
+
+func TestProgressAfterStageDoneChangesNothing(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	s := spec()
+	s.StopAfter = gatewayv1.Stage_STAGE_INGEST
+	job, _ := h.o.CreateJob(ctx, s, "")
+	task := h.pub.last(t).task
+	if err := h.o.OnStageDone(ctx, done(task)); err != nil {
+		t.Fatal(err)
+	}
+	pct := int32(50)
+	if err := h.o.OnTaskProgress(ctx, &gatewayv1.TaskProgress{Meta: task.GetMeta(), Percent: &pct}); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := h.o.GetJob(ctx, job.GetId())
+	if st := got.GetTasks()[0]; st.GetState() != gatewayv1.TaskState_TASK_STATE_SUCCEEDED || st.Percent != nil {
+		t.Errorf("a late update changed a finished task: %v", st)
+	}
+}
+
+func TestProgressForAnUnknownTaskIsIgnored(t *testing.T) {
+	h := newHarness(t)
+	meta := &gatewayv1.TaskMeta{JobId: "nope", TaskId: "nope-ingest-0", Stage: gatewayv1.Stage_STAGE_INGEST}
+	if err := h.o.OnTaskProgress(context.Background(), &gatewayv1.TaskProgress{Meta: meta}); err != nil {
+		t.Fatal(err)
+	}
+	if keys := h.mr.Keys(); len(keys) != 0 {
+		t.Errorf("progress for an unknown job wrote %v", keys)
 	}
 }

@@ -337,6 +337,59 @@ p {
   border-bottom-color: var(--fg);
 }
 
+/* Menus get the same bottom line, with a small drawn caret. */
+.field select {
+  width: 100%;
+  min-width: 0;
+  padding: 0.35rem 1rem 0.35rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background-color: transparent;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 7px) 55%,
+    calc(100% - 3px) 55%;
+  background-size: 4px 4px;
+  background-repeat: no-repeat;
+  font-family: var(--mono);
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+  appearance: none;
+  cursor: pointer;
+}
+
+.field select:focus {
+  outline: 0;
+  border-bottom-color: var(--fg);
+}
+
+.field select:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+/* A month and a year side by side. */
+.month-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 0.6rem;
+}
+
+.date-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.9rem 0 0;
+}
+
+.date-presets .note {
+  margin: 0 0.3rem 0 0;
+}
+
 .field input[type="file"] {
   border-bottom: 0;
   font-size: 0.78rem;

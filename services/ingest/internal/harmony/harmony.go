@@ -28,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	commonv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/common/v1"
@@ -183,7 +184,16 @@ func (a *Adapter) Fetch(ctx context.Context, task *ingestv1.IngestTask, sink cor
 		_ = a.rdb.Del(ctx, stateKey).Err()
 		return nil, failure(job, req.collection)
 	}
+	core.ReportProgress(ctx, job.Progress, a.mode.working())
 	return nil, core.Pending(pollEvery, fmt.Sprintf("Harmony job %s is %s, %d%%", jobID, job.Status, job.Progress))
+}
+
+// working says what NASA is doing with a submitted job, for people.
+func (m mode) working() string {
+	if m.areaAverage {
+		return "NASA's Giovanni service is averaging the data"
+	}
+	return "NASA's Harmony service is cutting the files to your rectangle"
 }
 
 // gesdiscApproval is where an Earthdata account accepts the GES DISC archive's
@@ -249,6 +259,7 @@ func (a *Adapter) start(ctx context.Context, req *request, token, stateKey strin
 		return core.Transient(err)
 	}
 	if !ok {
+		core.ReportProgress(ctx, core.Unknown, "Waiting for a turn at NASA: other jobs are using every slot")
 		return core.Pending(slotWait, "every Harmony slot for this token is busy")
 	}
 	jobID, err := a.submit(ctx, token, req)
@@ -260,6 +271,7 @@ func (a *Adapter) start(ctx context.Context, req *request, token, stateKey strin
 		return core.Transient(err)
 	}
 	_ = a.rdb.Expire(ctx, stateKey, stateTTL).Err()
+	core.ReportProgress(ctx, 0, a.mode.working())
 	return core.Pending(submitCheck, fmt.Sprintf("submitted Harmony job %s (%s, %d granules counted)", jobID, a.mode.version, hits))
 }
 
@@ -462,14 +474,26 @@ func (a *Adapter) download(ctx context.Context, token string, j *job, sink core.
 		wg       sync.WaitGroup
 		once     sync.Once
 		firstErr error
+		done     atomic.Int64
 	)
+	total := len(links)
+	downloading := func(n int) string {
+		if total == 1 {
+			return "Downloading the file from NASA"
+		}
+		return fmt.Sprintf("Downloading the files from NASA, %d of %d", n, total)
+	}
+	core.ReportProgress(ctx, 0, downloading(0))
 	for _, l := range links {
 		sem <- struct{}{}
 		wg.Go(func() {
 			defer func() { <-sem }()
 			if err := a.downloadOne(ctx, token, l, sink); err != nil {
 				once.Do(func() { firstErr = err; cancel() })
+				return
 			}
+			n := int(done.Add(1))
+			core.ReportProgress(ctx, n*100/total, downloading(n))
 		})
 	}
 	wg.Wait()

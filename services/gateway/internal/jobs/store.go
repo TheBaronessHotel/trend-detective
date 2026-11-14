@@ -142,6 +142,63 @@ func (s *Store) recordDone(ctx context.Context, d *gatewayv1.StageDone, status *
 	return res[0], res[1], nil
 }
 
+// recordProgress marks a task running and stores how far it has got. It
+// reports whether anything changed. A task that's unknown, or already
+// finished, is left alone, so a late update can't undo a StageDone.
+func (s *Store) recordProgress(ctx context.Context, p *gatewayv1.TaskProgress, now time.Time) (bool, error) {
+	meta := p.GetMeta()
+	key, field := tasksKey(meta.GetJobId()), meta.GetTaskId()
+	changed := false
+	update := func(tx *redis.Tx) error {
+		changed = false
+		raw, err := tx.HGet(ctx, key, field).Result()
+		if errors.Is(err, redis.Nil) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		t := &gatewayv1.TaskStatus{}
+		if err := unmarshal.Unmarshal([]byte(raw), t); err != nil {
+			return fmt.Errorf("decode task: %w", err)
+		}
+		if t.GetState() == gatewayv1.TaskState_TASK_STATE_SUCCEEDED || t.GetState() == gatewayv1.TaskState_TASK_STATE_FAILED {
+			return nil
+		}
+		t.State = gatewayv1.TaskState_TASK_STATE_RUNNING
+		if t.GetStartedAt() == nil {
+			t.StartedAt = p.GetStartedAt()
+			if t.StartedAt == nil {
+				t.StartedAt = timestamppb.New(now)
+			}
+		}
+		if p.Percent != nil {
+			t.Percent = p.Percent
+		}
+		if p.GetActivity() != "" {
+			t.Activity = p.GetActivity()
+		}
+		b, err := marshal.Marshal(t)
+		if err != nil {
+			return err
+		}
+		_, err = tx.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+			pipe.HSet(ctx, key, field, b)
+			return nil
+		})
+		changed = err == nil
+		return err
+	}
+	// StageDone writes the same hash; if it lands in between, read again.
+	for range 3 {
+		err := s.rdb.Watch(ctx, update, key)
+		if !errors.Is(err, redis.TxFailedErr) {
+			return changed, err
+		}
+	}
+	return false, redis.TxFailedErr
+}
+
 // addStage creates a stage's tasks unless an earlier call already did, and
 // moves the job to that stage. It reports whether it created them.
 var addStageScript = redis.NewScript(`
