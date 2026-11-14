@@ -61,3 +61,17 @@ func Duration(name string, fallback time.Duration) (time.Duration, error) {
 	}
 	return d, nil
 }
+
+// Float01 returns the variable as a number from 0 to 1, or fallback when
+// it's unset.
+func Float01(name string, fallback float64) (float64, error) {
+	v := os.Getenv(name)
+	if v == "" {
+		return fallback, nil
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil || f < 0 || f > 1 {
+		return 0, fmt.Errorf("%s must be a number from 0 to 1, got %q", name, v)
+	}
+	return f, nil
+}

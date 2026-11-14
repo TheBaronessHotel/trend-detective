@@ -39,7 +39,7 @@ Only `variableId`, `bbox` and `dates` are required. The gateway fills in the res
 
 ## How a job runs
 
-1. `CreateJob` checks the request, fills in defaults, stores the job and publishes the ingest task.
+1. `CreateJob` checks the request, fills in defaults, runs the preflight checks below, stores the job and publishes the ingest task.
 2. Every `StageDone` is recorded, and its task is counted once. JetStream delivers each event at least once, so a Lua script makes the count safe to repeat.
 3. When the last task of a stage reports:
    - if any task failed, the job fails;
@@ -47,6 +47,19 @@ Only `variableId`, `bbox` and `dates` are required. The gateway fills in the res
    - otherwise the gateway builds the next stage's tasks from the results and publishes them.
 
 Task IDs are predictable, like `<job>-preprocess-0`. If the gateway crashes halfway through starting a stage, the redelivered event starts it again with the same IDs, and JetStream drops the repeated publishes by `Nats-Msg-Id`.
+
+## Preflight checks
+
+Before queuing anything, `CreateJob` refuses a job that can't work, with a message the user can act on:
+
+- **Dates.** Dates partly outside the variable's `available` range are clamped to it, and `GetJob` shows the dates used. Dates entirely outside it are refused, with the range in the message.
+- **Harmony sources:**
+  - **Granule count:** CMR counts the granules. Zero is refused as "no data". More than `MAX_GRANULES` is refused with the count, so the user can shorten the range.
+  - **Capabilities:** once every 6 hours per collection, Harmony's capabilities must show a service that subsets by area, time and variable.
+- **Giovanni sources.** The job is refused once the quota used reaches `QUOTA_CUTOFF`. The check uses the user's token, or `EARTHDATA_TOKEN`. The refusal comes back as `resource_exhausted`, and every other refusal as `invalid_argument`.
+- **Task cap.** A job that plans more tasks than `TASK_CAP` is refused.
+
+The NASA checks fail open. If CMR, Harmony or Giovanni can't answer within 5 seconds, the gateway logs a warning and the job goes ahead, and ingest's own checks apply.
 
 ## Downloads and uploads
 
@@ -99,10 +112,14 @@ Add an entry to `catalog.yaml` and run `make test`. The catalog test fails on un
 | `CORS_ORIGINS` | `*` | Comma-separated origins allowed to call the API from a browser |
 | `SUBREGION_N` | 8 | Default sub-regions per side |
 | `MAX_GRID` | 128 | Largest grid side. A request can lower it, never raise it |
-| `MAX_GRANULES` | 1000 | Passed to Harmony tasks |
+| `MAX_GRANULES` | 1000 | Most granules a Harmony job may fetch. Checked in preflight and again in ingest |
+| `TASK_CAP` | 256 | Most tasks one job may plan |
+| `QUOTA_CUTOFF` | 0.9 | Share of the Giovanni quota after which Giovanni jobs are refused |
+| `EARTHDATA_TOKEN` | empty | The team's token, for the Giovanni quota check |
+| `CMR_URL`, `HARMONY_URL`, `GIOVANNI_URL` | NASA's public addresses | |
 | `LOG_LEVEL`, `ADMIN_ADDR` | `info`, `:9090` | As for every Go service |
 
 ## Testing
 
-- `make test` covers the catalog, and the orchestrator against an in-memory Redis: every stage, duplicates, late duplicates, failures, `stop_after`, the token handling, `WatchJob`, the advisory mapping, the debug page, signed downloads and uploads.
+- `make test` covers the catalog, and the orchestrator against an in-memory Redis: every stage, duplicates, late duplicates, failures, `stop_after`, the token handling, `WatchJob`, the advisory mapping, the debug page, signed downloads and uploads, the preflight checks against a fake NASA, date clamping and the task cap.
 - `make smoke`, with the stack up, creates a real job that stops after ingest, follows it with `WatchJob` until it succeeds, and checks `/debug/jobs`. It also checks that the job has no series, and uploads a CSV through a signed URL.

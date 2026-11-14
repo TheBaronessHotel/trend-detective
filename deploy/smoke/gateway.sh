@@ -88,6 +88,12 @@ if [ "$status" != 200 ] || ! curl -s "http://127.0.0.1:8888/buckets/uploads/$key
 fi
 curl -s -o /dev/null -X DELETE "http://127.0.0.1:8888/buckets/uploads/$key"
 
+echo "Checking that dates outside the variable's range are refused"
+outside=$(call CreateJob '{"spec": {"variableId": "air-temperature-power", "source": "SOURCE_BUNDLE",
+  "bbox": {"west": 77, "south": 28, "east": 78, "north": 29},
+  "dates": {"start": {"year": 1950, "month": 1, "day": 1}, "end": {"year": 1960, "month": 12, "day": 31}}}}')
+case "$outside" in *"has data from"*) ;; *) echo "FAIL: dates before 1981 weren't refused: $outside"; exit 1 ;; esac
+
 echo "Checking that a bad request is refused"
 bad=$(call CreateJob '{"spec": {"variableId": "nope"}}')
 case "$bad" in *invalid_argument*) ;; *) echo "FAIL: unknown variable wasn't refused: $bad"; exit 1 ;; esac

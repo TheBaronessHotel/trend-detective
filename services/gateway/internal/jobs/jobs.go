@@ -40,6 +40,14 @@ type Limits struct {
 	SubregionN  int32
 	MaxGrid     int32
 	MaxGranules int32
+	// Most tasks one job may plan. Zero means no limit.
+	TaskCap int32
+}
+
+// Preflight decides, before a job is queued, whether its ingest task can run.
+// It returns an error with a message for the user when it can't.
+type Preflight interface {
+	Check(ctx context.Context, task *ingestv1.IngestTask, userToken string) error
 }
 
 // InvalidError is a request the gateway refuses. Its message is shown to the
@@ -66,6 +74,8 @@ type Orchestrator struct {
 	now    func() time.Time
 	newID  func() string
 	hub    *hub
+	// Optional. Nil skips the checks.
+	preflight Preflight
 	// How often Watch re-reads a job when nothing woke it.
 	watchPoll time.Duration
 }
@@ -85,6 +95,9 @@ func New(cat *catalog.Catalog, store *Store, pub Publisher, limits Limits, log l
 		watchPoll: 5 * time.Second,
 	}
 }
+
+// UsePreflight makes CreateJob run p before queuing anything.
+func (o *Orchestrator) UsePreflight(p Preflight) { o.preflight = p }
 
 // TaskID names the n-th task of a stage. IDs are predictable, so starting a
 // stage again produces the same tasks, and JetStream drops the repeated
@@ -132,6 +145,14 @@ func (o *Orchestrator) CreateJob(ctx context.Context, spec *gatewayv1.JobSpec, e
 	}
 	if g := ingest.GetGiovanniPoint(); g != nil {
 		g.Point = center(resolved.GetBbox())
+	}
+	if planned := plannedTasks(resolved); o.limits.TaskCap > 0 && planned > o.limits.TaskCap {
+		return nil, invalid("This job needs %d tasks, more than the limit of %d.", planned, o.limits.TaskCap)
+	}
+	if o.preflight != nil {
+		if err := o.preflight.Check(ctx, ingest, earthdataToken); err != nil {
+			return nil, err
+		}
 	}
 	if earthdataToken != "" {
 		key, err := o.store.saveEarthdataToken(ctx, id, earthdataToken)
@@ -314,6 +335,12 @@ func collect(results *gatewayv1.JobResults, stage gatewayv1.Stage, dones []*gate
 	return r
 }
 
+// plannedTasks counts the tasks a job will run: one ingest task, then one per
+// later stage up to stop_after.
+func plannedTasks(spec *gatewayv1.JobSpec) int32 {
+	return int32(lastStage(spec))
+}
+
 func lastStage(spec *gatewayv1.JobSpec) gatewayv1.Stage {
 	if s := spec.GetStopAfter(); s != gatewayv1.Stage_STAGE_UNSPECIFIED {
 		return s
@@ -352,6 +379,9 @@ func (o *Orchestrator) resolve(spec *gatewayv1.JobSpec) (*gatewayv1.JobSpec, *ca
 	}
 
 	r := proto.CloneOf(spec)
+	if err := clampDates(r.Dates, entry.Variable); err != nil {
+		return nil, nil, err
+	}
 	if r.Source == ingestv1.Source_SOURCE_UNSPECIFIED {
 		r.Source = entry.Variable.GetDefaultSource()
 	}
@@ -405,6 +435,29 @@ func checkDates(r *commonv1.DateRange) error {
 	}
 	if end.Before(start) {
 		return invalid("The start date is after the end date.")
+	}
+	return nil
+}
+
+// clampDates trims a valid range to the dates the variable covers. A range
+// entirely outside them is refused, with the available range in the message.
+func clampDates(r *commonv1.DateRange, v *gatewayv1.Variable) error {
+	availStart, ok1 := toTime(v.GetAvailable().GetStart())
+	availEnd, ok2 := toTime(v.GetAvailable().GetEnd())
+	if !ok1 || !ok2 {
+		return nil
+	}
+	start, _ := toTime(r.GetStart())
+	end, _ := toTime(r.GetEnd())
+	if end.Before(availStart) || start.After(availEnd) {
+		return invalid("%s has data from %s to %s. Pick dates in that range.",
+			v.GetName(), availStart.Format("January 2006"), availEnd.Format("January 2006"))
+	}
+	if start.Before(availStart) {
+		r.Start = proto.CloneOf(v.GetAvailable().GetStart())
+	}
+	if end.After(availEnd) {
+		r.End = proto.CloneOf(v.GetAvailable().GetEnd())
 	}
 	return nil
 }

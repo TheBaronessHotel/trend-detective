@@ -12,6 +12,7 @@ import (
 	"github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/gateway/v1/gatewayv1connect"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/catalog"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/jobs"
+	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/preflight"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/results"
 	"github.com/lein3000zzz/the-watchers/pkg/observability/logging"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -107,7 +108,12 @@ func (s *Server) toConnect(ctx context.Context, err error) error {
 	var inv *jobs.InvalidError
 	var badResult *results.InvalidError
 	var notReady *results.NotReadyError
+	var refusal *preflight.Refusal
 	switch {
+	case errors.As(err, &refusal) && refusal.Quota:
+		return connect.NewError(connect.CodeResourceExhausted, refusal.Error())
+	case errors.As(err, &refusal):
+		return connect.NewError(connect.CodeInvalidArgument, refusal.Error())
 	case errors.As(err, &inv):
 		return connect.NewError(connect.CodeInvalidArgument, inv.Error())
 	case errors.As(err, &badResult):

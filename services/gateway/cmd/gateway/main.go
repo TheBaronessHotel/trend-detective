@@ -30,6 +30,7 @@ import (
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/catalog"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/events"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/jobs"
+	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/preflight"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/results"
 	"github.com/lein3000zzz/the-watchers/pkg/observability/logging"
 	"github.com/nats-io/nats.go"
@@ -100,6 +101,18 @@ func run() error {
 	}
 
 	orch := jobs.New(cat, jobs.NewStore(rdb, jobTTL), natsx.Publisher{JS: js}, limits, log)
+	quotaCutoff, err := envx.Float01("QUOTA_CUTOFF", 0.9)
+	if err != nil {
+		return err
+	}
+	orch.UsePreflight(preflight.New(preflight.Config{
+		CMRURL:      envx.String("CMR_URL", "https://cmr.earthdata.nasa.gov"),
+		HarmonyURL:  envx.String("HARMONY_URL", "https://harmony.earthdata.nasa.gov"),
+		GiovanniURL: envx.String("GIOVANNI_URL", "https://api.giovanni.earthdata.nasa.gov"),
+		TeamToken:   os.Getenv("EARTHDATA_TOKEN"),
+		QuotaCutoff: quotaCutoff,
+		Timeout:     5 * time.Second,
+	}, log))
 
 	store, err := blob.New(env["S3_ENDPOINT"], env["S3_ACCESS_KEY"], env["S3_SECRET_KEY"])
 	if err != nil {
@@ -172,7 +185,11 @@ func loadLimits() (jobs.Limits, error) {
 	if err != nil {
 		return jobs.Limits{}, err
 	}
-	return jobs.Limits{SubregionN: int32(subregionN), MaxGrid: int32(maxGrid), MaxGranules: int32(maxGranules)}, nil
+	taskCap, err := envx.Int("TASK_CAP", 256)
+	if err != nil {
+		return jobs.Limits{}, err
+	}
+	return jobs.Limits{SubregionN: int32(subregionN), MaxGrid: int32(maxGrid), MaxGranules: int32(maxGranules), TaskCap: int32(taskCap)}, nil
 }
 
 // withCORS lets the web app call the API from its own dev server.

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -359,5 +360,64 @@ func TestPublishFailureFailsTheJobAndSaysTryAgain(t *testing.T) {
 	got, _ := h.o.GetJob(context.Background(), "job1")
 	if got.GetState() != gatewayv1.JobState_JOB_STATE_FAILED {
 		t.Errorf("state: %v", got.GetState())
+	}
+}
+
+type refusingPreflight struct{ err error }
+
+func (r refusingPreflight) Check(context.Context, *ingestv1.IngestTask, string) error { return r.err }
+
+func TestPreflightRefusalStopsTheJob(t *testing.T) {
+	h := newHarness(t)
+	refusal := errors.New("too many files")
+	h.o.UsePreflight(refusingPreflight{err: refusal})
+	_, err := h.o.CreateJob(context.Background(), spec(), "secret")
+	if !errors.Is(err, refusal) {
+		t.Fatalf("want the refusal, got %v", err)
+	}
+	if len(h.pub.msgs) != 0 || len(h.mr.Keys()) != 0 {
+		t.Errorf("a refused job left %d messages and Redis keys %v", len(h.pub.msgs), h.mr.Keys())
+	}
+}
+
+func TestDatesAreClampedToTheCatalogRange(t *testing.T) {
+	h := newHarness(t)
+	s := spec()
+	s.Dates.Start = &commonv1.Date{Year: 1950, Month: 6, Day: 1}
+	s.Dates.End = &commonv1.Date{Year: 2030, Month: 1, Day: 1}
+	job, err := h.o.CreateJob(context.Background(), s, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := job.GetSpec().GetDates()
+	if d.GetStart().GetYear() != 1981 || d.GetEnd().GetYear() != 2025 || d.GetEnd().GetMonth() != 12 {
+		t.Errorf("dates: %v", d)
+	}
+	if in := h.pub.last(t).task.GetIngest(); in.GetDates().GetStart().GetYear() != 1981 {
+		t.Errorf("ingest got unclamped dates: %v", in.GetDates())
+	}
+
+	outside := spec()
+	outside.Dates.Start = &commonv1.Date{Year: 1950, Month: 1, Day: 1}
+	outside.Dates.End = &commonv1.Date{Year: 1960, Month: 1, Day: 1}
+	_, err = h.o.CreateJob(context.Background(), outside, "")
+	var inv *InvalidError
+	if !errors.As(err, &inv) || !strings.Contains(inv.Error(), "January 1981") {
+		t.Errorf("dates entirely outside: %v", err)
+	}
+}
+
+func TestTaskCap(t *testing.T) {
+	h := newHarness(t)
+	h.o.limits.TaskCap = 2
+	_, err := h.o.CreateJob(context.Background(), spec(), "")
+	var inv *InvalidError
+	if !errors.As(err, &inv) {
+		t.Fatalf("a 3-task job over a cap of 2: %v", err)
+	}
+	s := spec()
+	s.StopAfter = gatewayv1.Stage_STAGE_INGEST
+	if _, err := h.o.CreateJob(context.Background(), s, ""); err != nil {
+		t.Errorf("a 1-task job under a cap of 2: %v", err)
 	}
 }
