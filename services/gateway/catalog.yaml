@@ -161,6 +161,107 @@ variables:
       empty.
     dataset_url: https://disc.gsfc.nasa.gov/datasets/GLDAS_NOAH025_M_2.1/summary
 
+  - id: snow-gldas
+    name: Snow water (map)
+    definition: >-
+      How much water is stored in the snow on the ground, as the depth of
+      water you'd get if it all melted, averaged over each month. One kilogram
+      per square meter equals a 1 mm layer of water. It comes from GLDAS, a
+      NASA land model driven by satellite and ground measurements.
+    units: kg/m²
+    step: monthly
+    available: { start: 2000-01-01, end: 2026-07-31 }
+    grid: true
+    domain: land
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1342986036-GES_DISC
+        variables: [SWE_inst]
+    source_units: kg/m²
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 20000 }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      Most places have no snow in summer, so the winter and spring months
+      carry the signal, and the trend for each calendar month says more than
+      the overall one. GLDAS builds its snowpack from the weather it is fed
+      rather than measuring snow, so mountain snow is the least certain.
+      Glaciers and ice sheets aren't modeled well.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/GLDAS_NOAH025_M_2.1/summary
+
+  - id: ozone-merra2
+    name: Ozone layer (map)
+    definition: >-
+      How much ozone is in the air above the ground, averaged over each month.
+      Most of it is in the ozone layer, 15 to 35 km up, which blocks harmful
+      ultraviolet light from the Sun. If all of it were squeezed down to
+      ground pressure, 100 Dobson units would be a layer 1 mm thick. It comes
+      from MERRA-2, NASA's reanalysis, which takes in satellite measurements
+      of ozone.
+    units: DU
+    step: monthly
+    available: { start: 1980-01-01, end: 2026-09-30 }
+    grid: true
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1276812859-GES_DISC
+        variables: [TO3]
+    source_units: DU
+    filters:
+      ops:
+        - qc_range: { min: 50, max: 700 }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      The Antarctic ozone hole opens each September and October, so the trend
+      for those calendar months matters most there. The 1987 Montreal Protocol
+      banned the chemicals that destroy ozone, and the layer recovers slowly,
+      so trends since 2000 are small next to the swings from year to year.
+      MERRA-2 took in SBUV ozone until September 2004 and OMI and MLS after,
+      so a step change in 2004 can come from the data.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/M2TMNXSLV_5.12.4/summary
+
+  - id: aerosol-merra2
+    name: Haze from particles (map)
+    definition: >-
+      How much sunlight is blocked by tiny particles in the air, such as dust,
+      smoke, sea salt and pollution, averaged over each month. Scientists call
+      it aerosol optical depth, or AOD. Below 0.1 is clear air, and above 1 is
+      thick haze. It comes from MERRA-2, NASA's reanalysis, which takes in
+      satellite measurements of aerosols.
+    units: AOD
+    step: monthly
+    available: { start: 1980-01-01, end: 2026-09-30 }
+    grid: true
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1276812866-GES_DISC
+        variables: [TOTEXTTAU]
+    source_units: AOD
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 10 }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      MERRA-2 takes in MODIS aerosol measurements from 2000 on. Before that it
+      had much less to go on, so a trend that starts before 2000 partly
+      reflects the change in inputs. Dust storms, wildfire smoke and volcanic
+      eruptions make single months spike, so outlier months are common.
+      Pollution controls, as in China after 2013, can show up as a change
+      point.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/M2TMNXAER_5.12.4/summary
+
   # Area averages from Giovanni, through Harmony. These are series for the
   # whole rectangle, with no map, because the daily records have thousands of
   # files. Giovanni wants its own variable ID, from
@@ -231,6 +332,93 @@ variables:
       rectangles mostly reflect the model. Heavy pumping for irrigation, as
       in northwest India, shows up as a steady decline.
     dataset_url: https://disc.gsfc.nasa.gov/datasets/GLDAS_CLSM025_DA1_D_2.2/summary
+
+  - id: co2-oco2
+    name: Carbon dioxide, CO2 (area average)
+    definition: >-
+      How much carbon dioxide is in the air, in parts per million: out of every
+      million molecules of dry air, from the ground to the top of the
+      atmosphere, how many are CO2. Averaged over the rectangle and over each
+      month. It comes from NASA's OCO-2 satellite, with a weather model
+      filling the gaps between its paths.
+    units: ppm
+    step: monthly
+    available: { start: 2015-01-01, end: 2022-02-28 }
+    grid: false
+    domain: global
+    default_source: giovanni-area
+    sources:
+      giovanni-area:
+        data_field_id: OCO2_GEOS_L3CO2_DAY_10r_XCO2
+        collection_id: C2240248762-GES_DISC
+    source_units: mol/mol
+    filters:
+      ops:
+        - qc_range: { min: 3.0e-4, max: 5.0e-4 }
+        - linear: { scale: 1.0e+6, offset: 0, units: ppm }
+        # The data is daily, with no gaps.
+        - monthly_mean: { min_valid_days: 20 }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    # The record is about seven years, so the trend triangle starts at three.
+    tests:
+      alpha: 0.05
+      series:
+        - regression: { correct_autocorrelation: true }
+        - mann_kendall: { variant: MANN_KENDALL_VARIANT_HAMED_RAO }
+        - pettitt: {}
+        - residual_checks: {}
+        - outliers: { robust_z_threshold: 3.5 }
+        - shuffle: { permutations: 1000, block_length: 12 }
+        - trend_triangle: { min_years: 3 }
+        - monthly_trends: {}
+        - years_to_significance: {}
+    llm_hints: >-
+      CO2 mixes through the whole atmosphere within about a year, so every
+      region shows nearly the same steady rise, with a yearly cycle on top
+      from plants growing and decaying, strongest in the Northern Hemisphere.
+      The rise is so steady that it is significant after only a few years,
+      unlike rain or temperature. This version of the record ends in February
+      2022.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/OCO2_GEOS_L3CO2_DAY_10r/summary
+
+  - id: chlorophyll-nobm
+    name: Ocean chlorophyll (area average)
+    definition: >-
+      How much chlorophyll is in the sea's surface water, averaged over the
+      rectangle and over each month. Chlorophyll is the green pigment in
+      phytoplankton, the tiny plants at the base of the ocean food web, so
+      more chlorophyll means more of them. It comes from NASA's Ocean
+      Biogeochemical Model, which takes in chlorophyll measured from space.
+      Values are shown as log10, because they range from very low in the open
+      ocean to very high near coasts.
+    units: log₁₀(mg/m³)
+    step: monthly
+    available: { start: 1998-01-01, end: 2015-12-31 }
+    grid: false
+    domain: ocean
+    default_source: giovanni-area
+    sources:
+      giovanni-area:
+        data_field_id: NOBM_DAY_R2017_tot
+        collection_id: C1404080675-GES_DISC
+    source_units: mg/m³
+    filters:
+      ops:
+        - qc_range: { min: 0.001, max: 100 }
+        # The data is daily, with no gaps outside sea ice.
+        - monthly_mean: { min_valid_days: 20 }
+        - log10: {}
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *series-tests
+    llm_hints: >-
+      This is model output that takes in satellite chlorophyll from SeaWiFS
+      and MODIS, on a grid about 100 km across, so narrow coastal waters and
+      river plumes are blurred. Trends are on log10 values, so they describe
+      changes in percent rather than in mg/m³. The record ends in 2015.
+      Land pixels are empty.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/NOBM_DAY_R2017/summary
 
   - id: precipitation-power
     name: Rain and snow (one point)
