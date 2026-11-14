@@ -23,6 +23,7 @@ DECODERS: dict[int, Decoder] = {
     ingest_pb2.FORMAT_NETCDF4: netcdf.decode,
     ingest_pb2.FORMAT_USER_CSV: user_csv.decode,
     ingest_pb2.FORMAT_GIOVANNI_CSV: giovanni_csv.decode,
+    ingest_pb2.FORMAT_GIOVANNI_POINT_CSV: giovanni_csv.decode,
 }
 
 

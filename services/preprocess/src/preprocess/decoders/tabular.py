@@ -28,9 +28,12 @@ def parse_times(raw: pd.Series, file_name: str) -> np.ndarray:
 
 def parse_values(raw: pd.Series, fill_values: tuple[float, ...] = ()) -> np.ndarray:
     values = pd.to_numeric(raw.astype(str).str.strip().replace("", np.nan), errors="coerce")
-    values = values.to_numpy(dtype="float64")
+    # A copy: pandas 3 hands out read-only views.
+    values = values.to_numpy(dtype="float64", copy=True)
     for fill in fill_values:
-        values[values == fill] = np.nan
+        # A relative match, because huge markers like -1.26765e+30 may not
+        # round-trip through text to exactly the same float.
+        values[np.isclose(values, fill, rtol=1e-6, atol=0.0)] = np.nan
     return values
 
 

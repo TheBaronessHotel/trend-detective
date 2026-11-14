@@ -1,18 +1,19 @@
-"""Giovanni time-series CSV, from the giovanni-area and giovanni-point adapters.
+"""Giovanni time-series CSVs, from the giovanni-area and giovanni-point adapters.
 
 Both kinds start with metadata lines and then a table with a time column and
 one value column:
 
-- **Area average** (Harmony plus Giovanni): a few ``attr,value`` lines, a
-  separator line (blank, or only ``,``), then ``time,mean_<variable ID>``.
-  Missing days have an empty value, and some timestamps use a space instead
-  of ``T``.
-- **Point** (the time-series API): 13 ``key,value`` lines including
-  ``param_name``, ``unit``, ``lat`` and ``lon``, then ``Timestamp,<name>``.
+- **Area average**, ``FORMAT_GIOVANNI_CSV``: a few ``key:,value`` lines, a
+  blank line, then ``time,mean_<variable ID>``. Missing days have an empty
+  value, and some timestamps use a space instead of ``T``.
+- **Point**, ``FORMAT_GIOVANNI_POINT_CSV``: ``key,value`` lines including
+  ``unit``, ``undef``, ``lat`` and ``lon``, a blank line, then
+  ``Timestamp (UTC),Data``. Missing steps hold the ``undef`` value, such as
+  ``-9999`` or ``-1.26765e+30``.
 
-The table starts at the first line whose first cell is ``time`` or
-``Timestamp``. These layouts come from NASA's tutorial notebooks and haven't
-been checked against a file from our own adapters yet, which aren't built.
+The table starts at the first line whose first cell starts with ``time`` or
+``timestamp``. Header keys are matched without case and without a trailing
+colon. The layouts are the ones services/ingest/README.md describes.
 """
 
 from __future__ import annotations
@@ -32,7 +33,7 @@ from ..canonical import Decoded
 from . import tabular
 from .common import resolve_units
 
-_TABLE_STARTS = {"time", "timestamp"}
+_TABLE_STARTS = ("time", "timestamp")
 
 
 def decode(paths: list[Path], raw: ingest_pb2.RawDataset, source_units: str) -> Decoded:
@@ -50,7 +51,7 @@ def decode(paths: list[Path], raw: ingest_pb2.RawDataset, source_units: str) -> 
                 point = common_pb2.LatLon(lat=float(meta["lat"]), lon=float(meta["lon"]))
             except ValueError:
                 pass
-        fills = tuple(_floats(v for k, v in meta.items() if "fill" in k))
+        fills = tuple(_floats(v for k, v in meta.items() if k == "undef" or "fill" in k))
         times = tabular.parse_times(table.iloc[:, 0], path.name)
         values = tabular.parse_values(table.iloc[:, 1], fills)
         ds, step = tabular.to_dataset(times, values, path.name)
@@ -75,8 +76,8 @@ def _split(path: Path) -> tuple[dict[str, str], pd.DataFrame]:
     meta: dict[str, str] = {}
     for i, line in enumerate(lines):
         cells = next(csv.reader([line]), [])
-        first = cells[0].strip().lower() if cells else ""
-        if first in _TABLE_STARTS and len(cells) >= 2:
+        first = cells[0].strip().lower().rstrip(":").strip() if cells else ""
+        if first.startswith(_TABLE_STARTS) and len(cells) >= 2:
             table = pd.read_csv(
                 io.StringIO("\n".join(lines[i:])), dtype=str, keep_default_na=False, usecols=[0, 1]
             )
