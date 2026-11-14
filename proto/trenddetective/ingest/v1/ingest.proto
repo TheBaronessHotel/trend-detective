@@ -31,7 +31,9 @@ enum Format {
   FORMAT_UNSPECIFIED = 0;
   // NetCDF-4. Harmony HOSS writes one file per granule.
   FORMAT_NETCDF4 = 1;
-  // Giovanni time-series CSV, including its comment header.
+  // Giovanni area-average CSV, from giovanni-area. A few "key:,value" header
+  // lines, a blank line, then "time,mean_<id>" with one row per time step.
+  // Missing steps have an empty value.
   FORMAT_GIOVANNI_CSV = 2;
   // NASA POWER JSON.
   FORMAT_POWER_JSON = 3;
@@ -39,6 +41,11 @@ enum Format {
   FORMAT_USER_CSV = 4;
   // GeoTIFF, from AppEEARS area requests.
   FORMAT_GEOTIFF = 5;
+  // Giovanni point time-series CSV, from giovanni-point. "key,value" header
+  // lines (unit, undef, lat, lon and more), a blank line, then
+  // "Timestamp (UTC),Data" with one row per time step. Missing steps hold the
+  // header's undef value, for example -9999.
+  FORMAT_GIOVANNI_POINT_CSV = 6;
 }
 
 // Fetch one variable for one rectangle and date range. The gateway sends it
@@ -90,11 +97,15 @@ message GiovanniArea {
   string collection_id = 2;
 }
 
-// Settings for SOURCE_GIOVANNI_POINT.
+// Settings for SOURCE_GIOVANNI_POINT. Ingest asks Giovanni's time-series API
+// for the values at one point, as CSV.
 message GiovanniPoint {
   // Giovanni variable ID, for example "GLDAS_NOAH025_M_2_1_SoilMoi0_10cm_inst".
+  // The same IDs as GiovanniArea.
   string data_field_id = 1;
-  // The gateway uses the center of the rectangle.
+  // The gateway uses the center of the rectangle. Giovanni answers for the
+  // grid cell the point falls in, and RawDataset.point records that cell's
+  // center.
   trenddetective.common.v1.LatLon point = 2;
 }
 

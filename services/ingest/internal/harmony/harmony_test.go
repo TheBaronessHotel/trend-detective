@@ -16,6 +16,7 @@ import (
 	gatewayv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/gateway/v1"
 	ingestv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/ingest/v1"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/core"
+	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/earthdata"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 )
@@ -238,7 +239,7 @@ func TestGranuleChecks(t *testing.T) {
 func TestTokens(t *testing.T) {
 	t.Run("no token at all", func(t *testing.T) {
 		h := newHarness(t, Config{})
-		h.a.cfg.TeamToken = ""
+		h.a.tokens = earthdata.NewTokens(h.a.rdb, "")
 		_, err := h.a.Fetch(context.Background(), task(77), newSink())
 		wantCode(t, err, gatewayv1.ErrorCode_ERROR_CODE_UNAUTHENTICATED, false)
 	})

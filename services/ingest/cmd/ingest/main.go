@@ -15,6 +15,8 @@ import (
 	"github.com/TheBaronessHotel/trend-detective/internal/obs"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/bundle"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/core"
+	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/earthdata"
+	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/giovanni"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/harmony"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/power"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/worker"
@@ -88,11 +90,13 @@ func run() error {
 	}
 	harmonyAdapter := harmony.New(harmonyCfg, rdb)
 	giovanniArea := harmony.NewAreaAverage(harmonyCfg, rdb)
+	giovanniPoint := giovanni.New(envx.String("GIOVANNI_URL", "https://api.giovanni.earthdata.nasa.gov"),
+		earthdata.NewTokens(rdb, os.Getenv("EARTHDATA_TOKEN")))
 	if os.Getenv("EARTHDATA_TOKEN") == "" {
-		util.Logger.Warn(ctx, "EARTHDATA_TOKEN is empty, so Harmony tasks fail unless the user gives a token")
+		util.Logger.Warn(ctx, "EARTHDATA_TOKEN is empty, so Harmony and Giovanni tasks fail unless the user gives a token")
 	}
 	powerAdapter := power.New(envx.String("POWER_URL", "https://power.larc.nasa.gov"))
-	svc := core.New(store.Bucket("raw"), bundles, harmonyAdapter, giovanniArea, powerAdapter)
+	svc := core.New(store.Bucket("raw"), bundles, harmonyAdapter, giovanniArea, giovanniPoint, powerAdapter)
 
 	nc, err := nats.Connect(env["NATS_URL"], nats.Name("ingest"), nats.MaxReconnects(-1))
 	if err != nil {

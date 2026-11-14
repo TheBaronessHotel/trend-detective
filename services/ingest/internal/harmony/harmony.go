@@ -34,6 +34,7 @@ import (
 	gatewayv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/gateway/v1"
 	ingestv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/ingest/v1"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/core"
+	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/earthdata"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -82,10 +83,11 @@ type Config struct {
 // Adapter implements core.Adapter for SOURCE_HARMONY_SUBSET, or for
 // SOURCE_GIOVANNI_AREA when made with NewAreaAverage.
 type Adapter struct {
-	cfg  Config
-	rdb  *redis.Client
-	http *http.Client
-	mode mode
+	cfg    Config
+	rdb    *redis.Client
+	tokens *earthdata.Tokens
+	http   *http.Client
+	mode   mode
 }
 
 // errLogin means Earthdata sent us to its login page, which happens when the
@@ -107,9 +109,10 @@ func NewAreaAverage(cfg Config, rdb *redis.Client) *Adapter {
 
 func newAdapter(cfg Config, rdb *redis.Client, m mode) *Adapter {
 	return &Adapter{
-		cfg:  cfg,
-		rdb:  rdb,
-		mode: m,
+		cfg:    cfg,
+		rdb:    rdb,
+		tokens: earthdata.NewTokens(rdb, cfg.TeamToken),
+		mode:   m,
 		http: &http.Client{
 			Timeout: 10 * time.Minute,
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -140,7 +143,7 @@ func (a *Adapter) Fetch(ctx context.Context, task *ingestv1.IngestTask, sink cor
 	if err != nil {
 		return nil, err
 	}
-	token, err := a.token(ctx, task)
+	token, err := a.tokens.For(ctx, task)
 	if err != nil {
 		return nil, err
 	}
@@ -246,25 +249,6 @@ func (a *Adapter) start(ctx context.Context, req *request, token, stateKey strin
 	}
 	_ = a.rdb.Expire(ctx, stateKey, stateTTL).Err()
 	return core.Pending(submitCheck, fmt.Sprintf("submitted Harmony job %s (%s, %d granules counted)", jobID, a.mode.version, hits))
-}
-
-// token returns the user's own token when the task has one, else the team's.
-func (a *Adapter) token(ctx context.Context, task *ingestv1.IngestTask) (string, error) {
-	if key := task.GetEarthdataTokenKey(); key != "" {
-		t, err := a.rdb.Get(ctx, key).Result()
-		if err == nil && t != "" {
-			return t, nil
-		}
-		if err != nil && !errors.Is(err, redis.Nil) {
-			return "", core.Transient(err)
-		}
-		// The user's token expired from Redis. The team token still works.
-	}
-	if a.cfg.TeamToken == "" {
-		return "", core.Errorf(gatewayv1.ErrorCode_ERROR_CODE_UNAUTHENTICATED, false,
-			"Fetching NASA data needs an Earthdata token.", "EARTHDATA_TOKEN is empty and the task has no user token")
-	}
-	return a.cfg.TeamToken, nil
 }
 
 // request is a validated task.

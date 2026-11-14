@@ -12,7 +12,9 @@
 #   domain           land, ocean or global
 #   default_source   one of the keys under sources
 #   sources          settings per adapter. Each one is that adapter's message in
-#                    ingest.v1 (HarmonySubset, Power, Bundle and so on)
+#                    ingest.v1 (HarmonySubset, Power, Bundle and so on).
+#                    giovanni-point, where offered, is a quick second source:
+#                    the series at the rectangle's center, in a few seconds
 #   source_units     units of the raw values, for files that don't say
 #   filters          the default preprocess.v1.FilterChain
 #   aggregation      optional preprocess.v1.Aggregation. Unset uses SUBREGION_N and MAX_GRID
@@ -79,6 +81,7 @@ variables:
       harmony-subset:
         collection_id: C2723754851-GES_DISC
         variables: [Grid/precipitation]
+      giovanni-point: { data_field_id: GPM_3IMERGM_07_precipitation }
     source_units: mm/hr
     filters:
       ops:
@@ -148,6 +151,7 @@ variables:
       harmony-subset:
         collection_id: C1342986036-GES_DISC
         variables: [SoilMoi0_10cm_inst]
+      giovanni-point: { data_field_id: GLDAS_NOAH025_M_2_1_SoilMoi0_10cm_inst }
     source_units: kg/m²
     filters:
       ops:
@@ -178,6 +182,7 @@ variables:
       harmony-subset:
         collection_id: C1342986036-GES_DISC
         variables: [SWE_inst]
+      giovanni-point: { data_field_id: GLDAS_NOAH025_M_2_1_SWE_inst }
     source_units: kg/m²
     filters:
       ops:
@@ -283,6 +288,7 @@ variables:
       giovanni-area:
         data_field_id: OMNO2d_003_ColumnAmountNO2TropCloudScreened
         collection_id: C1266136111-GES_DISC
+      giovanni-point: { data_field_id: OMNO2d_003_ColumnAmountNO2TropCloudScreened }
     source_units: molecules/cm²
     filters:
       ops:
@@ -317,6 +323,7 @@ variables:
       giovanni-area:
         data_field_id: GLDAS_CLSM025_DA1_D_2_2_GWS_tavg
         collection_id: C1700900796-GES_DISC
+      giovanni-point: { data_field_id: GLDAS_CLSM025_DA1_D_2_2_GWS_tavg }
     source_units: mm
     filters:
       ops:
@@ -351,6 +358,7 @@ variables:
       giovanni-area:
         data_field_id: OCO2_GEOS_L3CO2_DAY_10r_XCO2
         collection_id: C2240248762-GES_DISC
+      giovanni-point: { data_field_id: OCO2_GEOS_L3CO2_DAY_10r_XCO2 }
     source_units: mol/mol
     filters:
       ops:
@@ -402,6 +410,7 @@ variables:
       giovanni-area:
         data_field_id: NOBM_DAY_R2017_tot
         collection_id: C1404080675-GES_DISC
+      giovanni-point: { data_field_id: NOBM_DAY_R2017_tot }
     source_units: mg/m³
     filters:
       ops:

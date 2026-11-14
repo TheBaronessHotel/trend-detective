@@ -13,6 +13,8 @@ The service is hexagonal: the core knows nothing about NATS or S3, and each side
 | `internal/worker` | The JetStream consumer that drives the core |
 | `internal/bundle` | The `bundle` adapter |
 | `internal/harmony` | The `harmony-subset` and `giovanni-area` adapters, which share Harmony's job flow |
+| `internal/giovanni` | The `giovanni-point` adapter |
+| `internal/earthdata` | Picks a task's Earthdata token: the user's own if the gateway stored one, else the team's |
 | `internal/power` | The `power` adapter |
 | `bundle/` | Datasets shipped with the app. See [bundle/README.md](bundle/README.md) |
 
@@ -71,6 +73,19 @@ Asks Harmony's Giovanni averaging service for the average over the rectangle, on
 - It uses the Giovanni quota. The gateway's preflight refuses new jobs once `QUOTA_CUTOFF` is reached.
 - A year of daily NO2 takes about 4 minutes on NASA's side, and two years of groundwater well under a minute.
 
+## giovanni-point
+
+Asks Giovanni's time-series API, `/timeseries`, for one variable at one point and stores the answer as `point.csv`. The gateway sets the point to the middle of the rectangle.
+
+- The API answers right away, in about 4 seconds even for twenty years of daily data (7,305 rows, about 220 KB). So there's no job to poll, no slot, and no Harmony.
+- It takes the same Giovanni variable IDs as `giovanni-area`, but no collection ID.
+- Giovanni answers for the grid cell the point falls in. The CSV header gives that cell's center, for example 30.625, 75.625 for a request at 30.5, 75.5, and the dataset records it as its point.
+- The CSV has `key,value` header lines (`unit`, `undef`, `lat`, `lon` and more), a blank line, then `Timestamp (UTC),Data` with one row per time step. Missing steps hold the header's `undef` value, such as `-9999` or `-1.26765e+30`. It's stored with `FORMAT_GIOVANNI_POINT_CSV`, because its layout differs from the area CSV.
+- When every step is missing, the task fails with `NO_DATA` and stores nothing. That's what Giovanni returns for a land variable over the sea, or for NOBM chlorophyll on land or near a coast.
+- Giovanni wraps most errors in a 403 and puts the real code in a JSON body. `code` 401 is a missing or bad token (`UNAUTHENTICATED`), and 400 an unknown variable (`INVALID_REQUEST`). A 404 means no data for those dates (`NO_DATA`). A 429, or any error that mentions the quota, is `QUOTA_EXCEEDED`, and a 5xx is transient.
+- A single pixel has more gaps than an area average. Twenty years of daily OMI NO2 at one point near Hefei had 62% of the days missing, mostly from clouds.
+- It uses the Giovanni quota, which the gateway's preflight checks.
+
 ## power
 
 Fetches NASA POWER monthly means for one point, with no login. The gateway sets the point to the middle of the rectangle.
@@ -92,11 +107,12 @@ Fetches NASA POWER monthly means for one point, with no login. The gateway sets 
 | Variable | Default | |
 |---|---|---|
 | `NATS_URL`, `REDIS_URL`, `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | required | Set by compose |
-| `EARTHDATA_TOKEN` | empty | The team's token, from `.env`. Without it, Harmony tasks fail unless the user gave their own |
+| `EARTHDATA_TOKEN` | empty | The team's token, from `.env`. Without it, Harmony and Giovanni tasks fail unless the user gave their own |
 | `HARMONY_CONCURRENCY` | 4 | Harmony jobs in flight per token |
 | `HARMONY_URL` | `https://harmony.earthdata.nasa.gov` | |
 | `CMR_URL` | `https://cmr.earthdata.nasa.gov` | |
 | `POWER_URL` | `https://power.larc.nasa.gov` | |
+| `GIOVANNI_URL` | `https://api.giovanni.earthdata.nasa.gov` | For `giovanni-point` |
 | `BUNDLE_DIR` | `/bundle` | Compose mounts `services/ingest/bundle` here |
 | `INGEST_CONCURRENCY` | 4 | Tasks in flight at once |
 | `INGEST_ACK_WAIT` | `2m` | How long JetStream waits for a heartbeat before it redelivers |
@@ -109,3 +125,4 @@ Fetches NASA POWER monthly means for one point, with no login. The gateway sets 
 - `make smoke`, with the stack up, publishes a real task for the `power-delhi-monthly` bundle and checks the `StageDone` and the files in the bucket.
 - `make smoke-power` runs a real job through NASA POWER at a point near Lisbon. It needs no token, but CI skips it so CI doesn't depend on NASA.
 - `make smoke-harmony` runs a real GPM job through the gateway and Harmony. It needs `EARTHDATA_TOKEN` in `.env`, so CI doesn't run it.
+- `make smoke-giovanni` runs twenty years of daily groundwater at a point in Punjab through the gateway and Giovanni, and checks the grid cell and the rows. It needs `EARTHDATA_TOKEN` too.
