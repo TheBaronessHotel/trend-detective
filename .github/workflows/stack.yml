@@ -8,6 +8,7 @@ on:
       - "internal/**"
       - "services/**"
       - "gen/go/**"
+      - "gen/python/**"
       - "Makefile"
       - ".env.example"
       - "go.mod"
@@ -20,6 +21,7 @@ on:
       - "internal/**"
       - "services/**"
       - "gen/go/**"
+      - "gen/python/**"
       - "Makefile"
       - ".env.example"
       - "go.mod"
@@ -42,6 +44,11 @@ jobs:
 
       - name: Go tests
         run: make test
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Preprocess tests
+        run: make test-preprocess
 
       # Starts the infrastructure and the services, and runs bootstrap.
       - name: make up

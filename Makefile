@@ -1,4 +1,4 @@
-.PHONY: up down logs ps clean smoke smoke-harmony smoke-power test gen lint fmt breaking
+.PHONY: up down logs ps clean smoke smoke-harmony smoke-power test test-preprocess gen lint fmt breaking
 
 # Start the stack in the background and wait until bootstrap has finished.
 # The first run creates .env from .env.example. `up --wait` would treat
@@ -35,6 +35,7 @@ clean:
 smoke:
 	sh deploy/smoke/ingest.sh
 	sh deploy/smoke/gateway.sh
+	sh deploy/smoke/preprocess.sh
 
 # Live check against real NASA services. Needs EARTHDATA_TOKEN in .env.
 smoke-harmony:
@@ -47,6 +48,10 @@ smoke-power:
 # Go unit tests.
 test:
 	go test ./...
+
+# Python unit tests for preprocess. Needs uv.
+test-preprocess:
+	cd services/preprocess && uv run --frozen pytest -q
 
 .env:
 	cp .env.example .env
