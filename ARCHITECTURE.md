@@ -66,6 +66,7 @@ Bootstrap creates three streams. Each keeps messages for 7 days, the same as job
 **SeaweedFS (S3 API)**
 - Buckets: `raw`, `prep`, `analysis` and `uploads`.
 - The object key is a content hash of the stage's inputs, its settings and its code version, so "is it cached?" is a single HEAD request.
+- Ingest writes `raw/<adapter>/<cache key>/files/<name>`, then `raw/<adapter>/<cache key>/dataset.json` with the `RawDataset`. The manifest goes last, so its presence means the dataset is complete.
 - The browser downloads results and uploads CSVs through presigned URLs, so those files never pass through the gateway.
 
 **Redis**
@@ -232,6 +233,11 @@ Settings are env vars per service, set in `compose.yaml` and read from `.env`. T
 | `S3_SECRET_KEY` | from `.env`. `.env.example` has a local value |
 | `S3_PUBLIC_ENDPOINT` | `http://localhost:8333`. The gateway signs presigned URLs for this host, so it must be what the browser uses |
 | `S3_ALLOWED_ORIGINS` | `*`. Browser origins SeaweedFS accepts for presigned URLs |
+| `LOG_LEVEL` | `info`. Go services: trace, debug, info, warn or error |
+| `ADMIN_ADDR` | `:9090`. Go services serve `/metrics` and `/debug/pprof/` here, inside the compose network only |
+| `BUNDLE_DIR` | `/bundle`. Ingest's bundled datasets, mounted from `services/ingest/bundle` |
+| `INGEST_CONCURRENCY` | 4 |
+| `INGEST_ACK_WAIT` | `2m`. Ingest sends a heartbeat every third of this while a task runs |
 
 ## Repository
 
@@ -261,6 +267,8 @@ One public monorepo, [TheBaronessHotel/trend-detective](https://github.com/TheBa
 | `make logs` | Follows logs |
 | `make ps` | Lists containers, including bootstrap after it exits |
 | `make clean` | Stops everything and deletes all data |
+| `make test` | Runs the Go unit tests |
+| `make smoke` | Runs end-to-end checks against the running stack |
 | `make gen` | Regenerates `gen/` from `proto/` |
 | `make lint` | Lints and format-checks the protos |
 

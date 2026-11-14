@@ -1,4 +1,4 @@
-.PHONY: up down logs ps clean gen lint fmt breaking
+.PHONY: up down logs ps clean smoke test gen lint fmt breaking
 
 # Start the stack in the background and wait until bootstrap has finished.
 # The first run creates .env from .env.example. `up --wait` would treat
@@ -30,6 +30,14 @@ ps:
 # Stop the stack and delete its data: streams, job state and every bucket.
 clean:
 	docker compose down -v
+
+# End-to-end checks against the running stack. Run `make up` first.
+smoke:
+	sh deploy/smoke/ingest.sh
+
+# Go unit tests.
+test:
+	go test ./...
 
 .env:
 	cp .env.example .env

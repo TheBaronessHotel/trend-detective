@@ -37,7 +37,7 @@ make up
 
 The first run copies `.env.example` to `.env`. Put your Earthdata token in it as `EARTHDATA_TOKEN`. You get one at [urs.earthdata.nasa.gov](https://urs.earthdata.nasa.gov) under "Generate Token".
 
-So far `make up` starts the infrastructure: NATS, Redis and SeaweedFS. Bootstrap then creates the JetStream streams and the S3 buckets. The services join compose as they get built. Other targets:
+So far `make up` starts NATS, Redis and SeaweedFS, runs bootstrap to create the JetStream streams and the S3 buckets, and starts ingest. The other services join compose as they get built. Other targets:
 
 | Target | What it does |
 |---|---|
@@ -45,6 +45,8 @@ So far `make up` starts the infrastructure: NATS, Redis and SeaweedFS. Bootstrap
 | `make logs` | Follows the logs |
 | `make ps` | Lists the containers |
 | `make clean` | Stops everything and deletes all data |
+| `make test` | Runs the Go unit tests |
+| `make smoke` | With the stack up, publishes a real ingest task and checks the result |
 
 The ports listen on 127.0.0.1 only:
 - NATS: 4222, and 8222 for monitoring.
