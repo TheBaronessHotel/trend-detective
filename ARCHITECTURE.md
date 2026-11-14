@@ -241,6 +241,8 @@ Settings are env vars per service, set in `compose.yaml` and read from `.env`. T
 | `BUNDLE_DIR` | `/bundle`. Ingest's bundled datasets, mounted from `services/ingest/bundle` |
 | `INGEST_CONCURRENCY` | 4 |
 | `INGEST_ACK_WAIT` | `2m`. Ingest sends a heartbeat every third of this while a task runs |
+| `PREPROCESS_CONCURRENCY` | 2 |
+| `PREPROCESS_ACK_WAIT` | `2m`. Preprocess sends a heartbeat every third of this while a task runs |
 | `HTTP_ADDR` | `:8080`. The gateway's Connect API |
 | `HARMONY_URL`, `CMR_URL` | `https://harmony.earthdata.nasa.gov`, `https://cmr.earthdata.nasa.gov` |
 | `POWER_URL` | `https://power.larc.nasa.gov` |
@@ -276,6 +278,7 @@ One public monorepo, [TheBaronessHotel/trend-detective](https://github.com/TheBa
 | `make ps` | Lists containers, including bootstrap after it exits |
 | `make clean` | Stops everything and deletes all data |
 | `make test` | Runs the Go unit tests |
+| `make test-preprocess` | Runs the preprocess checks CI runs: lockfile, lint and unit tests. Needs uv |
 | `make smoke` | Runs end-to-end checks against the running stack |
 | `make smoke-harmony` | Runs a real GPM job through Harmony. Needs `EARTHDATA_TOKEN`, so CI skips it |
 | `make smoke-power` | Runs a real job through NASA POWER. No token, but CI skips it |

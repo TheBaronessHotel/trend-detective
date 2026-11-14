@@ -105,6 +105,20 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  preprocess:
+    build:
+      context: .
+      dockerfile: services/preprocess/Dockerfile
+    environment:
+      <<: *infra-env
+      PREPROCESS_CONCURRENCY: ${PREPROCESS_CONCURRENCY:-2}
+      PREPROCESS_ACK_WAIT: ${PREPROCESS_ACK_WAIT:-2m}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
   # The public Connect API, on http://localhost:8080.
   gateway:
     build:

@@ -1,0 +1,58 @@
+name: preprocess
+
+# Fast checks for the preprocess service, in well under a minute. The Docker
+# build and the end-to-end run through the stack are in stack.yml.
+
+on:
+  pull_request:
+    paths:
+      - "services/preprocess/**"
+      - "gen/python/**"
+      - ".github/workflows/preprocess.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/preprocess/**"
+      - "gen/python/**"
+      - ".github/workflows/preprocess.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preprocess-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: services/preprocess
+    steps:
+      - uses: actions/checkout@v4
+
+      # Python comes from .python-version, the same version as the Dockerfile.
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: services/preprocess/uv.lock
+
+      # The Dockerfile installs with --frozen, so a lock that doesn't match
+      # pyproject.toml breaks the image.
+      - name: Lockfile matches pyproject.toml
+        run: uv lock --check
+
+      - name: Install
+        run: uv sync --frozen
+
+      # Bug rules only: syntax errors, undefined names, unused imports.
+      - name: Lint
+        run: uv run --frozen ruff check .
+
+      # Decoders, cache key, output documents, and imports of the worker and
+      # the generated protobuf code, which also checks gen/python against the
+      # pinned protobuf runtime.
+      - name: Unit tests
+        run: uv run --frozen pytest -q
