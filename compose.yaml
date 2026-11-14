@@ -137,6 +137,10 @@ services:
       TASK_CAP: ${TASK_CAP:-256}
       QUOTA_CUTOFF: ${QUOTA_CUTOFF:-0.9}
       EARTHDATA_TOKEN: ${EARTHDATA_TOKEN:-}
+      # No depends_on on narrator: the stack starts without it, and Narrate
+      # answers unavailable until it is up.
+      NARRATOR_URL: ${NARRATOR_URL:-http://narrator:8081}
+      NARRATOR_TIMEOUT: ${NARRATOR_TIMEOUT:-4m}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
       - "127.0.0.1:8080:8080"
