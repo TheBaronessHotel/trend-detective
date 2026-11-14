@@ -28,7 +28,7 @@ func (c *openAIClient) Stream(ctx context.Context, req Request) (<-chan Delta, e
 		Messages    []chatMessage `json:"messages"`
 		Stream      bool          `json:"stream"`
 		MaxTokens   int           `json:"max_tokens,omitempty"`
-		Temperature float64       `json:"temperature"`
+		Temperature float64       `json:"temperature,omitempty"`
 	}{req.Model, messages, true, req.MaxTokens, req.Temperature}
 	headers := make(http.Header)
 	if c.key != "" {
@@ -45,8 +45,9 @@ func decodeOpenAI(event sseEvent) (Delta, bool, error) {
 		Model   string    `json:"model"`
 		Error   *apiError `json:"error"`
 		Choices []struct {
-			Index int `json:"index"`
-			Delta struct {
+			Index        int    `json:"index"`
+			FinishReason string `json:"finish_reason"`
+			Delta        struct {
 				Content string `json:"content"`
 			} `json:"delta"`
 		} `json:"choices"`
@@ -61,6 +62,7 @@ func decodeOpenAI(event sseEvent) (Delta, bool, error) {
 	for _, choice := range chunk.Choices {
 		if choice.Index == 0 {
 			d.Text = choice.Delta.Content
+			d.Truncated = choice.FinishReason == "length"
 			break
 		}
 	}

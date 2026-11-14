@@ -88,7 +88,7 @@ func TestStreamHappyPath(t *testing.T) {
 				name := fmt.Sprintf("%s/chunk=%d/auth=%t", p.name, split, key != "")
 				t.Run(name, func(t *testing.T) {
 					client := newTestClient(t, p, func(w http.ResponseWriter, r *http.Request) {
-						checkRequest(t, p, r, key, 77)
+						checkRequest(t, p, r, key, 77, 0)
 						w.Header().Set("Content-Type", "text/event-stream")
 						// CRLF, comments and unknown fields are valid SSE framing.
 						wire := ": heartbeat\r\nid: ignored\r\n\r\n" + strings.ReplaceAll(p.start+p.text+p.stop, "\n", "\r\n")
@@ -129,7 +129,7 @@ func testRequest(maxTokens int) Request {
 	}
 }
 
-func checkRequest(t *testing.T, p providerFixture, r *http.Request, key string, maxTokens int) {
+func checkRequest(t *testing.T, p providerFixture, r *http.Request, key string, maxTokens int, temperature float64) {
 	t.Helper()
 	if r.Method != http.MethodPost || r.URL.Path != p.endpoint {
 		t.Errorf("request = %s %s, want POST %s", r.Method, r.URL.Path, p.endpoint)
@@ -161,7 +161,10 @@ func checkRequest(t *testing.T, p providerFixture, r *http.Request, key string, 
 		t.Error(err)
 		return
 	}
-	want := map[string]any{"model": "requested-model", "stream": true, "temperature": float64(0)}
+	want := map[string]any{"model": "requested-model", "stream": true}
+	if temperature != 0 {
+		want["temperature"] = temperature
+	}
 	messages := []any{
 		map[string]any{"role": "user", "content": "First question"},
 		map[string]any{"role": "assistant", "content": "Earlier answer"},
@@ -175,7 +178,7 @@ func checkRequest(t *testing.T, p providerFixture, r *http.Request, key string, 
 	} else {
 		want["system"] = "Explain supplied facts."
 		if maxTokens == 0 {
-			maxTokens = 1024
+			maxTokens = 1500
 		}
 		want["max_tokens"] = float64(maxTokens)
 	}
@@ -185,22 +188,35 @@ func checkRequest(t *testing.T, p providerFixture, r *http.Request, key string, 
 	}
 }
 
-func TestDefaultMaxTokens(t *testing.T) {
+func TestStreamRequestOptions(t *testing.T) {
 	for _, p := range providers {
-		t.Run(p.name, func(t *testing.T) {
-			client := newTestClient(t, p, func(w http.ResponseWriter, r *http.Request) {
-				checkRequest(t, p, r, "", 0)
-				_, _ = io.WriteString(w, p.stop)
-			}, "")
-			ctx := streamContext(t)
-			ch, err := client.Stream(ctx, testRequest(0))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got := collect(t, ctx, ch); len(got) != 0 {
-				t.Fatalf("unexpected deltas: %+v", got)
-			}
-		})
+		for _, tt := range []struct {
+			name        string
+			maxTokens   int
+			temperature float64
+		}{
+			{"defaults", 0, 0},
+			{"explicit tokens", 77, 0},
+			{"explicit temperature", 0, 0.4},
+			{"both explicit", 77, 0.4},
+		} {
+			t.Run(p.name+"/"+tt.name, func(t *testing.T) {
+				client := newTestClient(t, p, func(w http.ResponseWriter, r *http.Request) {
+					checkRequest(t, p, r, "", tt.maxTokens, tt.temperature)
+					_, _ = io.WriteString(w, p.stop)
+				}, "")
+				ctx := streamContext(t)
+				req := testRequest(tt.maxTokens)
+				req.Temperature = tt.temperature
+				ch, err := client.Stream(ctx, req)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := collect(t, ctx, ch); len(got) != 0 {
+					t.Fatalf("unexpected deltas: %+v", got)
+				}
+			})
+		}
 	}
 }
 
@@ -230,7 +246,14 @@ func TestHTTPStatusErrors(t *testing.T) {
 					if ch != nil || !errors.Is(err, tt.want) {
 						t.Fatalf("expected nil channel and %v", tt.want)
 					}
-					assertSafeError(t, err, "provider explanation")
+					if errors.Is(err, ErrUnauthorized) {
+						want := fmt.Sprintf("%s: HTTP %d: provider authentication failed", ErrUnauthorized, tt.status)
+						if err.Error() != want {
+							t.Fatal("authentication error must use the fixed message")
+						}
+					} else {
+						assertSafeError(t, err, "provider explanation")
+					}
 				})
 			}
 		}

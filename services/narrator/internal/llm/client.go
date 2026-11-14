@@ -74,16 +74,22 @@ func (c *transport) start(ctx context.Context, body any, headers http.Header, de
 		ctxErr := ctx.Err()
 		cancel()
 		if ctxErr != nil {
-			return nil, fmt.Errorf("%w: %w", ErrUpstream, ctxErr)
+			return nil, fmt.Errorf("llm: request failed: %w", ctxErr)
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil, fmt.Errorf("llm: request failed: %w", context.DeadlineExceeded)
 		}
 		return nil, fmt.Errorf("%w: request failed: %s", ErrUpstream, c.safe(err.Error()))
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		defer cancel()
 		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			return nil, c.statusError(resp.StatusCode, nil)
+		}
 		data, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 		if ctx.Err() != nil {
-			return nil, fmt.Errorf("%w: %w", ErrUpstream, ctx.Err())
+			return nil, fmt.Errorf("llm: request failed: %w", ctx.Err())
 		}
 		return nil, c.statusError(resp.StatusCode, data)
 	}
@@ -100,18 +106,23 @@ func (c *transport) start(ctx context.Context, body any, headers http.Header, de
 				return false
 			}
 		}
+		var truncated bool
 		err := readSSE(resp.Body, func(event sseEvent) (bool, error) {
 			d, done, err := decode(event)
 			if err != nil {
 				return false, err
 			}
-			if (d.Text != "" || d.Model != "") && !send(d) {
+			// Providers report token limits before the terminal SSE event and may
+			// send usage or model metadata afterward. Keep the flag for the end.
+			truncated = truncated || d.Truncated
+			d.Truncated = done && truncated
+			if (d.Text != "" || d.Model != "" || d.Truncated) && !send(d) {
 				return true, nil
 			}
 			return done, nil
 		})
 		if err != nil && ctx.Err() == nil {
-			send(Delta{Err: fmt.Errorf("%w: stream: %s", streamErrorKind(err), c.safe(err.Error()))})
+			send(Delta{Err: fmt.Errorf("%w: stream: %s", streamErrorKind(err), c.safe(err.Error())), Truncated: truncated})
 		}
 	}()
 	return out, nil
@@ -156,7 +167,7 @@ func (c *transport) statusError(status int, data []byte) error {
 	kind := ErrUpstream
 	switch status {
 	case 401, 403:
-		kind = ErrUnauthorized
+		return fmt.Errorf("%w: HTTP %d: provider authentication failed", ErrUnauthorized, status)
 	case 429:
 		kind = ErrRateLimited
 	case 400, 404:

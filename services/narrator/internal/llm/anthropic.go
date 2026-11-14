@@ -16,7 +16,7 @@ func (c *anthropicClient) Stream(ctx context.Context, req Request) (<-chan Delta
 	}
 	maxTokens := req.MaxTokens
 	if maxTokens == 0 {
-		maxTokens = 1024
+		maxTokens = 1500
 	}
 	body := struct {
 		Model       string        `json:"model"`
@@ -24,7 +24,7 @@ func (c *anthropicClient) Stream(ctx context.Context, req Request) (<-chan Delta
 		Messages    []chatMessage `json:"messages"`
 		Stream      bool          `json:"stream"`
 		MaxTokens   int           `json:"max_tokens"`
-		Temperature float64       `json:"temperature"`
+		Temperature float64       `json:"temperature,omitempty"`
 	}{req.Model, req.System, messages, true, maxTokens, req.Temperature}
 	headers := make(http.Header)
 	headers.Set("anthropic-version", "2023-06-01")
@@ -42,8 +42,9 @@ func decodeAnthropic(event sseEvent) (Delta, bool, error) {
 			Model string `json:"model"`
 		} `json:"message"`
 		Delta struct {
-			Type string `json:"type"`
-			Text string `json:"text"`
+			Type       string `json:"type"`
+			Text       string `json:"text"`
+			StopReason string `json:"stop_reason"`
 		} `json:"delta"`
 	}
 	if err := json.Unmarshal([]byte(event.data), &chunk); err != nil {
@@ -63,6 +64,8 @@ func decodeAnthropic(event sseEvent) (Delta, bool, error) {
 		if chunk.Delta.Type == "text_delta" {
 			return Delta{Text: chunk.Delta.Text}, false, nil
 		}
+	case "message_delta":
+		return Delta{Truncated: chunk.Delta.StopReason == "max_tokens"}, false, nil
 	case "message_stop":
 		return Delta{}, true, nil
 	case "error":

@@ -40,9 +40,10 @@ type Config struct {
 // Delta is one streamed piece of output. The channel is closed after the
 // final Delta; a non-nil Err on a Delta terminates the stream.
 type Delta struct {
-	Text  string
-	Model string // set when the provider reports the resolved model name
-	Err   error
+	Text      string
+	Model     string // set when the provider reports the resolved model name
+	Err       error
+	Truncated bool // set on the final Delta when the provider's output token limit was reached
 }
 
 // Client streams a completion. Cancelling ctx must stop the HTTP request
