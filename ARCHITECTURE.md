@@ -73,7 +73,7 @@ Bootstrap creates three streams. Each keeps messages for 7 days, the same as job
 - Job and task state. The gateway is the only writer.
 - AOF persistence is on.
 - Jobs expire after 7 days. Losing job state never loses results, because results are keyed by content hash.
-- Fan-in uses `HINCRBY` counters. A job is done when succeeded plus failed equals total.
+- Fan-in uses `HINCRBY` counters per stage, inside a Lua script that counts each task once, so a redelivered `StageDone` can't count twice. A stage is complete when its finished count equals its total. The key layout is in [services/gateway/README.md](services/gateway/README.md).
 - Ingest keeps a counter of in-flight Harmony jobs per Earthdata token. It needs its own counter because a task waiting on `NakWithDelay` isn't reliably counted as in-flight by JetStream.
 
 **Bootstrap**
@@ -140,7 +140,7 @@ Result messages hold only `BlobRef`s. The documents themselves are protojson fil
 
 ## Data sources
 
-Each source is an ingest adapter, chosen per request, with the default set in config.
+Each source is an ingest adapter, chosen per request. Each catalog entry sets its own default with `default_source`.
 
 | Adapter | What it returns | Notes |
 |---|---|---|
@@ -224,7 +224,6 @@ Settings are env vars per service, set in `compose.yaml` and read from `.env`. T
 | `MAX_GRANULES` | 1000 |
 | `MAX_GRID` | 128 |
 | `SUBREGION_N` | 8 |
-| `DEFAULT_SOURCE` | `harmony-subset` |
 | `EARTHDATA_TOKEN` | none, required |
 | `NATS_URL` | `nats://nats:4222`, set in compose |
 | `REDIS_URL` | `redis://redis:6379/0`, set in compose |
@@ -238,6 +237,8 @@ Settings are env vars per service, set in `compose.yaml` and read from `.env`. T
 | `BUNDLE_DIR` | `/bundle`. Ingest's bundled datasets, mounted from `services/ingest/bundle` |
 | `INGEST_CONCURRENCY` | 4 |
 | `INGEST_ACK_WAIT` | `2m`. Ingest sends a heartbeat every third of this while a task runs |
+| `HTTP_ADDR` | `:8080`. The gateway's Connect API |
+| `CORS_ORIGINS` | `*`. Comma-separated origins allowed to call the gateway from a browser |
 
 ## Repository
 

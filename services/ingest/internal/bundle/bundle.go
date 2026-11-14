@@ -18,6 +18,7 @@ import (
 	"mime"
 	"os"
 	"path/filepath"
+	"slices"
 
 	gatewayv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/gateway/v1"
 	ingestv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/ingest/v1"
@@ -77,6 +78,16 @@ func (a *Adapter) Fetch(ctx context.Context, task *ingestv1.IngestTask, sink cor
 	if err != nil {
 		return nil, err
 	}
+	variables := m.GetVariables()
+	if want := task.GetBundle().GetVariables(); len(want) > 0 {
+		for _, v := range want {
+			if !slices.Contains(variables, v) {
+				return nil, core.Errorf(gatewayv1.ErrorCode_ERROR_CODE_INVALID_REQUEST, false,
+					"The demo dataset doesn't have that variable.", "bundle %q has no variable %q", name, v)
+			}
+		}
+		variables = want
+	}
 	for _, rf := range m.GetFiles() {
 		rel := rf.GetBlob().GetKey()
 		f, err := a.root.Open(filepath.Join(name, rel))
@@ -103,7 +114,7 @@ func (a *Adapter) Fetch(ctx context.Context, task *ingestv1.IngestTask, sink cor
 	return &core.Fetched{
 		Source:    m.GetSource(),
 		Format:    m.GetFormat(),
-		Variables: m.GetVariables(),
+		Variables: variables,
 		Point:     m.GetPoint(),
 	}, nil
 }

@@ -68,3 +68,13 @@ func ExtractTrace(ctx context.Context, h nats.Header) context.Context {
 	}
 	return oteltracing.ExtractMap(ctx, carrier)
 }
+
+// Publisher publishes protojson messages on JetStream.
+type Publisher struct {
+	JS jetstream.JetStream
+}
+
+// Publish calls the package-level Publish.
+func (p Publisher) Publish(ctx context.Context, subject, msgID string, msg proto.Message) error {
+	return Publish(ctx, p.JS, subject, msgID, msg)
+}

@@ -1,0 +1,91 @@
+# The variable catalog. The gateway checks it at startup and fills in each
+# job's defaults from it, so the stages never read it themselves.
+#
+# Fields of each entry:
+#   id               stable ID, used in jobs and cache keys
+#   name             shown in the app
+#   definition       one or two plain sentences for a high-school student
+#   units            display units, after the filter chain
+#   step             daily, weekly or monthly
+#   available        dates the product covers, YYYY-MM-DD
+#   grid             false for series-only sources, which hide the slider and heatmap
+#   domain           land, ocean or global
+#   default_source   one of the keys under sources
+#   sources          settings per adapter. Each one is that adapter's message in
+#                    ingest.v1 (HarmonySubset, Power, Bundle and so on)
+#   source_units     units of the raw values, for files that don't say
+#   filters          the default preprocess.v1.FilterChain
+#   aggregation      optional preprocess.v1.Aggregation. Unset uses SUBREGION_N and MAX_GRID
+#   tests            the default analysis.v1.TestPlan
+#   llm_hints        extra context for the narrator
+#   dataset_url      the product's page, for citations
+#
+# sources, filters, aggregation and tests use protojson field and enum names.
+
+variables:
+  - id: air-temperature-power
+    name: Air temperature
+    definition: >-
+      How warm the air is 2 meters above the ground, averaged over each month.
+      It comes from NASA's POWER project, which combines satellite data with
+      weather models.
+    units: °C
+    step: monthly
+    available: { start: 1981-01-01, end: 2024-12-31 }
+    grid: false
+    domain: land
+    # The bundle covers one point in Delhi. Switch to power once the POWER
+    # adapter (ING-4) exists, and it will serve any point.
+    default_source: bundle
+    sources:
+      bundle: { name: power-delhi-monthly, variables: [T2M] }
+      power: { parameters: [T2M], community: AG }
+    source_units: °C
+    filters:
+      ops:
+        - qc_range: { min: -90, max: 60 }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: &series-tests
+      alpha: 0.05
+      series:
+        - regression: { correct_autocorrelation: true }
+        - mann_kendall: { variant: MANN_KENDALL_VARIANT_HAMED_RAO }
+        - pettitt: {}
+        - residual_checks: {}
+        - outliers: { robust_z_threshold: 3.5 }
+        - shuffle: { permutations: 1000, block_length: 12 }
+        - trend_triangle: { min_years: 10 }
+        - monthly_trends: {}
+        - years_to_significance: {}
+    llm_hints: >-
+      POWER values at a point come from a roughly 50 km model grid cell, not a
+      weather station.
+    dataset_url: https://power.larc.nasa.gov/
+
+  - id: precipitation-power
+    name: Rain and snow
+    definition: >-
+      How much rain and snow falls, in millimeters per day, averaged over each
+      month. It comes from NASA's POWER project, which combines satellite data
+      with weather models.
+    units: mm/day
+    step: monthly
+    available: { start: 1981-01-01, end: 2024-12-31 }
+    grid: false
+    domain: land
+    default_source: bundle
+    sources:
+      bundle: { name: power-delhi-monthly, variables: [PRECTOTCORR] }
+      power: { parameters: [PRECTOTCORR], community: AG }
+    source_units: mm/day
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 1000 }
+        - anomaly: { kind: ANOMALY_KIND_PERCENT }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *series-tests
+    llm_hints: >-
+      Delhi gets most of its rain in the June to September monsoon, so
+      year-to-year noise is large and trends need a long record.
+    dataset_url: https://power.larc.nasa.gov/
