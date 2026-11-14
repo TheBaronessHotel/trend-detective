@@ -17,7 +17,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file trenddetective/ingest/v1/ingest.proto.
  */
 export const file_trenddetective_ingest_v1_ingest: GenFile = /*@__PURE__*/
-  fileDesc("CiV0cmVuZGRldGVjdGl2ZS9pbmdlc3QvdjEvaW5nZXN0LnByb3RvEhh0cmVuZGRldGVjdGl2ZS5pbmdlc3QudjEiywQKCkluZ2VzdFRhc2sSEwoLdmFyaWFibGVfaWQYASABKAkSLAoEYmJveBgCIAEoCzIeLnRyZW5kZGV0ZWN0aXZlLmNvbW1vbi52MS5CQm94EjIKBWRhdGVzGAMgASgLMiMudHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLkRhdGVSYW5nZRIbChNlYXJ0aGRhdGFfdG9rZW5fa2V5GAQgASgJEkEKDmhhcm1vbnlfc3Vic2V0GAogASgLMicudHJlbmRkZXRlY3RpdmUuaW5nZXN0LnYxLkhhcm1vbnlTdWJzZXRIABI/Cg1naW92YW5uaV9hcmVhGAsgASgLMiYudHJlbmRkZXRlY3RpdmUuaW5nZXN0LnYxLkdpb3Zhbm5pQXJlYUgAEkEKDmdpb3Zhbm5pX3BvaW50GAwgASgLMicudHJlbmRkZXRlY3RpdmUuaW5nZXN0LnYxLkdpb3Zhbm5pUG9pbnRIABIwCgVwb3dlchgNIAEoCzIfLnRyZW5kZGV0ZWN0aXZlLmluZ2VzdC52MS5Qb3dlckgAEjkKCmNzdl91cGxvYWQYDiABKAsyIy50cmVuZGRldGVjdGl2ZS5pbmdlc3QudjEuQ3N2VXBsb2FkSAASMgoGYnVuZGxlGA8gASgLMiAudHJlbmRkZXRlY3RpdmUuaW5nZXN0LnYxLkJ1bmRsZUgAEjYKCGFwcGVlYXJzGBAgASgLMiIudHJlbmRkZXRlY3RpdmUuaW5nZXN0LnYxLkFwcGVlYXJzSABCCQoHYWRhcHRlciJPCg1IYXJtb255U3Vic2V0EhUKDWNvbGxlY3Rpb25faWQYASABKAkSEQoJdmFyaWFibGVzGAIgAygJEhQKDG1heF9ncmFudWxlcxgDIAEoBSIlCgxHaW92YW5uaUFyZWESFQoNZGF0YV9maWVsZF9pZBgBIAEoCSJXCg1HaW92YW5uaVBvaW50EhUKDWRhdGFfZmllbGRfaWQYASABKAkSLwoFcG9pbnQYAiABKAsyIC50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuTGF0TG9uIl8KBVBvd2VyEhIKCnBhcmFtZXRlcnMYASADKAkSEQoJY29tbXVuaXR5GAIgASgJEi8KBXBvaW50GAMgASgLMiAudHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLkxhdExvbiI+CglDc3ZVcGxvYWQSMQoGdXBsb2FkGAEgASgLMiEudHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLkJsb2JSZWYiKQoGQnVuZGxlEgwKBG5hbWUYASABKAkSEQoJdmFyaWFibGVzGAIgAygJIisKCEFwcGVlYXJzEg8KB3Byb2R1Y3QYASABKAkSDgoGbGF5ZXJzGAIgAygJIo0DCgpSYXdEYXRhc2V0EjAKBnNvdXJjZRgBIAEoDjIgLnRyZW5kZGV0ZWN0aXZlLmluZ2VzdC52MS5Tb3VyY2USMAoGZm9ybWF0GAIgASgOMiAudHJlbmRkZXRlY3RpdmUuaW5nZXN0LnYxLkZvcm1hdBITCgt2YXJpYWJsZV9pZBgDIAEoCRIRCgl2YXJpYWJsZXMYBCADKAkSLAoEYmJveBgFIAEoCzIeLnRyZW5kZGV0ZWN0aXZlLmNvbW1vbi52MS5CQm94Ei8KBXBvaW50GAYgASgLMiAudHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLkxhdExvbhIyCgVkYXRlcxgHIAEoCzIjLnRyZW5kZGV0ZWN0aXZlLmNvbW1vbi52MS5EYXRlUmFuZ2USMAoFZmlsZXMYCCADKAsyIS50cmVuZGRldGVjdGl2ZS5pbmdlc3QudjEuUmF3RmlsZRIuCgpmZXRjaGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJxCgdSYXdGaWxlEi8KBGJsb2IYASABKAsyIS50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuQmxvYlJlZhI1Cghjb3ZlcmFnZRgCIAEoCzIjLnRyZW5kZGV0ZWN0aXZlLmNvbW1vbi52MS5EYXRlUmFuZ2UqwQEKBlNvdXJjZRIWChJTT1VSQ0VfVU5TUEVDSUZJRUQQABIZChVTT1VSQ0VfSEFSTU9OWV9TVUJTRVQQARIYChRTT1VSQ0VfR0lPVkFOTklfQVJFQRACEhkKFVNPVVJDRV9HSU9WQU5OSV9QT0lOVBADEhAKDFNPVVJDRV9QT1dFUhAEEhUKEVNPVVJDRV9DU1ZfVVBMT0FEEAUSEQoNU09VUkNFX0JVTkRMRRAGEhMKD1NPVVJDRV9BUFBFRUFSUxAHKo0BCgZGb3JtYXQSFgoSRk9STUFUX1VOU1BFQ0lGSUVEEAASEgoORk9STUFUX05FVENERjQQARIXChNGT1JNQVRfR0lPVkFOTklfQ1NWEAISFQoRRk9STUFUX1BPV0VSX0pTT04QAxITCg9GT1JNQVRfVVNFUl9DU1YQBBISCg5GT1JNQVRfR0VPVElGRhAFQoMCChxjb20udHJlbmRkZXRlY3RpdmUuaW5nZXN0LnYxQgtJbmdlc3RQcm90b1ABWlRnaXRodWIuY29tL1RoZUJhcm9uZXNzSG90ZWwvdHJlbmQtZGV0ZWN0aXZlL2dlbi9nby90cmVuZGRldGVjdGl2ZS9pbmdlc3QvdjE7aW5nZXN0djGiAgNUSViqAhhUcmVuZGRldGVjdGl2ZS5Jbmdlc3QuVjHKAhhUcmVuZGRldGVjdGl2ZVxJbmdlc3RcVjHiAiRUcmVuZGRldGVjdGl2ZVxJbmdlc3RcVjFcR1BCTWV0YWRhdGHqAhpUcmVuZGRldGVjdGl2ZTo6SW5nZXN0OjpWMWIGcHJvdG8z", [file_google_protobuf_timestamp, file_trenddetective_common_v1_common]);
+  fileDesc("CiV0cmVuZGRldGVjdGl2ZS9pbmdlc3QvdjEvaW5nZXN0LnByb3RvEhh0cmVuZGRldGVjdGl2ZS5pbmdlc3QudjEiywQKCkluZ2VzdFRhc2sSEwoLdmFyaWFibGVfaWQYASABKAkSLAoEYmJveBgCIAEoCzIeLnRyZW5kZGV0ZWN0aXZlLmNvbW1vbi52MS5CQm94EjIKBWRhdGVzGAMgASgLMiMudHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLkRhdGVSYW5nZRIbChNlYXJ0aGRhdGFfdG9rZW5fa2V5GAQgASgJEkEKDmhhcm1vbnlfc3Vic2V0GAogASgLMicudHJlbmRkZXRlY3RpdmUuaW5nZXN0LnYxLkhhcm1vbnlTdWJzZXRIABI/Cg1naW92YW5uaV9hcmVhGAsgASgLMiYudHJlbmRkZXRlY3RpdmUuaW5nZXN0LnYxLkdpb3Zhbm5pQXJlYUgAEkEKDmdpb3Zhbm5pX3BvaW50GAwgASgLMicudHJlbmRkZXRlY3RpdmUuaW5nZXN0LnYxLkdpb3Zhbm5pUG9pbnRIABIwCgVwb3dlchgNIAEoCzIfLnRyZW5kZGV0ZWN0aXZlLmluZ2VzdC52MS5Qb3dlckgAEjkKCmNzdl91cGxvYWQYDiABKAsyIy50cmVuZGRldGVjdGl2ZS5pbmdlc3QudjEuQ3N2VXBsb2FkSAASMgoGYnVuZGxlGA8gASgLMiAudHJlbmRkZXRlY3RpdmUuaW5nZXN0LnYxLkJ1bmRsZUgAEjYKCGFwcGVlYXJzGBAgASgLMiIudHJlbmRkZXRlY3RpdmUuaW5nZXN0LnYxLkFwcGVlYXJzSABCCQoHYWRhcHRlciJPCg1IYXJtb255U3Vic2V0EhUKDWNvbGxlY3Rpb25faWQYASABKAkSEQoJdmFyaWFibGVzGAIgAygJEhQKDG1heF9ncmFudWxlcxgDIAEoBSI8CgxHaW92YW5uaUFyZWESFQoNZGF0YV9maWVsZF9pZBgBIAEoCRIVCg1jb2xsZWN0aW9uX2lkGAIgASgJIlcKDUdpb3Zhbm5pUG9pbnQSFQoNZGF0YV9maWVsZF9pZBgBIAEoCRIvCgVwb2ludBgCIAEoCzIgLnRyZW5kZGV0ZWN0aXZlLmNvbW1vbi52MS5MYXRMb24iXwoFUG93ZXISEgoKcGFyYW1ldGVycxgBIAMoCRIRCgljb21tdW5pdHkYAiABKAkSLwoFcG9pbnQYAyABKAsyIC50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuTGF0TG9uIj4KCUNzdlVwbG9hZBIxCgZ1cGxvYWQYASABKAsyIS50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuQmxvYlJlZiIpCgZCdW5kbGUSDAoEbmFtZRgBIAEoCRIRCgl2YXJpYWJsZXMYAiADKAkiKwoIQXBwZWVhcnMSDwoHcHJvZHVjdBgBIAEoCRIOCgZsYXllcnMYAiADKAkijQMKClJhd0RhdGFzZXQSMAoGc291cmNlGAEgASgOMiAudHJlbmRkZXRlY3RpdmUuaW5nZXN0LnYxLlNvdXJjZRIwCgZmb3JtYXQYAiABKA4yIC50cmVuZGRldGVjdGl2ZS5pbmdlc3QudjEuRm9ybWF0EhMKC3ZhcmlhYmxlX2lkGAMgASgJEhEKCXZhcmlhYmxlcxgEIAMoCRIsCgRiYm94GAUgASgLMh4udHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLkJCb3gSLwoFcG9pbnQYBiABKAsyIC50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuTGF0TG9uEjIKBWRhdGVzGAcgASgLMiMudHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLkRhdGVSYW5nZRIwCgVmaWxlcxgIIAMoCzIhLnRyZW5kZGV0ZWN0aXZlLmluZ2VzdC52MS5SYXdGaWxlEi4KCmZldGNoZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wInEKB1Jhd0ZpbGUSLwoEYmxvYhgBIAEoCzIhLnRyZW5kZGV0ZWN0aXZlLmNvbW1vbi52MS5CbG9iUmVmEjUKCGNvdmVyYWdlGAIgASgLMiMudHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLkRhdGVSYW5nZSrBAQoGU291cmNlEhYKElNPVVJDRV9VTlNQRUNJRklFRBAAEhkKFVNPVVJDRV9IQVJNT05ZX1NVQlNFVBABEhgKFFNPVVJDRV9HSU9WQU5OSV9BUkVBEAISGQoVU09VUkNFX0dJT1ZBTk5JX1BPSU5UEAMSEAoMU09VUkNFX1BPV0VSEAQSFQoRU09VUkNFX0NTVl9VUExPQUQQBRIRCg1TT1VSQ0VfQlVORExFEAYSEwoPU09VUkNFX0FQUEVFQVJTEAcqrAEKBkZvcm1hdBIWChJGT1JNQVRfVU5TUEVDSUZJRUQQABISCg5GT1JNQVRfTkVUQ0RGNBABEhcKE0ZPUk1BVF9HSU9WQU5OSV9DU1YQAhIVChFGT1JNQVRfUE9XRVJfSlNPThADEhMKD0ZPUk1BVF9VU0VSX0NTVhAEEhIKDkZPUk1BVF9HRU9USUZGEAUSHQoZRk9STUFUX0dJT1ZBTk5JX1BPSU5UX0NTVhAGQoMCChxjb20udHJlbmRkZXRlY3RpdmUuaW5nZXN0LnYxQgtJbmdlc3RQcm90b1ABWlRnaXRodWIuY29tL1RoZUJhcm9uZXNzSG90ZWwvdHJlbmQtZGV0ZWN0aXZlL2dlbi9nby90cmVuZGRldGVjdGl2ZS9pbmdlc3QvdjE7aW5nZXN0djGiAgNUSViqAhhUcmVuZGRldGVjdGl2ZS5Jbmdlc3QuVjHKAhhUcmVuZGRldGVjdGl2ZVxJbmdlc3RcVjHiAiRUcmVuZGRldGVjdGl2ZVxJbmdlc3RcVjFcR1BCTWV0YWRhdGHqAhpUcmVuZGRldGVjdGl2ZTo6SW5nZXN0OjpWMWIGcHJvdG8z", [file_google_protobuf_timestamp, file_trenddetective_common_v1_common]);
 
 /**
  * Fetch one variable for one rectangle and date range. The gateway sends it
@@ -146,17 +146,30 @@ export const HarmonySubsetSchema: GenMessage<HarmonySubset> = /*@__PURE__*/
   messageDesc(file_trenddetective_ingest_v1_ingest, 1);
 
 /**
- * Settings for SOURCE_GIOVANNI_AREA.
+ * Settings for SOURCE_GIOVANNI_AREA. Ingest asks Harmony's Giovanni
+ * averaging service for the area average of the rectangle, one value per
+ * time step, as CSV.
  *
  * @generated from message trenddetective.ingest.v1.GiovanniArea
  */
 export type GiovanniArea = Message<"trenddetective.ingest.v1.GiovanniArea"> & {
   /**
-   * Giovanni variable ID, for example "GPM_3IMERGM_07_precipitation".
+   * Giovanni variable ID, for example
+   * "OMNO2d_003_ColumnAmountNO2TropCloudScreened". The list is at
+   * api.giovanni.earthdata.nasa.gov/configured-variables/. The averaging
+   * service refuses the variable's path inside the file.
    *
    * @generated from field: string data_field_id = 1;
    */
   dataFieldId: string;
+
+  /**
+   * CMR collection concept ID, for example "C1266136111-GES_DISC". Harmony
+   * needs it in the request URL.
+   *
+   * @generated from field: string collection_id = 2;
+   */
+  collectionId: string;
 };
 
 /**
@@ -167,20 +180,24 @@ export const GiovanniAreaSchema: GenMessage<GiovanniArea> = /*@__PURE__*/
   messageDesc(file_trenddetective_ingest_v1_ingest, 2);
 
 /**
- * Settings for SOURCE_GIOVANNI_POINT.
+ * Settings for SOURCE_GIOVANNI_POINT. Ingest asks Giovanni's time-series API
+ * for the values at one point, as CSV.
  *
  * @generated from message trenddetective.ingest.v1.GiovanniPoint
  */
 export type GiovanniPoint = Message<"trenddetective.ingest.v1.GiovanniPoint"> & {
   /**
    * Giovanni variable ID, for example "GLDAS_NOAH025_M_2_1_SoilMoi0_10cm_inst".
+   * The same IDs as GiovanniArea.
    *
    * @generated from field: string data_field_id = 1;
    */
   dataFieldId: string;
 
   /**
-   * The gateway uses the center of the rectangle.
+   * The gateway uses the center of the rectangle. Giovanni answers for the
+   * grid cell the point falls in, and RawDataset.point records that cell's
+   * center.
    *
    * @generated from field: trenddetective.common.v1.LatLon point = 2;
    */
@@ -486,7 +503,9 @@ export enum Format {
   NETCDF4 = 1,
 
   /**
-   * Giovanni time-series CSV, including its comment header.
+   * Giovanni area-average CSV, from giovanni-area. A few "key:,value" header
+   * lines, a blank line, then "time,mean_<id>" with one row per time step.
+   * Missing steps have an empty value.
    *
    * @generated from enum value: FORMAT_GIOVANNI_CSV = 2;
    */
@@ -512,6 +531,16 @@ export enum Format {
    * @generated from enum value: FORMAT_GEOTIFF = 5;
    */
   GEOTIFF = 5,
+
+  /**
+   * Giovanni point time-series CSV, from giovanni-point. "key,value" header
+   * lines (unit, undef, lat, lon and more), a blank line, then
+   * "Timestamp (UTC),Data" with one row per time step. Missing steps hold the
+   * header's undef value, for example -9999.
+   *
+   * @generated from enum value: FORMAT_GIOVANNI_POINT_CSV = 6;
+   */
+  GIOVANNI_POINT_CSV = 6,
 }
 
 /**

@@ -30,6 +30,7 @@ class Format(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     FORMAT_POWER_JSON: _ClassVar[Format]
     FORMAT_USER_CSV: _ClassVar[Format]
     FORMAT_GEOTIFF: _ClassVar[Format]
+    FORMAT_GIOVANNI_POINT_CSV: _ClassVar[Format]
 SOURCE_UNSPECIFIED: Source
 SOURCE_HARMONY_SUBSET: Source
 SOURCE_GIOVANNI_AREA: Source
@@ -44,6 +45,7 @@ FORMAT_GIOVANNI_CSV: Format
 FORMAT_POWER_JSON: Format
 FORMAT_USER_CSV: Format
 FORMAT_GEOTIFF: Format
+FORMAT_GIOVANNI_POINT_CSV: Format
 
 class IngestTask(_message.Message):
     __slots__ = ("variable_id", "bbox", "dates", "earthdata_token_key", "harmony_subset", "giovanni_area", "giovanni_point", "power", "csv_upload", "bundle", "appeears")
@@ -82,10 +84,12 @@ class HarmonySubset(_message.Message):
     def __init__(self, collection_id: _Optional[str] = ..., variables: _Optional[_Iterable[str]] = ..., max_granules: _Optional[int] = ...) -> None: ...
 
 class GiovanniArea(_message.Message):
-    __slots__ = ("data_field_id",)
+    __slots__ = ("data_field_id", "collection_id")
     DATA_FIELD_ID_FIELD_NUMBER: _ClassVar[int]
+    COLLECTION_ID_FIELD_NUMBER: _ClassVar[int]
     data_field_id: str
-    def __init__(self, data_field_id: _Optional[str] = ...) -> None: ...
+    collection_id: str
+    def __init__(self, data_field_id: _Optional[str] = ..., collection_id: _Optional[str] = ...) -> None: ...
 
 class GiovanniPoint(_message.Message):
     __slots__ = ("data_field_id", "point")

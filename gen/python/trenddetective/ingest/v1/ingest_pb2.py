@@ -26,7 +26,7 @@ from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__
 from trenddetective.common.v1 import common_pb2 as trenddetective_dot_common_dot_v1_dot_common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n%trenddetective/ingest/v1/ingest.proto\x12\x18trenddetective.ingest.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a%trenddetective/common/v1/common.proto\"\xc7\x05\n\nIngestTask\x12\x1f\n\x0bvariable_id\x18\x01 \x01(\tR\nvariableId\x12\x32\n\x04\x62\x62ox\x18\x02 \x01(\x0b\x32\x1e.trenddetective.common.v1.BBoxR\x04\x62\x62ox\x12\x39\n\x05\x64\x61tes\x18\x03 \x01(\x0b\x32#.trenddetective.common.v1.DateRangeR\x05\x64\x61tes\x12.\n\x13\x65\x61rthdata_token_key\x18\x04 \x01(\tR\x11\x65\x61rthdataTokenKey\x12P\n\x0eharmony_subset\x18\n \x01(\x0b\x32\'.trenddetective.ingest.v1.HarmonySubsetH\x00R\rharmonySubset\x12M\n\rgiovanni_area\x18\x0b \x01(\x0b\x32&.trenddetective.ingest.v1.GiovanniAreaH\x00R\x0cgiovanniArea\x12P\n\x0egiovanni_point\x18\x0c \x01(\x0b\x32\'.trenddetective.ingest.v1.GiovanniPointH\x00R\rgiovanniPoint\x12\x37\n\x05power\x18\r \x01(\x0b\x32\x1f.trenddetective.ingest.v1.PowerH\x00R\x05power\x12\x44\n\ncsv_upload\x18\x0e \x01(\x0b\x32#.trenddetective.ingest.v1.CsvUploadH\x00R\tcsvUpload\x12:\n\x06\x62undle\x18\x0f \x01(\x0b\x32 .trenddetective.ingest.v1.BundleH\x00R\x06\x62undle\x12@\n\x08\x61ppeears\x18\x10 \x01(\x0b\x32\".trenddetective.ingest.v1.AppeearsH\x00R\x08\x61ppeearsB\t\n\x07\x61\x64\x61pter\"u\n\rHarmonySubset\x12#\n\rcollection_id\x18\x01 \x01(\tR\x0c\x63ollectionId\x12\x1c\n\tvariables\x18\x02 \x03(\tR\tvariables\x12!\n\x0cmax_granules\x18\x03 \x01(\x05R\x0bmaxGranules\"2\n\x0cGiovanniArea\x12\"\n\rdata_field_id\x18\x01 \x01(\tR\x0b\x64\x61taFieldId\"k\n\rGiovanniPoint\x12\"\n\rdata_field_id\x18\x01 \x01(\tR\x0b\x64\x61taFieldId\x12\x36\n\x05point\x18\x02 \x01(\x0b\x32 .trenddetective.common.v1.LatLonR\x05point\"}\n\x05Power\x12\x1e\n\nparameters\x18\x01 \x03(\tR\nparameters\x12\x1c\n\tcommunity\x18\x02 \x01(\tR\tcommunity\x12\x36\n\x05point\x18\x03 \x01(\x0b\x32 .trenddetective.common.v1.LatLonR\x05point\"F\n\tCsvUpload\x12\x39\n\x06upload\x18\x01 \x01(\x0b\x32!.trenddetective.common.v1.BlobRefR\x06upload\":\n\x06\x42undle\x12\x12\n\x04name\x18\x01 \x01(\tR\x04name\x12\x1c\n\tvariables\x18\x02 \x03(\tR\tvariables\"<\n\x08\x41ppeears\x12\x18\n\x07product\x18\x01 \x01(\tR\x07product\x12\x16\n\x06layers\x18\x02 \x03(\tR\x06layers\"\xda\x03\n\nRawDataset\x12\x38\n\x06source\x18\x01 \x01(\x0e\x32 .trenddetective.ingest.v1.SourceR\x06source\x12\x38\n\x06\x66ormat\x18\x02 \x01(\x0e\x32 .trenddetective.ingest.v1.FormatR\x06\x66ormat\x12\x1f\n\x0bvariable_id\x18\x03 \x01(\tR\nvariableId\x12\x1c\n\tvariables\x18\x04 \x03(\tR\tvariables\x12\x32\n\x04\x62\x62ox\x18\x05 \x01(\x0b\x32\x1e.trenddetective.common.v1.BBoxR\x04\x62\x62ox\x12\x36\n\x05point\x18\x06 \x01(\x0b\x32 .trenddetective.common.v1.LatLonR\x05point\x12\x39\n\x05\x64\x61tes\x18\x07 \x01(\x0b\x32#.trenddetective.common.v1.DateRangeR\x05\x64\x61tes\x12\x37\n\x05\x66iles\x18\x08 \x03(\x0b\x32!.trenddetective.ingest.v1.RawFileR\x05\x66iles\x12\x39\n\nfetched_at\x18\t \x01(\x0b\x32\x1a.google.protobuf.TimestampR\tfetchedAt\"\x81\x01\n\x07RawFile\x12\x35\n\x04\x62lob\x18\x01 \x01(\x0b\x32!.trenddetective.common.v1.BlobRefR\x04\x62lob\x12?\n\x08\x63overage\x18\x02 \x01(\x0b\x32#.trenddetective.common.v1.DateRangeR\x08\x63overage*\xc1\x01\n\x06Source\x12\x16\n\x12SOURCE_UNSPECIFIED\x10\x00\x12\x19\n\x15SOURCE_HARMONY_SUBSET\x10\x01\x12\x18\n\x14SOURCE_GIOVANNI_AREA\x10\x02\x12\x19\n\x15SOURCE_GIOVANNI_POINT\x10\x03\x12\x10\n\x0cSOURCE_POWER\x10\x04\x12\x15\n\x11SOURCE_CSV_UPLOAD\x10\x05\x12\x11\n\rSOURCE_BUNDLE\x10\x06\x12\x13\n\x0fSOURCE_APPEEARS\x10\x07*\x8d\x01\n\x06\x46ormat\x12\x16\n\x12\x46ORMAT_UNSPECIFIED\x10\x00\x12\x12\n\x0e\x46ORMAT_NETCDF4\x10\x01\x12\x17\n\x13\x46ORMAT_GIOVANNI_CSV\x10\x02\x12\x15\n\x11\x46ORMAT_POWER_JSON\x10\x03\x12\x13\n\x0f\x46ORMAT_USER_CSV\x10\x04\x12\x12\n\x0e\x46ORMAT_GEOTIFF\x10\x05\x42\x83\x02\n\x1c\x63om.trenddetective.ingest.v1B\x0bIngestProtoP\x01ZTgithub.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/ingest/v1;ingestv1\xa2\x02\x03TIX\xaa\x02\x18Trenddetective.Ingest.V1\xca\x02\x18Trenddetective\\Ingest\\V1\xe2\x02$Trenddetective\\Ingest\\V1\\GPBMetadata\xea\x02\x1aTrenddetective::Ingest::V1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n%trenddetective/ingest/v1/ingest.proto\x12\x18trenddetective.ingest.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a%trenddetective/common/v1/common.proto\"\xc7\x05\n\nIngestTask\x12\x1f\n\x0bvariable_id\x18\x01 \x01(\tR\nvariableId\x12\x32\n\x04\x62\x62ox\x18\x02 \x01(\x0b\x32\x1e.trenddetective.common.v1.BBoxR\x04\x62\x62ox\x12\x39\n\x05\x64\x61tes\x18\x03 \x01(\x0b\x32#.trenddetective.common.v1.DateRangeR\x05\x64\x61tes\x12.\n\x13\x65\x61rthdata_token_key\x18\x04 \x01(\tR\x11\x65\x61rthdataTokenKey\x12P\n\x0eharmony_subset\x18\n \x01(\x0b\x32\'.trenddetective.ingest.v1.HarmonySubsetH\x00R\rharmonySubset\x12M\n\rgiovanni_area\x18\x0b \x01(\x0b\x32&.trenddetective.ingest.v1.GiovanniAreaH\x00R\x0cgiovanniArea\x12P\n\x0egiovanni_point\x18\x0c \x01(\x0b\x32\'.trenddetective.ingest.v1.GiovanniPointH\x00R\rgiovanniPoint\x12\x37\n\x05power\x18\r \x01(\x0b\x32\x1f.trenddetective.ingest.v1.PowerH\x00R\x05power\x12\x44\n\ncsv_upload\x18\x0e \x01(\x0b\x32#.trenddetective.ingest.v1.CsvUploadH\x00R\tcsvUpload\x12:\n\x06\x62undle\x18\x0f \x01(\x0b\x32 .trenddetective.ingest.v1.BundleH\x00R\x06\x62undle\x12@\n\x08\x61ppeears\x18\x10 \x01(\x0b\x32\".trenddetective.ingest.v1.AppeearsH\x00R\x08\x61ppeearsB\t\n\x07\x61\x64\x61pter\"u\n\rHarmonySubset\x12#\n\rcollection_id\x18\x01 \x01(\tR\x0c\x63ollectionId\x12\x1c\n\tvariables\x18\x02 \x03(\tR\tvariables\x12!\n\x0cmax_granules\x18\x03 \x01(\x05R\x0bmaxGranules\"W\n\x0cGiovanniArea\x12\"\n\rdata_field_id\x18\x01 \x01(\tR\x0b\x64\x61taFieldId\x12#\n\rcollection_id\x18\x02 \x01(\tR\x0c\x63ollectionId\"k\n\rGiovanniPoint\x12\"\n\rdata_field_id\x18\x01 \x01(\tR\x0b\x64\x61taFieldId\x12\x36\n\x05point\x18\x02 \x01(\x0b\x32 .trenddetective.common.v1.LatLonR\x05point\"}\n\x05Power\x12\x1e\n\nparameters\x18\x01 \x03(\tR\nparameters\x12\x1c\n\tcommunity\x18\x02 \x01(\tR\tcommunity\x12\x36\n\x05point\x18\x03 \x01(\x0b\x32 .trenddetective.common.v1.LatLonR\x05point\"F\n\tCsvUpload\x12\x39\n\x06upload\x18\x01 \x01(\x0b\x32!.trenddetective.common.v1.BlobRefR\x06upload\":\n\x06\x42undle\x12\x12\n\x04name\x18\x01 \x01(\tR\x04name\x12\x1c\n\tvariables\x18\x02 \x03(\tR\tvariables\"<\n\x08\x41ppeears\x12\x18\n\x07product\x18\x01 \x01(\tR\x07product\x12\x16\n\x06layers\x18\x02 \x03(\tR\x06layers\"\xda\x03\n\nRawDataset\x12\x38\n\x06source\x18\x01 \x01(\x0e\x32 .trenddetective.ingest.v1.SourceR\x06source\x12\x38\n\x06\x66ormat\x18\x02 \x01(\x0e\x32 .trenddetective.ingest.v1.FormatR\x06\x66ormat\x12\x1f\n\x0bvariable_id\x18\x03 \x01(\tR\nvariableId\x12\x1c\n\tvariables\x18\x04 \x03(\tR\tvariables\x12\x32\n\x04\x62\x62ox\x18\x05 \x01(\x0b\x32\x1e.trenddetective.common.v1.BBoxR\x04\x62\x62ox\x12\x36\n\x05point\x18\x06 \x01(\x0b\x32 .trenddetective.common.v1.LatLonR\x05point\x12\x39\n\x05\x64\x61tes\x18\x07 \x01(\x0b\x32#.trenddetective.common.v1.DateRangeR\x05\x64\x61tes\x12\x37\n\x05\x66iles\x18\x08 \x03(\x0b\x32!.trenddetective.ingest.v1.RawFileR\x05\x66iles\x12\x39\n\nfetched_at\x18\t \x01(\x0b\x32\x1a.google.protobuf.TimestampR\tfetchedAt\"\x81\x01\n\x07RawFile\x12\x35\n\x04\x62lob\x18\x01 \x01(\x0b\x32!.trenddetective.common.v1.BlobRefR\x04\x62lob\x12?\n\x08\x63overage\x18\x02 \x01(\x0b\x32#.trenddetective.common.v1.DateRangeR\x08\x63overage*\xc1\x01\n\x06Source\x12\x16\n\x12SOURCE_UNSPECIFIED\x10\x00\x12\x19\n\x15SOURCE_HARMONY_SUBSET\x10\x01\x12\x18\n\x14SOURCE_GIOVANNI_AREA\x10\x02\x12\x19\n\x15SOURCE_GIOVANNI_POINT\x10\x03\x12\x10\n\x0cSOURCE_POWER\x10\x04\x12\x15\n\x11SOURCE_CSV_UPLOAD\x10\x05\x12\x11\n\rSOURCE_BUNDLE\x10\x06\x12\x13\n\x0fSOURCE_APPEEARS\x10\x07*\xac\x01\n\x06\x46ormat\x12\x16\n\x12\x46ORMAT_UNSPECIFIED\x10\x00\x12\x12\n\x0e\x46ORMAT_NETCDF4\x10\x01\x12\x17\n\x13\x46ORMAT_GIOVANNI_CSV\x10\x02\x12\x15\n\x11\x46ORMAT_POWER_JSON\x10\x03\x12\x13\n\x0f\x46ORMAT_USER_CSV\x10\x04\x12\x12\n\x0e\x46ORMAT_GEOTIFF\x10\x05\x12\x1d\n\x19\x46ORMAT_GIOVANNI_POINT_CSV\x10\x06\x42\x83\x02\n\x1c\x63om.trenddetective.ingest.v1B\x0bIngestProtoP\x01ZTgithub.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/ingest/v1;ingestv1\xa2\x02\x03TIX\xaa\x02\x18Trenddetective.Ingest.V1\xca\x02\x18Trenddetective\\Ingest\\V1\xe2\x02$Trenddetective\\Ingest\\V1\\GPBMetadata\xea\x02\x1aTrenddetective::Ingest::V1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -34,28 +34,28 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'trenddetective.ingest.v1.in
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n\034com.trenddetective.ingest.v1B\013IngestProtoP\001ZTgithub.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/ingest/v1;ingestv1\242\002\003TIX\252\002\030Trenddetective.Ingest.V1\312\002\030Trenddetective\\Ingest\\V1\342\002$Trenddetective\\Ingest\\V1\\GPBMetadata\352\002\032Trenddetective::Ingest::V1'
-  _globals['_SOURCE']._serialized_start=2064
-  _globals['_SOURCE']._serialized_end=2257
-  _globals['_FORMAT']._serialized_start=2260
-  _globals['_FORMAT']._serialized_end=2401
+  _globals['_SOURCE']._serialized_start=2101
+  _globals['_SOURCE']._serialized_end=2294
+  _globals['_FORMAT']._serialized_start=2297
+  _globals['_FORMAT']._serialized_end=2469
   _globals['_INGESTTASK']._serialized_start=140
   _globals['_INGESTTASK']._serialized_end=851
   _globals['_HARMONYSUBSET']._serialized_start=853
   _globals['_HARMONYSUBSET']._serialized_end=970
   _globals['_GIOVANNIAREA']._serialized_start=972
-  _globals['_GIOVANNIAREA']._serialized_end=1022
-  _globals['_GIOVANNIPOINT']._serialized_start=1024
-  _globals['_GIOVANNIPOINT']._serialized_end=1131
-  _globals['_POWER']._serialized_start=1133
-  _globals['_POWER']._serialized_end=1258
-  _globals['_CSVUPLOAD']._serialized_start=1260
-  _globals['_CSVUPLOAD']._serialized_end=1330
-  _globals['_BUNDLE']._serialized_start=1332
-  _globals['_BUNDLE']._serialized_end=1390
-  _globals['_APPEEARS']._serialized_start=1392
-  _globals['_APPEEARS']._serialized_end=1452
-  _globals['_RAWDATASET']._serialized_start=1455
-  _globals['_RAWDATASET']._serialized_end=1929
-  _globals['_RAWFILE']._serialized_start=1932
-  _globals['_RAWFILE']._serialized_end=2061
+  _globals['_GIOVANNIAREA']._serialized_end=1059
+  _globals['_GIOVANNIPOINT']._serialized_start=1061
+  _globals['_GIOVANNIPOINT']._serialized_end=1168
+  _globals['_POWER']._serialized_start=1170
+  _globals['_POWER']._serialized_end=1295
+  _globals['_CSVUPLOAD']._serialized_start=1297
+  _globals['_CSVUPLOAD']._serialized_end=1367
+  _globals['_BUNDLE']._serialized_start=1369
+  _globals['_BUNDLE']._serialized_end=1427
+  _globals['_APPEEARS']._serialized_start=1429
+  _globals['_APPEEARS']._serialized_end=1489
+  _globals['_RAWDATASET']._serialized_start=1492
+  _globals['_RAWDATASET']._serialized_end=1966
+  _globals['_RAWFILE']._serialized_start=1969
+  _globals['_RAWFILE']._serialized_end=2098
 # @@protoc_insertion_point(module_scope)

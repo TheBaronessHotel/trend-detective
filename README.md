@@ -49,6 +49,7 @@ So far `make up` starts NATS, Redis and SeaweedFS, runs bootstrap to create the 
 | `make smoke` | With the stack up, publishes a real ingest task and checks the result |
 | `make smoke-harmony` | Runs a real GPM job through NASA Harmony. Needs `EARTHDATA_TOKEN` in `.env` |
 | `make smoke-power` | Runs a real job through NASA POWER. Needs no token |
+| `make smoke-giovanni` | Runs a real point job through NASA Giovanni. Needs `EARTHDATA_TOKEN` in `.env` |
 
 The ports listen on 127.0.0.1 only:
 - NATS: 4222, and 8222 for monitoring.
