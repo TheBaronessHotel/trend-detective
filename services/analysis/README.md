@@ -1,20 +1,20 @@
 # analysis
 
-Python 3.14. Runs the trend tests on the region series preprocess wrote, and writes a `SeriesAnalysis` document to the `analysis` bucket. It reads `gateway.v1.Task` messages from `tasks.analysis` and reports a `StageDone` for each one on `events.stage.done`.
+Python 3.14. Runs the trend tests on the region series preprocess wrote, and the fast tests on every cell of its grid, and writes `SeriesAnalysis` and `GridAnalysis` documents to the `analysis` bucket. It reads `gateway.v1.Task` messages from `tasks.analysis` and reports a `StageDone` for each one on `events.stage.done`.
 
 See the Analysis section of [ARCHITECTURE.md](../../ARCHITECTURE.md), and the [science notes](https://app.notion.com/p/41897b633bd6819384e5d98df3e80c02) for where the methods come from.
 
 ## Status
 
-Every series test of the plan is in:
+Every test of the plan is in:
 
 - ANA-1: regression, Mann-Kendall with Sen's slope, and the agreement check.
+- ANA-2: the fast tests on every grid cell, with the false discovery rate correction.
 - ANA-3: the Pettitt change-point test, the residual checks and the outlier months.
 - ANA-4: the shuffle test, the trend triangle, the monthly trends and the years to significance.
+- ANA-5: our numbers checked against NOAA's published CO2 growth, see Validation.
 
-Still to come is ANA-2, the grid tests. `TestPlan.grid` is logged and skipped, and `AnalysisResult.grid` stays unset.
-
-Skipped tests leave their fields unset, so the web app and the narrator should check a field is there before using it.
+A test that couldn't run, like the shuffle test on a short record, leaves its field unset, so the web app and the narrator should check a field is there before using it.
 
 ## Layout
 
@@ -22,13 +22,14 @@ Skipped tests leave their fields unset, so the web app and the narrator should c
 |---|---|
 | `src/analysis/__main__.py` | Wiring: settings, logging, S3, the worker |
 | `src/analysis/worker.py` | The JetStream consumer. Acks only after its `StageDone` is out |
-| `src/analysis/pipeline.py` | One task: cache check, read the `Series`, run the suite, write. Knows nothing about NATS |
+| `src/analysis/pipeline.py` | One task: cache check, read the `Series` and the `Grid`, run the series suite and the grid tests, write. Knows nothing about NATS |
 | `src/analysis/series.py` | Puts a `Series` on a regular monthly calendar and picks the field to test |
 | `src/analysis/suite.py` | Runs the plan's series tests and builds `SeriesAnalysis`, with the caveats |
 | `src/analysis/regression.py` | Least squares with the effective sample size correction |
 | `src/analysis/kendall.py` | Mann-Kendall (original, Hamed and Rao, seasonal), Sen's slope and its interval |
 | `src/analysis/extras.py` | The shuffle test, the trend triangle, the monthly trends and the years to significance |
 | `src/analysis/diagnostics.py` | The Pettitt test, the residual checks and the robust z-scores for outliers |
+| `src/analysis/grid.py` | The fast tests on every grid cell and the false discovery rate correction |
 | `src/analysis/storage.py` | S3 through boto3, plus an in-memory store for tests |
 | `scripts/validate_noaa_co2.py` | Compares our trends with NOAA's published CO2 growth, see Validation |
 | `tests/data/` | A small NOAA fixture for the offline validation tests |
@@ -97,6 +98,16 @@ They look at the same field as the regression, and use the regression's fit wher
 
 Values, `highest` and `lowest` are in the tested field's `units`, so anomalies by default.
 
+### Grid cells
+
+When the source is gridded and the plan has grid tests, every cell of preprocess's `Grid` gets the fast tests, and the results go to a `GridAnalysis` for the heatmap. The full suite stays with the region series, as the science notes say.
+
+- **The tests.** `regression`, with the autocorrelation correction as set, and `mann_kendall`, Hamed and Rao when unset, each giving one `GridLayer` of slopes per decade and p-values. A cell gets exactly the numbers the series code would give that cell alone, which the unit tests check for all three Mann-Kendall variants. They're computed for all cells at once, except Seasonal Kendall, which goes cell by cell.
+- **The data.** The tested field, as for the series: preprocess's grid anomalies when it made them, or anomalies made here per cell the same way as for the series. A cell needs 12 values over two years, or its slope and p-value are NaN. `valid_steps` counts each cell's values either way.
+- **The correction.** Thousands of cells tested at alpha 0.05 would light up dozens by chance, so `significant` comes from the Benjamini-Hochberg false discovery rate, `fdr_q`, 0.05 by default, across the cells that were tested (Wilks 2016). `p_threshold` is the largest p-value still significant, 0 when none is. The unit tests check it against `scipy.stats.false_discovery_control`.
+- **The layout.** Per-cell arrays are row-major `[row][col]`, row 0 at the north and column 0 at the west, like `Grid`.
+- **Time.** Tests on 8×8 cells take 0.1 s, 50×50 take about 6 s, and the largest grid preprocess sends today, 128×128 over 330 months, about 40 s, most of it Sen's slope over 54,000 pairs per cell. The worker's heartbeat keeps such a task alive. Coarser grids, as PRE-5 plans, make it quicker.
+
 ## Drawing the trend line and its band
 
 `RegressionResult.model` is enough to draw both, with no extra fields:
@@ -158,6 +169,7 @@ Each task has a cache key: a SHA-256 of the `AnalysisTask` plus `CODE_VERSION` i
 
 ```
 analysis/<cache key>/series.json    SeriesAnalysis, as protojson
+analysis/<cache key>/grid.json      GridAnalysis, for gridded sources with grid tests
 analysis/<cache key>/result.json    AnalysisResult, written last
 ```
 
@@ -167,9 +179,9 @@ If `result.json` exists, the task reuses it and reports `cache_hit: true`. Bump 
 
 | Error | Code |
 |---|---|
-| A daily or weekly series, more than one value in a month, a bad `alpha`, an unknown variant, shuffle or triangle settings out of range, or an outlier threshold not above 0 | `INVALID_REQUEST` |
+| A daily or weekly series, more than one value in a month, a bad `alpha` or `fdr_q`, an unknown variant, shuffle or triangle settings out of range, or an outlier threshold not above 0 | `INVALID_REQUEST` |
 | Fewer than 12 values, or less than 2 years between the first and the last | `NO_DATA` |
-| A `Series` that isn't valid protojson | `INTERNAL` |
+| A `Series` or `Grid` that isn't valid protojson, or a grid blob of the wrong size | `INTERNAL` |
 | SeaweedFS errors, including a missing `Series` | Retried after 10 s, then 1 min, and reported as `INTERNAL` after 3 attempts |
 | Anything else | `INTERNAL` |
 
@@ -189,5 +201,6 @@ Logs are `key=value` lines with `time`, `level` and `msg`, plus `job_id`, `task_
 - `make test-analysis` runs what CI's `analysis` workflow runs, in a few seconds: the lockfile check, ruff with bug rules only, and the unit tests. It needs uv.
 - pymannkendall is a dev dependency only. The service doesn't import it.
 - A calibration test runs the shuffle test on 100 trendless autocorrelated series and expects about 5% false alarms. The same series give a plain t-test about 21%.
+- The grid tests check every cell against the series code, with gaps and ties, and the false discovery rate correction against scipy.
 - The validation tests check the trends against NOAA's published CO2 growth, offline. `uv run python scripts/validate_noaa_co2.py` repeats it on NOAA's current files, or with `--from` on files downloaded already.
 - `make smoke`, with the stack up, runs the Delhi bundle through every stage and checks the trend analysis has the regression, Mann-Kendall, extras and diagnostics results.
