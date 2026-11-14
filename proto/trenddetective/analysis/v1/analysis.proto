@@ -1,0 +1,132 @@
+syntax = "proto3";
+
+// Contracts owned by the analysis service: the task it receives, the test
+// specs, and the result it reports. results.proto has the documents it
+// writes. The analysts can change any of this.
+package trenddetective.analysis.v1;
+
+import "trenddetective/common/v1/common.proto";
+import "trenddetective/preprocess/v1/preprocess.proto";
+
+// Run the test plan on preprocess output. The gateway sends it on
+// tasks.analysis inside a gateway.v1.Task.
+message AnalysisTask {
+  trenddetective.preprocess.v1.PreprocessResult input = 1;
+  TestPlan tests = 2;
+}
+
+// Which tests to run. The gateway fills it in from the catalog unless the
+// user picks tests.
+message TestPlan {
+  // Significance level. Default 0.05.
+  double alpha = 1;
+  // Which series the tests use. Default anomalies.
+  SeriesField field = 2;
+  // The full suite, on the region-average series.
+  repeated SeriesTest series = 3;
+  // Fast tests on every grid cell, followed by a Benjamini-Hochberg FDR
+  // correction across all cells.
+  repeated GridTest grid = 4;
+  // False discovery rate for the grid correction. Default 0.05.
+  double fdr_q = 5;
+}
+
+// Which series the tests run on.
+enum SeriesField {
+  SERIES_FIELD_UNSPECIFIED = 0;
+  // The seasonal cycle removed. The default.
+  SERIES_FIELD_ANOMALIES = 1;
+  // The values as they are.
+  SERIES_FIELD_VALUES = 2;
+}
+
+// One test on the region-average series.
+message SeriesTest {
+  oneof test {
+    Regression regression = 1;
+    MannKendall mann_kendall = 2;
+    Pettitt pettitt = 3;
+    ResidualChecks residual_checks = 4;
+    Outliers outliers = 5;
+    Shuffle shuffle = 6;
+    TrendTriangle trend_triangle = 7;
+    MonthlyTrends monthly_trends = 8;
+    YearsToSignificance years_to_significance = 9;
+  }
+}
+
+// One test on every grid cell.
+message GridTest {
+  oneof test {
+    Regression regression = 1;
+    MannKendall mann_kendall = 2;
+  }
+}
+
+// Linear regression of the series on time, with a t-test on the slope.
+message Regression {
+  // Use the effective sample size n(1 - r1)/(1 + r1), where r1 is the lag-1
+  // autocorrelation of the residuals (Santer et al. 2000).
+  bool correct_autocorrelation = 1;
+}
+
+// Mann-Kendall trend test, with Sen's slope.
+message MannKendall {
+  MannKendallVariant variant = 1;
+}
+
+// Which form of Mann-Kendall to run.
+enum MannKendallVariant {
+  MANN_KENDALL_VARIANT_UNSPECIFIED = 0;
+  // The original test. Assumes no autocorrelation.
+  MANN_KENDALL_VARIANT_ORIGINAL = 1;
+  // Variance corrected for autocorrelation (Hamed and Rao 1998). The default.
+  MANN_KENDALL_VARIANT_HAMED_RAO = 2;
+  // Seasonal Kendall (Hirsch et al. 1982). Runs on raw monthly values,
+  // whatever TestPlan.field says.
+  MANN_KENDALL_VARIANT_SEASONAL = 3;
+}
+
+// Pettitt change-point test (1979). A step change, like a sensor switch or a
+// new dam, can look like a trend.
+message Pettitt {}
+
+// Checks residual autocorrelation and normality, and reports pass or warn.
+message ResidualChecks {}
+
+// Flags outlier months by robust z-score, using the median and MAD.
+message Outliers {
+  // Default 3.5.
+  double robust_z_threshold = 1;
+}
+
+// Block-permutes the series and refits the slope each time, to show the
+// p-value as a histogram.
+message Shuffle {
+  // Default 1000.
+  int32 permutations = 1;
+  // Steps per block, to keep autocorrelation. Default 12.
+  int32 block_length = 2;
+}
+
+// The trend for every start and end year, to show whether it depends on the
+// window.
+message TrendTriangle {
+  // Shortest window to fit. Default 10.
+  int32 min_years = 1;
+}
+
+// A separate trend for each calendar month.
+message MonthlyTrends {}
+
+// How many years of record this trend needs to become significant
+// (Weatherhead et al. 1998).
+message YearsToSignificance {}
+
+// What analysis wrote to the analysis bucket. It reports this in StageDone.
+message AnalysisResult {
+  // A SeriesAnalysis as protojson.
+  trenddetective.common.v1.BlobRef series = 1;
+  // A GridAnalysis as protojson. Unset for series-only sources.
+  trenddetective.common.v1.BlobRef grid = 2;
+}

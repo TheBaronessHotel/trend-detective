@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+// Contracts owned by the preprocess service: the task it receives, the filter
+// chain, and the result it reports. data.proto has the documents it writes.
+package trenddetective.preprocess.v1;
+
+import "trenddetective/common/v1/common.proto";
+import "trenddetective/ingest/v1/ingest.proto";
+import "trenddetective/preprocess/v1/data.proto";
+
+// Decode raw files, run the filter chain, and aggregate the region. The
+// gateway sends it on tasks.preprocess inside a gateway.v1.Task.
+message PreprocessTask {
+  // Everything ingest fetched for the job. There is more than one when ingest
+  // ran as several tasks.
+  repeated trenddetective.ingest.v1.RawDataset raw = 1;
+  // Units of the raw values, for files that don't say, for example "K".
+  string source_units = 2;
+  FilterChain filters = 3;
+  Aggregation aggregation = 4;
+}
+
+// An ordered list of filter steps.
+message FilterChain {
+  repeated FilterOp ops = 1;
+}
+
+// One step of the filter chain.
+message FilterOp {
+  oneof op {
+    QcRange qc_range = 1;
+    Linear linear = 2;
+    MonthlyMean monthly_mean = 3;
+    Anomaly anomaly = 4;
+    Log10 log10 = 5;
+    Coarsen coarsen = 6;
+    GapFillDisplay gap_fill_display = 7;
+  }
+}
+
+// Drop values outside [min, max] and record them as failed quality checks.
+// For example, negative rain or NDVI above 1.
+message QcRange {
+  double min = 1;
+  double max = 2;
+}
+
+// Replace each value with value * scale + offset, for unit conversion. K to
+// °C is scale 1 and offset -273.15. kg/m²/s to mm/day is scale 86400.
+message Linear {
+  double scale = 1;
+  double offset = 2;
+  // Units after this step, for example "°C".
+  string units = 3;
+}
+
+// Turn daily or weekly data into monthly means.
+message MonthlyMean {
+  // A month with fewer valid days than this is missing.
+  int32 min_valid_days = 1;
+}
+
+// Compute each step's anomaly from the normal for its calendar month.
+// Preprocess computes anomalies per pixel first and then averages them.
+message Anomaly {
+  AnomalyKind kind = 1;
+  // Years the normals come from. Unset means the whole record.
+  trenddetective.common.v1.YearRange baseline = 2;
+  // Share of baseline years a calendar month needs data in for its normal to
+  // count. Default 0.7.
+  double min_baseline_coverage = 3;
+  ClimatologyMethod method = 4;
+  // Sine and cosine pairs for CLIMATOLOGY_METHOD_HARMONIC. Default 2.
+  int32 harmonics = 5;
+}
+
+// Take log10 of each value. Values at or below zero become missing.
+// Chlorophyll is roughly log-normal, so it uses this.
+message Log10 {}
+
+// Block-average pixels by a factor in each direction.
+message Coarsen {
+  int32 factor = 1;
+}
+
+// Fill short gaps by linear interpolation in Series.display_values, for the
+// chart only. Statistics never see filled values.
+message GapFillDisplay {
+  // Longest gap to fill, in time steps. Default 2.
+  int32 max_gap = 1;
+}
+
+// How preprocess aggregates pixels.
+message Aggregation {
+  // Sub-regions per side for the slider and heatmap. Default 8. Zero means
+  // native pixels, still capped by max_grid.
+  int32 subregion_n = 1;
+  // Largest grid side. Bigger grids are block-averaged down. The gateway sets
+  // it from MAX_GRID.
+  int32 max_grid = 2;
+  // A time step counts only if at least this share of the rectangle's pixels
+  // is valid. Default 0.5.
+  double min_valid_fraction = 3;
+}
+
+// What preprocess wrote to the prep bucket. It reports this in StageDone.
+message PreprocessResult {
+  // A Series as protojson.
+  trenddetective.common.v1.BlobRef series = 1;
+  // The same series as CSV, for download.
+  trenddetective.common.v1.BlobRef series_csv = 2;
+  // A Grid as protojson. Unset for series-only sources.
+  trenddetective.common.v1.BlobRef grid = 3;
+  // A CubeHeader for the values, as protojson. Unset for series-only sources.
+  trenddetective.common.v1.BlobRef value_cube = 4;
+  // A CubeHeader for the anomalies. Unset without an anomaly step.
+  trenddetective.common.v1.BlobRef anomaly_cube = 5;
+}

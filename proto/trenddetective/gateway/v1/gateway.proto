@@ -1,0 +1,232 @@
+syntax = "proto3";
+
+// The gateway's public API, which the browser calls over Connect.
+package trenddetective.gateway.v1;
+
+import "google/protobuf/timestamp.proto";
+import "trenddetective/analysis/v1/analysis.proto";
+import "trenddetective/common/v1/common.proto";
+import "trenddetective/gateway/v1/task.proto";
+import "trenddetective/ingest/v1/ingest.proto";
+import "trenddetective/narrator/v1/narrator.proto";
+import "trenddetective/preprocess/v1/preprocess.proto";
+
+// Everything the web app needs. Two optional headers carry user secrets:
+// x-earthdata-token on CreateJob, to use the user's own NASA quota, and
+// x-llm-api-key on Narrate.
+service GatewayService {
+  // The variable catalog.
+  rpc ListVariables(ListVariablesRequest) returns (ListVariablesResponse);
+  // Runs preflight checks and starts a job. Fails fast with a readable reason
+  // when the request would exceed a size guard or the quota.
+  rpc CreateJob(CreateJobRequest) returns (CreateJobResponse);
+  rpc GetJob(GetJobRequest) returns (GetJobResponse);
+  // Streams the job each time it changes, until it finishes.
+  rpc WatchJob(WatchJobRequest) returns (stream WatchJobResponse);
+  // A presigned download URL for one of a finished job's outputs.
+  rpc GetResultURL(GetResultURLRequest) returns (GetResultURLResponse);
+  // A presigned upload URL for a user CSV.
+  rpc CreateUploadURL(CreateUploadURLRequest) returns (CreateUploadURLResponse);
+  // Streams an LLM explanation of a finished job. Fails with
+  // FAILED_PRECONDITION (HTTP 409) while analysis hasn't finished.
+  rpc Narrate(NarrateRequest) returns (stream NarrateResponse);
+  // How much NASA quota is left.
+  rpc GetQuota(GetQuotaRequest) returns (GetQuotaResponse);
+}
+
+message ListVariablesRequest {}
+
+message ListVariablesResponse {
+  repeated Variable variables = 1;
+}
+
+// A catalog entry, as the browser sees it.
+message Variable {
+  // For example "gpm-precipitation".
+  string id = 1;
+  // For example "Precipitation".
+  string name = 2;
+  // One or two plain sentences for a high-school student.
+  string definition = 3;
+  // Display units, for example "mm/day".
+  string units = 4;
+  trenddetective.common.v1.TimeStep step = 5;
+  // Dates the product covers.
+  trenddetective.common.v1.DateRange available = 6;
+  // False for series-only sources, which hide the slider and heatmap.
+  bool grid = 7;
+  Domain domain = 8;
+  trenddetective.ingest.v1.Source default_source = 9;
+  // Every source that can serve this variable.
+  repeated trenddetective.ingest.v1.Source sources = 10;
+  // The product's page, for citations.
+  string dataset_url = 11;
+}
+
+// Where a variable has data.
+enum Domain {
+  DOMAIN_UNSPECIFIED = 0;
+  DOMAIN_LAND = 1;
+  DOMAIN_OCEAN = 2;
+  DOMAIN_GLOBAL = 3;
+}
+
+message CreateJobRequest {
+  JobSpec spec = 1;
+}
+
+message CreateJobResponse {
+  Job job = 1;
+}
+
+// What a job runs. In CreateJob, only variable_id, bbox and dates are
+// required, and the gateway fills in catalog defaults for everything else.
+// In Job.spec, every field holds the value actually used.
+message JobSpec {
+  string variable_id = 1;
+  trenddetective.common.v1.BBox bbox = 2;
+  trenddetective.common.v1.DateRange dates = 3;
+  // Unspecified means the variable's default source.
+  trenddetective.ingest.v1.Source source = 4;
+  // The last stage to run. Unspecified runs every stage.
+  Stage stop_after = 5;
+  // The uploaded file, from CreateUploadURL. Required for SOURCE_CSV_UPLOAD.
+  trenddetective.common.v1.BlobRef upload = 6;
+  // Replaces the catalog's default filter chain.
+  trenddetective.preprocess.v1.FilterChain filters = 7;
+  // Replaces the default aggregation settings.
+  trenddetective.preprocess.v1.Aggregation aggregation = 8;
+  // Replaces the catalog's default tests.
+  trenddetective.analysis.v1.TestPlan tests = 9;
+}
+
+// A job and everything known about it. The gateway is the only writer.
+message Job {
+  string id = 1;
+  JobState state = 2;
+  JobSpec spec = 3;
+  repeated TaskStatus tasks = 4;
+  int32 tasks_total = 5;
+  int32 tasks_succeeded = 6;
+  int32 tasks_failed = 7;
+  // Outputs so far. Each field fills in as its stage finishes.
+  JobResults results = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+// Where a job is.
+enum JobState {
+  JOB_STATE_UNSPECIFIED = 0;
+  JOB_STATE_PENDING = 1;
+  JOB_STATE_RUNNING = 2;
+  JOB_STATE_SUCCEEDED = 3;
+  JOB_STATE_FAILED = 4;
+}
+
+// One task of a job.
+message TaskStatus {
+  TaskMeta meta = 1;
+  TaskState state = 2;
+  // Deliveries so far.
+  int32 attempts = 3;
+  bool cache_hit = 4;
+  // Set when state is TASK_STATE_FAILED.
+  TaskError error = 5;
+  google.protobuf.Timestamp started_at = 6;
+  google.protobuf.Timestamp finished_at = 7;
+}
+
+// Where a task is.
+enum TaskState {
+  TASK_STATE_UNSPECIFIED = 0;
+  TASK_STATE_QUEUED = 1;
+  TASK_STATE_RUNNING = 2;
+  TASK_STATE_SUCCEEDED = 3;
+  TASK_STATE_FAILED = 4;
+}
+
+// What a job has produced.
+message JobResults {
+  repeated trenddetective.ingest.v1.RawDataset raw = 1;
+  trenddetective.preprocess.v1.PreprocessResult preprocess = 2;
+  trenddetective.analysis.v1.AnalysisResult analysis = 3;
+}
+
+message GetJobRequest {
+  string job_id = 1;
+}
+
+message GetJobResponse {
+  Job job = 1;
+}
+
+message WatchJobRequest {
+  string job_id = 1;
+}
+
+message WatchJobResponse {
+  Job job = 1;
+}
+
+// A job output the browser can download.
+enum Artifact {
+  ARTIFACT_UNSPECIFIED = 0;
+  ARTIFACT_SERIES = 1;
+  ARTIFACT_SERIES_CSV = 2;
+  ARTIFACT_VALUE_CUBE = 3;
+  ARTIFACT_ANOMALY_CUBE = 4;
+  ARTIFACT_SERIES_ANALYSIS = 5;
+  ARTIFACT_GRID_ANALYSIS = 6;
+}
+
+message GetResultURLRequest {
+  string job_id = 1;
+  Artifact artifact = 2;
+}
+
+message GetResultURLResponse {
+  string url = 1;
+  // For cubes, the binary data the header points to. Empty otherwise.
+  string data_url = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+message CreateUploadURLRequest {
+  string filename = 1;
+  int64 size_bytes = 2;
+}
+
+message CreateUploadURLResponse {
+  // PUT the file here.
+  string url = 1;
+  // Pass this as JobSpec.upload.
+  trenddetective.common.v1.BlobRef upload = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+message NarrateRequest {
+  string job_id = 1;
+  // Empty for the overview.
+  string question = 2;
+  // Earlier turns, oldest first.
+  repeated trenddetective.narrator.v1.ChatMessage history = 3;
+  trenddetective.narrator.v1.LlmConfig llm = 4;
+}
+
+message NarrateResponse {
+  trenddetective.narrator.v1.NarrateEvent event = 1;
+}
+
+message GetQuotaRequest {}
+
+message GetQuotaResponse {
+  // Share of this month's Giovanni compute quota used, 0 to 1.
+  double giovanni_used_fraction = 1;
+  // The gateway refuses Giovanni jobs past this share. QUOTA_CUTOFF.
+  double giovanni_cutoff = 2;
+  // Harmony jobs running now on the team token.
+  int32 harmony_in_flight = 3;
+  // HARMONY_CONCURRENCY.
+  int32 harmony_limit = 4;
+}

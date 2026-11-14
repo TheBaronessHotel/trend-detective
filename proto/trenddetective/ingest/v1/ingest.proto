@@ -1,0 +1,146 @@
+syntax = "proto3";
+
+// Contracts owned by the ingest service: the task it receives and the raw
+// dataset it reports.
+package trenddetective.ingest.v1;
+
+import "google/protobuf/timestamp.proto";
+import "trenddetective/common/v1/common.proto";
+
+// The adapter that fetches a dataset.
+enum Source {
+  SOURCE_UNSPECIFIED = 0;
+  // Gridded NetCDF from Harmony's HOSS subsetter. The default.
+  SOURCE_HARMONY_SUBSET = 1;
+  // Area-averaged CSV from Harmony plus Giovanni. Uses the Giovanni quota.
+  SOURCE_GIOVANNI_AREA = 2;
+  // Single-point CSV from the Giovanni time-series API.
+  SOURCE_GIOVANNI_POINT = 3;
+  // Single-point JSON from NASA POWER. No login needed.
+  SOURCE_POWER = 4;
+  // A CSV the user uploaded.
+  SOURCE_CSV_UPLOAD = 5;
+  // Files shipped with the app, for offline demos and the video.
+  SOURCE_BUNDLE = 6;
+  // MODIS land products from AppEEARS. Not built yet.
+  SOURCE_APPEEARS = 7;
+}
+
+// File format of the raw files. Preprocess picks its decoder from this.
+enum Format {
+  FORMAT_UNSPECIFIED = 0;
+  // NetCDF-4. Harmony HOSS writes one file per granule.
+  FORMAT_NETCDF4 = 1;
+  // Giovanni time-series CSV, including its comment header.
+  FORMAT_GIOVANNI_CSV = 2;
+  // NASA POWER JSON.
+  FORMAT_POWER_JSON = 3;
+  // A user CSV with a date column and a value column.
+  FORMAT_USER_CSV = 4;
+  // GeoTIFF, from AppEEARS area requests.
+  FORMAT_GEOTIFF = 5;
+}
+
+// Fetch one variable for one rectangle and date range. The gateway sends it
+// on tasks.ingest inside a gateway.v1.Task.
+message IngestTask {
+  // Catalog ID of the variable, for example "gpm-precipitation".
+  string variable_id = 1;
+  trenddetective.common.v1.BBox bbox = 2;
+  trenddetective.common.v1.DateRange dates = 3;
+  // Redis key where the gateway put a user's own Earthdata token, with a TTL.
+  // Empty means use the team token from EARTHDATA_TOKEN. The token itself
+  // never goes over NATS, because JetStream stores every message.
+  string earthdata_token_key = 4;
+
+  // The adapter to use, with its settings.
+  oneof adapter {
+    HarmonySubset harmony_subset = 10;
+    GiovanniArea giovanni_area = 11;
+    GiovanniPoint giovanni_point = 12;
+    Power power = 13;
+    CsvUpload csv_upload = 14;
+    Bundle bundle = 15;
+    Appeears appeears = 16;
+  }
+}
+
+// Settings for SOURCE_HARMONY_SUBSET.
+message HarmonySubset {
+  // CMR collection concept ID, for example "C1598621096-GES_DISC".
+  string collection_id = 1;
+  // Variable names inside the product, for example "precipitation".
+  repeated string variables = 2;
+  // Fail instead of fetching when CMR reports more granules than this. The
+  // gateway sets it from MAX_GRANULES.
+  int32 max_granules = 3;
+}
+
+// Settings for SOURCE_GIOVANNI_AREA.
+message GiovanniArea {
+  // Giovanni variable ID, for example "GPM_3IMERGM_07_precipitation".
+  string data_field_id = 1;
+}
+
+// Settings for SOURCE_GIOVANNI_POINT.
+message GiovanniPoint {
+  // Giovanni variable ID, for example "GLDAS_NOAH025_M_2_1_SoilMoi0_10cm_inst".
+  string data_field_id = 1;
+  // The gateway uses the center of the rectangle.
+  trenddetective.common.v1.LatLon point = 2;
+}
+
+// Settings for SOURCE_POWER.
+message Power {
+  // POWER parameter names, for example "T2M" or "PRECTOTCORR".
+  repeated string parameters = 1;
+  // POWER community: "RE", "AG" or "SB".
+  string community = 2;
+  // The gateway uses the center of the rectangle.
+  trenddetective.common.v1.LatLon point = 3;
+}
+
+// Settings for SOURCE_CSV_UPLOAD.
+message CsvUpload {
+  // The file in the uploads bucket, from CreateUploadURL.
+  trenddetective.common.v1.BlobRef upload = 1;
+}
+
+// Settings for SOURCE_BUNDLE.
+message Bundle {
+  // Name of a dataset shipped with the app.
+  string name = 1;
+}
+
+// Settings for SOURCE_APPEEARS.
+message Appeears {
+  // AppEEARS product, for example "MOD13A3.061".
+  string product = 1;
+  // Layers inside the product, for example "_1_km_monthly_NDVI".
+  repeated string layers = 2;
+}
+
+// What ingest wrote to the raw bucket. Ingest reports it in StageDone, and
+// the gateway passes it to preprocess unchanged.
+message RawDataset {
+  Source source = 1;
+  Format format = 2;
+  string variable_id = 3;
+  // Variable names inside the files.
+  repeated string variables = 4;
+  // The rectangle that was requested.
+  trenddetective.common.v1.BBox bbox = 5;
+  // The point that was sampled. Set only for point sources.
+  trenddetective.common.v1.LatLon point = 6;
+  trenddetective.common.v1.DateRange dates = 7;
+  repeated RawFile files = 8;
+  google.protobuf.Timestamp fetched_at = 9;
+}
+
+// One file in the raw bucket.
+message RawFile {
+  trenddetective.common.v1.BlobRef blob = 1;
+  // The dates the file covers, when known. Unset when one file covers the
+  // whole request.
+  trenddetective.common.v1.DateRange coverage = 2;
+}

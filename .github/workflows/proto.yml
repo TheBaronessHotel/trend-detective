@@ -1,0 +1,33 @@
+name: proto
+
+on:
+  pull_request:
+    paths: ["proto/**", "gen/**", "buf.yaml", "buf.gen.yaml"]
+  push:
+    branches: [main]
+    paths: ["proto/**", "gen/**", "buf.yaml", "buf.gen.yaml"]
+
+permissions:
+  contents: read
+
+jobs:
+  buf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Lint, format check, and on pull requests a breaking-change check
+      # against the base branch. Nothing is pushed to the BSR.
+      - uses: bufbuild/buf-action@v1
+        with:
+          push: false
+          pr_comment: false
+
+      - name: Generated code is up to date
+        run: |
+          buf generate
+          git add --intent-to-add gen
+          if ! git diff --exit-code --stat -- gen; then
+            echo "::error::gen/ is out of date. Run make gen and commit the result."
+            exit 1
+          fi

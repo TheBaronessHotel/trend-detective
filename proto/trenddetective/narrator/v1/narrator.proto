@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+// Contracts owned by the narrator service. The gateway calls it directly over
+// Connect, only after analysis has finished. No queue is involved.
+package trenddetective.narrator.v1;
+
+import "trenddetective/analysis/v1/analysis.proto";
+import "trenddetective/common/v1/common.proto";
+
+// Explains finished analysis results with an LLM. The user's API key travels
+// in the x-llm-api-key header. The narrator keeps it in memory for the call
+// only and never logs it.
+service NarratorService {
+  // Streams the answer as it's generated. An empty question asks for the
+  // overview.
+  rpc Narrate(NarrateRequest) returns (stream NarrateResponse);
+}
+
+message NarrateRequest {
+  // The results to explain. The narrator reads them from SeaweedFS.
+  trenddetective.analysis.v1.AnalysisResult result = 1;
+  VariableContext variable = 2;
+  trenddetective.common.v1.BBox bbox = 3;
+  trenddetective.common.v1.DateRange dates = 4;
+  // Empty for the overview.
+  string question = 5;
+  // Earlier turns, oldest first. The narrator stores nothing between calls,
+  // so the browser sends the whole history each time.
+  repeated ChatMessage history = 6;
+  LlmConfig llm = 7;
+}
+
+message NarrateResponse {
+  NarrateEvent event = 1;
+}
+
+// One event in a narration stream. The gateway forwards these as they are.
+message NarrateEvent {
+  oneof event {
+    // The next piece of the answer.
+    string text_delta = 1;
+    // Always the last event.
+    NarrateDone done = 2;
+  }
+}
+
+// Sent once the answer is complete.
+message NarrateDone {
+  // Numbers in the answer that don't appear in the results. The web app
+  // shows them as a warning.
+  repeated string unverified_numbers = 1;
+  // The model that answered.
+  string model = 2;
+}
+
+// What the LLM needs to know about the variable. The gateway copies it from
+// the catalog.
+message VariableContext {
+  string id = 1;
+  string name = 2;
+  // The plain-language definition shown in the app.
+  string definition = 3;
+  string units = 4;
+  // Extra notes for the LLM, for example known caveats of the product.
+  string llm_hints = 5;
+}
+
+// One earlier turn of the conversation.
+message ChatMessage {
+  Role role = 1;
+  string text = 2;
+}
+
+// Who sent a chat message.
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_USER = 1;
+  ROLE_ASSISTANT = 2;
+}
+
+// Which LLM API to call. The key isn't here: it goes in the x-llm-api-key
+// header.
+message LlmConfig {
+  Provider provider = 1;
+  // API base URL. Empty means the provider's public endpoint. Set it for
+  // Ollama, OpenRouter, vLLM or LM Studio.
+  string base_url = 2;
+  // For example "gpt-5.5" or "claude-sonnet-5-5".
+  string model = 3;
+}
+
+// The wire format of an LLM API.
+enum Provider {
+  PROVIDER_UNSPECIFIED = 0;
+  // OpenAI Chat Completions, which Ollama, OpenRouter, vLLM and LM Studio also
+  // speak.
+  PROVIDER_OPENAI_CHAT = 1;
+  // Anthropic Messages.
+  PROVIDER_ANTHROPIC_MESSAGES = 2;
+}

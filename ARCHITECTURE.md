@@ -101,18 +101,21 @@ Failures use `TaskError{code, retryable, user_message}`. Messages like "quota ex
 - All protos live in `proto/`, one package per owning service, for example `trenddetective.ingest.v1`.
 - `buf generate` writes Go, Python and TypeScript code into `gen/`. The generated code is committed, so building a service doesn't need buf.
 - Codegen uses remote plugins from the Buf Schema Registry, so nobody installs protoc plugins. We can also push the module to our BSR org for browsable schema docs.
-- CI runs `buf lint` and `buf breaking` against `main`.
+- CI runs `buf lint`, a format check and `buf breaking` against `main`. It also fails if `gen/` is out of date.
 
 | Owner | Messages |
 |---|---|
-| gateway | `TaskMeta{job_id, task_id, attempt}`, `StageDone`, `TaskError`, the public Connect API |
-| ingest | `IngestTask`, `RawDataset` (file refs, format, source, variable, rectangle, dates) |
-| preprocess | `PreprocessTask`, filter-chain ops, `Series`, `Grid`, the slider-cube header |
-| analysis | `AnalysisTask`, test specs, results including fitted model parameters |
-| narrator | the `Narrate` streaming API |
+| gateway | The shared types in `common.v1`: `BBox`, `DateRange`, `BlobRef` and a few more. The `Task` envelope with `TaskMeta{job_id, task_id, stage}`, plus `StageDone`, `TaskError` and the public Connect API |
+| ingest | `IngestTask` with one settings message per adapter, `RawDataset` (file refs, format, source, variable, rectangle, dates) |
+| preprocess | `PreprocessTask`, filter-chain ops, `PreprocessResult`, and the `Series`, `Grid` and `CubeHeader` documents |
+| analysis | `AnalysisTask`, `TestPlan` and the test specs, `AnalysisResult`, and the `SeriesAnalysis` and `GridAnalysis` documents, including fitted model parameters |
+| narrator | `NarratorService.Narrate` |
 
-`Series` holds time, value, unit, variable, region, source, quality flag and coverage fraction.
-Each stage's task message embeds `TaskMeta`.
+The gateway publishes a `Task` envelope, and its `spec` is the stage's own task message. Stage packages therefore never import the gateway's, and the Go packages have no import cycles. Each stage answers with a `StageDone` that carries its result or a `TaskError`, plus the JetStream delivery count as `attempt`.
+
+Result messages hold only `BlobRef`s. The documents themselves are protojson files in SeaweedFS. Grid values and cube data are raw little-endian binary files stored next to them.
+
+`Series` holds times, values, anomalies, units, variable, rectangle, source, coverage fraction, and the reason each missing value is missing.
 
 ### Gateway API, first version
 

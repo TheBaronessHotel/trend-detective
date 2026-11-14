@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+// The gateway's side of the pipeline: the envelope every stage receives, and
+// the StageDone event every stage sends back. The gateway owns the envelope,
+// so stage packages never import this one.
+package trenddetective.gateway.v1;
+
+import "google/protobuf/timestamp.proto";
+import "trenddetective/analysis/v1/analysis.proto";
+import "trenddetective/ingest/v1/ingest.proto";
+import "trenddetective/preprocess/v1/preprocess.proto";
+
+// A pipeline stage.
+enum Stage {
+  STAGE_UNSPECIFIED = 0;
+  STAGE_INGEST = 1;
+  STAGE_PREPROCESS = 2;
+  STAGE_ANALYSIS = 3;
+}
+
+// Identifies a task. Every Task and StageDone carries it. Every log line
+// carries job_id and task_id too.
+message TaskMeta {
+  string job_id = 1;
+  string task_id = 2;
+  Stage stage = 3;
+}
+
+// What the gateway publishes on tasks.ingest, tasks.preprocess and
+// tasks.analysis. The spec always matches the subject. The gateway sets
+// Nats-Msg-Id to task_id, so a duplicate publish is dropped.
+message Task {
+  TaskMeta meta = 1;
+  oneof spec {
+    trenddetective.ingest.v1.IngestTask ingest = 10;
+    trenddetective.preprocess.v1.PreprocessTask preprocess = 11;
+    trenddetective.analysis.v1.AnalysisTask analysis = 12;
+  }
+}
+
+// What a stage publishes on events.stage.done when a task ends, with a result
+// or an error.
+//
+// For an error that might go away on its own, like a Harmony 5xx, the stage
+// NAKs the message and lets JetStream redeliver it. It reports an error here
+// only when retrying can't help, or on its last attempt. If a stage dies on
+// every attempt, the gateway marks the task failed from the max-deliveries
+// advisory instead.
+message StageDone {
+  TaskMeta meta = 1;
+  // JetStream delivery count of the attempt that finished, starting at 1.
+  int32 attempt = 2;
+  // True when the output already existed under its content-hash key.
+  bool cache_hit = 3;
+  google.protobuf.Timestamp finished_at = 4;
+  oneof result {
+    trenddetective.ingest.v1.RawDataset ingest = 10;
+    trenddetective.preprocess.v1.PreprocessResult preprocess = 11;
+    trenddetective.analysis.v1.AnalysisResult analysis = 12;
+    TaskError error = 20;
+  }
+}
+
+// Why a task failed.
+message TaskError {
+  ErrorCode code = 1;
+  // Whether the same job might succeed later, for example after the quota
+  // resets. The web app offers a retry button when true.
+  bool retryable = 2;
+  // Shown to the user as written, so keep it plain. For example "NASA has no
+  // data for this rectangle before 2002."
+  string user_message = 3;
+  // Technical detail for logs and /debug/jobs. Never shown in the app.
+  string detail = 4;
+}
+
+// What kind of failure a task hit.
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  // A bug on our side.
+  ERROR_CODE_INTERNAL = 1;
+  // The task itself is wrong, for example a reversed bounding box.
+  ERROR_CODE_INVALID_REQUEST = 2;
+  // The source has nothing for this rectangle and date range.
+  ERROR_CODE_NO_DATA = 3;
+  // The Giovanni quota or a rate limit ran out.
+  ERROR_CODE_QUOTA_EXCEEDED = 4;
+  // Over MAX_GRANULES, MAX_GRID or the task cap.
+  ERROR_CODE_TOO_LARGE = 5;
+  // The Earthdata token is missing, expired or rejected.
+  ERROR_CODE_UNAUTHENTICATED = 6;
+  // A NASA service failed or returned something we couldn't read.
+  ERROR_CODE_UPSTREAM = 7;
+  // The source can't serve this variable this way, for example Giovanni area
+  // averages for MERRA-2 monthly.
+  ERROR_CODE_UNSUPPORTED = 8;
+  // Every JetStream delivery failed. Set by the gateway from the advisory.
+  ERROR_CODE_RETRIES_EXHAUSTED = 9;
+}

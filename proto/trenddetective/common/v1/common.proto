@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+// Types every service shares. The gateway owns this package. It imports
+// nothing, so any package can use it without creating an import cycle.
+package trenddetective.common.v1;
+
+// A latitude/longitude rectangle in degrees (WGS84). West must be less than
+// east, so a box can't cross the antimeridian.
+message BBox {
+  // Western edge, -180 to 180.
+  double west = 1;
+  // Southern edge, -90 to 90.
+  double south = 2;
+  // Eastern edge, -180 to 180.
+  double east = 3;
+  // Northern edge, -90 to 90.
+  double north = 4;
+}
+
+// A point in degrees (WGS84).
+message LatLon {
+  double lat = 1;
+  double lon = 2;
+}
+
+// A calendar date with no time zone.
+message Date {
+  int32 year = 1;
+  // 1 to 12.
+  int32 month = 2;
+  // 1 to 31.
+  int32 day = 3;
+}
+
+// A range of dates. Both ends are included.
+message DateRange {
+  Date start = 1;
+  Date end = 2;
+}
+
+// A range of years. Both ends are included. Used for anomaly baselines.
+message YearRange {
+  int32 start_year = 1;
+  int32 end_year = 2;
+}
+
+// How far apart the points of a time series are.
+enum TimeStep {
+  TIME_STEP_UNSPECIFIED = 0;
+  TIME_STEP_DAILY = 1;
+  TIME_STEP_WEEKLY = 2;
+  TIME_STEP_MONTHLY = 3;
+}
+
+// An object in SeaweedFS. Stage outputs are keyed by a hash of the stage's
+// inputs, settings and code version, so the same work always lands on the
+// same key.
+message BlobRef {
+  // raw, prep, analysis or uploads.
+  string bucket = 1;
+  string key = 2;
+  int64 size_bytes = 3;
+  // For example "application/json" or "application/octet-stream".
+  string content_type = 4;
+}

@@ -11,8 +11,10 @@ The design is in [ARCHITECTURE.md](ARCHITECTURE.md). Tasks and decisions live in
 ```
 .
 ├── ARCHITECTURE.md
-├── compose.yaml, .env.example, Makefile    (coming in PLAT-2 to PLAT-4)
-├── buf.yaml, buf.gen.yaml                  (coming in CON-1)
+├── compose.yaml, .env.example               (coming in PLAT-2 to PLAT-4)
+├── Makefile                                gen, lint, fmt, breaking for now
+├── buf.yaml, buf.gen.yaml                  buf module and codegen settings
+├── go.mod                                  one Go module for gen/go, gateway and ingest
 ├── proto/trenddetective/<service>/v1/      contracts, one package per owning service
 ├── gen/                                    generated Go, Python and TS code, committed
 ├── deploy/                                 NATS, Redis and SeaweedFS configs, bootstrap container

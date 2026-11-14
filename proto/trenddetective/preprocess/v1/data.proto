@@ -1,0 +1,163 @@
+syntax = "proto3";
+
+// The documents preprocess writes to the prep bucket. Analysis and the web
+// app read them.
+package trenddetective.preprocess.v1;
+
+import "google/protobuf/timestamp.proto";
+import "trenddetective/common/v1/common.proto";
+import "trenddetective/ingest/v1/ingest.proto";
+
+// How anomalies are expressed.
+enum AnomalyKind {
+  ANOMALY_KIND_UNSPECIFIED = 0;
+  // Difference from the normal, in the variable's units. The default for
+  // temperature.
+  ANOMALY_KIND_ABSOLUTE = 1;
+  // Difference as a percentage of the normal. For rain, chlorophyll and NO2.
+  // Skipped where the normal is near zero, and never used for °C.
+  ANOMALY_KIND_PERCENT = 2;
+  // Difference divided by the calendar month's standard deviation, for
+  // comparing variables. Skipped for months whose deviation is zero.
+  ANOMALY_KIND_STANDARDIZED = 3;
+}
+
+// How the normal for each calendar month is computed.
+enum ClimatologyMethod {
+  CLIMATOLOGY_METHOD_UNSPECIFIED = 0;
+  // The mean of each calendar month over the baseline. The default.
+  CLIMATOLOGY_METHOD_MONTHLY_MEANS = 1;
+  // A smooth fit of sines and cosines. Steadier for short records.
+  CLIMATOLOGY_METHOD_HARMONIC = 2;
+}
+
+// Why a value is missing.
+enum MissingReason {
+  // Missing for a reason the decoder couldn't tell.
+  MISSING_REASON_UNSPECIFIED = 0;
+  MISSING_REASON_FILL_VALUE = 1;
+  MISSING_REASON_QC_FAILED = 2;
+  MISSING_REASON_CLOUD = 3;
+  MISSING_REASON_POLAR_NIGHT = 4;
+  MISSING_REASON_INSTRUMENT_OUTAGE = 5;
+  MISSING_REASON_BEFORE_MISSION = 6;
+  // Fewer valid pixels than Aggregation.min_valid_fraction.
+  MISSING_REASON_LOW_COVERAGE = 7;
+  // Fewer valid days than MonthlyMean.min_valid_days.
+  MISSING_REASON_TOO_FEW_DAYS = 8;
+  // Log10 of a value at or below zero.
+  MISSING_REASON_NOT_POSITIVE = 9;
+  // The calendar month has no usable normal, so there is no anomaly.
+  MISSING_REASON_NO_NORMAL = 10;
+}
+
+// The region-average series for the whole rectangle, written as protojson.
+// Every array indexed by time step has the same length as times.
+message Series {
+  string variable_id = 1;
+  // Units of values after the filter chain.
+  string units = 2;
+  trenddetective.common.v1.BBox bbox = 3;
+  trenddetective.ingest.v1.Source source = 4;
+  trenddetective.common.v1.TimeStep step = 5;
+  // Start of each time step, in UTC.
+  repeated google.protobuf.Timestamp times = 6;
+  // Values after the filter chain, weighted by cos(latitude). NaN where
+  // missing. Never gap-filled.
+  repeated double values = 7;
+  // Anomalies, computed per pixel and then averaged. NaN where missing.
+  // Empty when the chain has no anomaly step.
+  repeated double anomalies = 8;
+  // Values with short gaps filled, for drawing the chart line. Gap-filled
+  // points are drawn dashed. Never use these for statistics. Empty when the
+  // chain has no gap_fill_display step.
+  repeated double display_values = 9;
+  // Share of the rectangle's pixels that were valid at each step, 0 to 1.
+  repeated double coverage = 10;
+  // Why each missing step is missing. Steps with a value aren't listed.
+  repeated MissingValue missing = 11;
+  AnomalyKind anomaly_kind = 12;
+  // The baseline the normals actually came from.
+  trenddetective.common.v1.YearRange baseline = 13;
+  // The normal for each calendar month, January first. Empty when the chain
+  // has no anomaly step.
+  repeated MonthlyNormal normals = 14;
+}
+
+// A missing step in a Series.
+message MissingValue {
+  // Index into Series.times.
+  int32 index = 1;
+  MissingReason reason = 2;
+}
+
+// The normal for one calendar month.
+message MonthlyNormal {
+  // 1 to 12.
+  int32 month = 1;
+  double mean = 2;
+  double sd = 3;
+  // Baseline years with data for this month.
+  int32 years = 4;
+  // False when too few baseline years had data. That month then has no
+  // anomalies.
+  bool usable = 5;
+}
+
+// Gridded data for the per-cell tests, written as protojson. The values
+// themselves are separate binary blobs.
+message Grid {
+  string variable_id = 1;
+  string units = 2;
+  trenddetective.common.v1.BBox bbox = 3;
+  int32 rows = 4;
+  int32 cols = 5;
+  // Latitude of each row's center, north first. Length rows.
+  repeated double lats = 6;
+  // Longitude of each column's center, west first. Length cols.
+  repeated double lons = 7;
+  trenddetective.common.v1.TimeStep step = 8;
+  // Start of each time step, in UTC.
+  repeated google.protobuf.Timestamp times = 9;
+  // Little-endian float32 in [time][row][col] order, NaN where missing.
+  // numpy reads it with np.fromfile(f, "<f4").reshape(times, rows, cols).
+  trenddetective.common.v1.BlobRef values = 10;
+  // Anomalies in the same layout. Unset without an anomaly step.
+  trenddetective.common.v1.BlobRef anomalies = 11;
+}
+
+// Which data a slider cube holds.
+enum CubeKind {
+  CUBE_KIND_UNSPECIFIED = 0;
+  CUBE_KIND_VALUES = 1;
+  CUBE_KIND_ANOMALIES = 2;
+}
+
+// Header of a slider cube, written as protojson. The browser downloads the
+// data once and draws any time step locally. A stored value decodes as
+// stored * scale + offset.
+message CubeHeader {
+  string variable_id = 1;
+  string units = 2;
+  CubeKind kind = 3;
+  trenddetective.common.v1.BBox bbox = 4;
+  int32 rows = 5;
+  int32 cols = 6;
+  // Latitude of each row's center, north first.
+  repeated double lats = 7;
+  // Longitude of each column's center, west first.
+  repeated double lons = 8;
+  trenddetective.common.v1.TimeStep step = 9;
+  repeated google.protobuf.Timestamp times = 10;
+  double scale = 11;
+  double offset = 12;
+  // The stored value that means missing. Always 65535.
+  uint32 missing_value = 13;
+  // Suggested color range, in decoded units.
+  double color_min = 14;
+  double color_max = 15;
+  // True for anomalies, which use a diverging scale centered on zero.
+  bool diverging = 16;
+  // Little-endian uint16 in [time][row][col] order.
+  trenddetective.common.v1.BlobRef data = 17;
+}

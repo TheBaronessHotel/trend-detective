@@ -1,0 +1,206 @@
+syntax = "proto3";
+
+// The documents analysis writes to the analysis bucket. The web app and the
+// narrator read them. Slopes are in the variable's units per decade.
+package trenddetective.analysis.v1;
+
+import "google/protobuf/timestamp.proto";
+import "trenddetective/analysis/v1/analysis.proto";
+import "trenddetective/common/v1/common.proto";
+
+// Results for the region-average series, written as protojson. Only the tests
+// in the plan are set.
+message SeriesAnalysis {
+  string variable_id = 1;
+  string units = 2;
+  double alpha = 3;
+  SeriesField field = 4;
+  // Steps with a value.
+  int32 n_valid = 5;
+  // All steps, including missing ones.
+  int32 n_total = 6;
+  RegressionResult regression = 10;
+  MannKendallResult mann_kendall = 11;
+  // Set when both regression and Mann-Kendall ran.
+  Agreement agreement = 12;
+  PettittResult pettitt = 13;
+  ResidualChecksResult residual_checks = 14;
+  OutliersResult outliers = 15;
+  ShuffleResult shuffle = 16;
+  TrendTriangleResult trend_triangle = 17;
+  // January first. Empty unless MonthlyTrends ran.
+  repeated MonthlyTrend monthly_trends = 18;
+  YearsToSignificanceResult years_to_significance = 19;
+  // Plain-language caveats for the user, for example "Only 8 years of data".
+  repeated string warnings = 20;
+}
+
+// Result of Regression.
+message RegressionResult {
+  double slope_per_decade = 1;
+  // Confidence interval for the slope at 1 - alpha.
+  double slope_ci_low = 2;
+  double slope_ci_high = 3;
+  double p_value = 4;
+  bool significant = 5;
+  double r_squared = 6;
+  int32 n = 7;
+  // Sample size after the autocorrelation correction. Equals n without it.
+  double n_effective = 8;
+  // The fitted line, kept so prediction bands can come later without a
+  // contract change.
+  FittedModel model = 9;
+}
+
+// A fitted line y = intercept + slope * t, with t in years since time_origin.
+message FittedModel {
+  google.protobuf.Timestamp time_origin = 1;
+  double intercept = 2;
+  double intercept_stderr = 3;
+  // Per year.
+  double slope = 4;
+  double slope_stderr = 5;
+  // Standard deviation of the residuals.
+  double residual_sd = 6;
+  // Lag-1 autocorrelation of the residuals.
+  double lag1_autocorrelation = 7;
+}
+
+// Result of MannKendall.
+message MannKendallResult {
+  MannKendallVariant variant = 1;
+  double tau = 2;
+  double z = 3;
+  double p_value = 4;
+  bool significant = 5;
+  double sens_slope_per_decade = 6;
+  // Confidence interval for Sen's slope at 1 - alpha.
+  double sens_ci_low = 7;
+  double sens_ci_high = 8;
+  int32 n = 9;
+}
+
+// Whether regression and Mann-Kendall tell the same story. When they don't, a
+// few extreme months are probably driving the regression.
+message Agreement {
+  bool same_direction = 1;
+  bool same_significance = 2;
+}
+
+// Result of Pettitt.
+message PettittResult {
+  // Start of the first step after the change.
+  google.protobuf.Timestamp change_time = 1;
+  double p_value = 2;
+  bool significant = 3;
+  double mean_before = 4;
+  double mean_after = 5;
+}
+
+// Pass or warn, for a diagnostic check.
+enum CheckStatus {
+  CHECK_STATUS_UNSPECIFIED = 0;
+  CHECK_STATUS_PASS = 1;
+  CHECK_STATUS_WARN = 2;
+}
+
+// Result of ResidualChecks.
+message ResidualChecksResult {
+  CheckStatus autocorrelation = 1;
+  double lag1_autocorrelation = 2;
+  CheckStatus normality = 3;
+  double normality_p_value = 4;
+}
+
+// Result of Outliers.
+message OutliersResult {
+  double robust_z_threshold = 1;
+  repeated Outlier outliers = 2;
+  // The record high and low.
+  Outlier highest = 3;
+  Outlier lowest = 4;
+}
+
+// One flagged time step.
+message Outlier {
+  google.protobuf.Timestamp time = 1;
+  double value = 2;
+  double robust_z = 3;
+}
+
+// Result of Shuffle.
+message ShuffleResult {
+  int32 permutations = 1;
+  int32 block_length = 2;
+  double observed_slope_per_decade = 3;
+  // Share of shuffled slopes at least as extreme as the observed one.
+  double p_value = 4;
+  // Every shuffled slope, for the histogram.
+  repeated double shuffled_slopes_per_decade = 5;
+}
+
+// Result of TrendTriangle. The matrices are row-major [start][end], with NaN
+// where the window is shorter than min_years.
+message TrendTriangleResult {
+  int32 min_years = 1;
+  repeated int32 start_years = 2;
+  repeated int32 end_years = 3;
+  repeated double slopes_per_decade = 4;
+  repeated double p_values = 5;
+}
+
+// The trend for one calendar month.
+message MonthlyTrend {
+  // 1 to 12.
+  int32 month = 1;
+  double slope_per_decade = 2;
+  double p_value = 3;
+  bool significant = 4;
+}
+
+// Result of YearsToSignificance, from Weatherhead et al. 1998:
+// n* = [3.3 sd / |trend| * sqrt((1 + phi)/(1 - phi))]^(2/3).
+message YearsToSignificanceResult {
+  // n*, the record length at which this trend would be detected with 90%
+  // probability.
+  double years_needed = 1;
+  double years_so_far = 2;
+  // Standard deviation of the noise.
+  double noise_sd = 3;
+  double trend_per_year = 4;
+  // Lag-1 autocorrelation of the noise.
+  double phi = 5;
+  bool already_significant = 6;
+}
+
+// Per-cell results for the heatmap, written as protojson. Per-cell arrays are
+// row-major [row][col], with row 0 at the north and column 0 at the west.
+message GridAnalysis {
+  string variable_id = 1;
+  string units = 2;
+  double alpha = 3;
+  double fdr_q = 4;
+  trenddetective.common.v1.BBox bbox = 5;
+  int32 rows = 6;
+  int32 cols = 7;
+  // Latitude of each row's center, north first.
+  repeated double lats = 8;
+  // Longitude of each column's center, west first.
+  repeated double lons = 9;
+  // Time steps with a value, per cell.
+  repeated int32 valid_steps = 10;
+  // One layer per grid test.
+  repeated GridLayer layers = 11;
+}
+
+// One grid test's results across all cells.
+message GridLayer {
+  GridTest test = 1;
+  // NaN where a cell has too few valid steps.
+  repeated double slopes_per_decade = 2;
+  repeated double p_values = 3;
+  // After the FDR correction.
+  repeated bool significant = 4;
+  // Largest p-value that still counts as significant after the correction.
+  double p_threshold = 5;
+}
