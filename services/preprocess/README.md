@@ -6,10 +6,9 @@ See the Preprocessing and Regions and grids sections of [ARCHITECTURE.md](../../
 
 ## Status
 
-PRE-1 is in: the service runs, decodes every format ingest produces today, and writes a passthrough result so the walking skeleton works end to end. Still to come:
+PRE-1 (decoders) and PRE-2 (the filter chain) are in. Still to come:
 
-- **PRE-2, the filter chain.** The task's `filters` are logged and skipped, so values go out in the source's units.
-- **PRE-3, aggregation.** A grid becomes a region series by a plain cos(latitude)-weighted mean of its valid pixels. Anomalies per pixel, normals and the N×N sub-regions come with PRE-3.
+- **PRE-3, aggregation.** A grid becomes a region series by a cos(latitude)-weighted mean of its valid pixels, for values and anomalies separately, so the region anomaly is already the mean of the per-pixel anomalies. The N×N sub-regions come with PRE-3; until then the Grid stays at native resolution, capped at `max_grid`.
   - Coverage counts only pixels that have data at least once in the record, so ocean in a land-only product like GLDAS works as a mask instead of failing every month of a coastal rectangle.
   - `Grid.bbox` is the requested rectangle, the same as `Series.bbox`.
 - **PRE-4, the slider cubes.** `value_cube` and `anomaly_cube` stay unset.
@@ -23,6 +22,7 @@ PRE-1 is in: the service runs, decodes every format ingest produces today, and w
 | `src/preprocess/pipeline.py` | One task: cache check, download, decode, trim, write. Knows nothing about NATS |
 | `src/preprocess/canonical.py` | The in-memory form every decoder returns, and the time and axis helpers |
 | `src/preprocess/decoders/` | One module per `ingest.v1.Format` |
+| `src/preprocess/filters/` | The filter chain: the registry and chain checks, the pixel steps, and normals and anomalies |
 | `src/preprocess/output.py` | Builds `Series`, `Grid` and the series CSV |
 | `src/preprocess/storage.py` | S3 through boto3, plus an in-memory store for tests |
 
@@ -36,6 +36,38 @@ Every decoder returns a `Decoded`: an xarray Dataset with a `value` variable (fl
 - Units are the task's `source_units` when set. A file that says otherwise is logged, because the catalog's unit filters are written against `source_units`.
 
 After decoding, the pipeline keeps the steps inside the requested dates and the pixels whose centers fall inside the rectangle. A rectangle smaller than one pixel keeps the pixel it touches.
+
+The time step comes from `RawDataset.step` when ingest set it, as csv-upload does, and otherwise from the spacing of the dates. Monthly series get every month from first to last, with months a source skipped marked missing, so a step's position always says how far apart two steps are.
+
+## The filter chain
+
+The catalog gives each variable an ordered list of steps, and the gateway copies it into every task. The steps act at three points, whatever their place in the list:
+
+1. **Pixel steps** change the values in list order.
+2. **`anomaly`** adds a per-pixel anomaly layer next to the values, which stay as they are.
+3. **`gap_fill_display`** fills `Series.display_values` on the finished region series.
+
+| Step | What it does | Marks missing as |
+|---|---|---|
+| `qc_range{min, max}` | Drops values outside the range. Uses the source's units, so it comes before `linear` | `QC_FAILED` |
+| `linear{scale, offset, units}` | `value × scale + offset`, then renames the units. An unset scale means 1 | |
+| `monthly_mean{min_valid_days}` | The mean of each month's valid days. A weekly value counts as 7 days. Monthly data passes through | `TOO_FEW_DAYS` |
+| `log10` | Units become `log₁₀(<units>)`, as the catalog writes them | `NOT_POSITIVE` |
+| `coarsen{factor}` | Averages blocks of pixels. Point data passes through | |
+| `anomaly{kind, baseline, min_baseline_coverage, method, harmonics}` | The difference from each calendar month's normal, per pixel | |
+| `gap_fill_display{max_gap}` | Draws straight lines across gaps of up to `max_gap` steps (default 2), never at the ends | |
+
+Anomalies:
+- **Baseline:** the step's years, or the whole record, clipped to the data. `Series.baseline` says which were used.
+- **Normals:** the mean of each calendar month, or a fit of `harmonics` sine and cosine pairs (default 2). A month's normal counts only with data in at least `min_baseline_coverage` (default 0.7) of the baseline years it appears in.
+- **Kinds:** absolute (the default); percent, skipped where a normal is under 1% of that pixel's largest monthly normal and refused for temperatures; standardized, skipped where a month's deviation is zero.
+- **Missing anomalies:** a step whose value is missing has no anomaly. A missing anomaly next to a present value always means that calendar month has `usable: false` in `Series.normals`.
+
+Chain checks fail the task with `INVALID_REQUEST`: an empty step, `anomaly`, `monthly_mean` or `gap_fill_display` twice, a pixel step after `anomaly`, or a `qc_range` whose max is below its min or whose limits are both 0. proto3 reads an unset limit as 0, so a `qc_range` needs both limits. One with only `min` set below 0 can't be caught and drops every value above 0.
+
+Daily or weekly data whose chain has no `monthly_mean` gets `monthly_mean{min_valid_days: 20}` before its first step other than `qc_range` or `linear`. Anomalies need calendar months, and a daily user CSV can't say so in the catalog.
+
+`tests/test_catalog.py` runs every chain in `services/gateway/catalog.yaml` on synthetic data and checks the units come out as the catalog shows them, so a catalog change preprocess can't carry out fails CI.
 
 ## Decoders
 
@@ -89,4 +121,5 @@ Logs are `key=value` lines with `time`, `level` and `msg`, plus `job_id`, `task_
 
 - `make test-preprocess` runs what CI's `preprocess` workflow runs, in a few seconds: the lockfile check, ruff with bug rules only, and the unit tests. It needs uv.
 - The unit tests also import the worker and every module in `gen/python`, and check that each `ingest.v1.Format` an adapter can produce has a decoder. A new format in the proto fails that test until it has one.
+- `tests/test_catalog.py` runs every filter chain in the catalog. The workflow also runs when `services/gateway/catalog.yaml` changes.
 - `make smoke`, with the stack up, runs the Delhi bundle through the gateway, ingest and preprocess, then downloads the series and checks it has 528 months.

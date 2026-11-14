@@ -15,7 +15,7 @@ from google.protobuf import json_format
 
 from trenddetective.preprocess.v1 import preprocess_pb2
 
-from . import canonical, decoders, errors, output
+from . import canonical, decoders, errors, filters, output
 from .canonical import Decoded
 from .storage import Storage
 
@@ -24,7 +24,7 @@ PREP_BUCKET = "prep"
 # Changes whenever the documents this code writes could change for the same
 # task, like a new decoder rule or the filter chain arriving. It is part of the
 # cache key, so bumping it makes every cached result stale at once.
-CODE_VERSION = "1"
+CODE_VERSION = "3"
 KEY_VERSION = "preprocess/v1"
 
 RESULT_FILE = "result.json"
@@ -63,13 +63,17 @@ def run(
         return cached, True
 
     dec = decode_all(task, store)
-    for note in dec.notes:
-        logger.warning(note)
-    if task.filters.ops:
-        logger.info("filter chain not applied yet (PRE-2); writing decoded values")
     if not output.has_values(dec):
         raise errors.no_data(
             "NASA has no valid data for this rectangle and these dates.", "every value is missing"
+        )
+    filters.apply(dec, task.filters)
+    for note in dec.notes:
+        logger.warning(note)
+    if not output.has_values(dec):
+        raise errors.no_data(
+            "No value passed the quality checks for this rectangle and these dates.",
+            f"every value is missing after {', '.join(dec.applied)}",
         )
 
     raw = task.raw[0]
@@ -78,6 +82,10 @@ def run(
     if dec.gridded:
         g = output.grid(dec, raw.variable_id, task.aggregation, raw.bbox if raw.HasField("bbox") else None)
         g.grid.values.CopyFrom(store.put(PREP_BUCKET, f"{key}/grid-values.f32", g.values, "application/octet-stream"))
+        if g.anomalies is not None:
+            g.grid.anomalies.CopyFrom(
+                store.put(PREP_BUCKET, f"{key}/grid-anomalies.f32", g.anomalies, "application/octet-stream")
+            )
         result.grid.CopyFrom(_put_json(store, f"{key}/grid.json", g.grid))
 
     series = output.region_series(dec, raw, raw.variable_id, task.aggregation)
@@ -88,7 +96,14 @@ def run(
     _put_json(store, result_key, result)
     logger.info(
         "prepared",
-        extra={"fields": {"steps": len(series.times), "gridded": dec.gridded, "units": dec.units}},
+        extra={
+            "fields": {
+                "steps": len(series.times),
+                "gridded": dec.gridded,
+                "units": dec.units,
+                "chain": ",".join(dec.applied) or "none",
+            }
+        },
     )
     return result, False
 
@@ -108,6 +123,10 @@ def decode_all(task: preprocess_pb2.PreprocessTask, store: Storage) -> Decoded:
             if not paths:
                 raise errors.no_data("No files arrived for this request.", f"raw[{n}] has no files")
             dec = decoder(paths, raw, task.source_units)
+            # Ingest knows the step for sources like csv-upload. Otherwise it
+            # was worked out from the dates.
+            if raw.step:
+                dec.step = raw.step
             data = canonical.trim(dec.data, raw.dates, dec.step)
             data = canonical.clip_bbox(data, raw.bbox if raw.HasField("bbox") else None)
             dec.data = data

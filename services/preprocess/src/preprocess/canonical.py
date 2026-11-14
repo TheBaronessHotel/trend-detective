@@ -11,6 +11,9 @@ every source:
 - ``time`` holds the start of each step in UTC, as naive datetime64;
 - ``lat`` runs north first and ``lon`` west first, in -180 to 180.
 
+After the filter chain, the Dataset can also hold ``anomaly``: float64 over the
+same dims, the per-pixel anomaly. Values stay in ``value``.
+
 Nothing outside preprocess sees this form. The documents other services read
 are Series and Grid, written by output.py.
 """
@@ -24,12 +27,13 @@ import pandas as pd
 import xarray as xr
 
 from trenddetective.common.v1 import common_pb2
-from trenddetective.preprocess.v1 import data_pb2
+from trenddetective.preprocess.v1 import data_pb2, preprocess_pb2
 
 from . import errors
 
 VALUE = "value"
 REASON = "reason"
+ANOMALY = "anomaly"
 
 FILL_VALUE = data_pb2.MISSING_REASON_FILL_VALUE
 
@@ -44,6 +48,18 @@ class Decoded:
     # Things a later step or the provenance log should know, like the units a
     # file declared when they differed from the task's.
     notes: list[str] = field(default_factory=list)
+    # Set by the filter chain. The anomaly step's settings, with the baseline
+    # it actually used, so aggregation can compute the region's normals the
+    # same way. None without an anomaly step.
+    anomaly: preprocess_pb2.Anomaly | None = None
+    # Longest gap gap_fill_display fills, in steps. 0 means no display series.
+    gap_fill_max: int = 0
+    # The steps the chain ran, in order, for the log.
+    applied: list[str] = field(default_factory=list)
+
+    @property
+    def anomalies(self) -> xr.DataArray | None:
+        return self.data[ANOMALY] if ANOMALY in self.data else None
 
     @property
     def gridded(self) -> bool:
@@ -118,6 +134,26 @@ def snap_to_month_start(ds: xr.Dataset) -> xr.Dataset:
     of the step, so monthly times become the 1st at 00:00."""
     times = pd.DatetimeIndex(ds["time"].values).to_period("M").to_timestamp()
     return ds.assign_coords(time=times.values.astype("datetime64[ns]"))
+
+
+def regularize_monthly(ds: xr.Dataset) -> xr.Dataset:
+    """Gives a monthly series every month from its first to its last, so a
+    step's position says how far apart two steps are. Months a source skipped
+    become missing with no known reason.
+
+    Times are first moved to the 1st of their month. Without that, data
+    stamped on another day, like the 15th, would match none of the months
+    and every value would be lost."""
+    if ds.sizes.get("time", 0) == 0:
+        return ds
+    ds = combine([snap_to_month_start(ds)])
+    t = pd.DatetimeIndex(ds["time"].values)
+    full = pd.date_range(t.min(), t.max(), freq="MS")
+    if len(full) == len(t):
+        return ds
+    out = ds.reindex(time=full.values.astype("datetime64[ns]"))
+    out[REASON] = out[REASON].fillna(data_pb2.MISSING_REASON_UNSPECIFIED).astype("int8")
+    return out
 
 
 def date_bounds(r: common_pb2.DateRange) -> tuple[np.datetime64, np.datetime64] | None:
