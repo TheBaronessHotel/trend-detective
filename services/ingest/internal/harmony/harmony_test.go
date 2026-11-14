@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	commonv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/common/v1"
 	gatewayv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/gateway/v1"
@@ -38,6 +39,7 @@ type fakeNASA struct {
 	login     bool
 	// When set, a failed job reports this error message.
 	failWith string
+	cancels  int
 }
 
 func newFakeNASA(t *testing.T) *fakeNASA {
@@ -72,6 +74,9 @@ func (f *fakeNASA) serve(w http.ResponseWriter, r *http.Request) {
 		f.submits++
 		f.lastQuery = r.URL.Query()
 		_ = json.NewEncoder(w).Encode(map[string]any{"jobID": "job-1", "status": "accepted"})
+	case r.URL.Path == "/jobs/job-1/cancel" && r.Method == http.MethodPost:
+		f.cancels++
+		_ = json.NewEncoder(w).Encode(map[string]any{"jobID": "job-1", "status": "canceled"})
 	case r.URL.Path == "/jobs/job-1":
 		status := f.statuses[min(f.polls, len(f.statuses)-1)]
 		f.polls++
@@ -248,6 +253,67 @@ func TestReportsProgress(t *testing.T) {
 	}
 	if reports[4] != "100 Downloading the files from NASA, 2 of 2" {
 		t.Errorf("last report: %q", reports[4])
+	}
+}
+
+// A job NASA can't finish, like the Giovanni averaging that sat at 0% for 15
+// minutes, would hold one of the few Harmony slots for hours.
+func TestTimeLimitStopsAStuckJob(t *testing.T) {
+	h := newHarness(t, Config{MaxWait: 30 * time.Minute})
+	h.nasa.statuses = []string{"running"}
+	start := time.Date(2026, 11, 14, 20, 0, 0, 0, time.UTC)
+	ctx := context.Background()
+
+	h.a.now = func() time.Time { return start }
+	_, err := h.a.Fetch(ctx, task(77), newSink()) // submit
+	wantPending(t, err)
+	h.a.now = func() time.Time { return start.Add(29 * time.Minute) }
+	_, err = h.a.Fetch(ctx, task(77), newSink())
+	wantPending(t, err)
+
+	h.a.now = func() time.Time { return start.Add(31 * time.Minute) }
+	_, err = h.a.Fetch(ctx, task(77), newSink())
+	wantCode(t, err, gatewayv1.ErrorCode_ERROR_CODE_UPSTREAM, false)
+	if msg := core.AsError(err).UserMessage; !strings.Contains(msg, "30 minutes") || !strings.Contains(msg, "shorter date range") {
+		t.Errorf("user message: %q", msg)
+	}
+	if h.nasa.cancels != 1 {
+		t.Errorf("cancelled %d times at NASA, want 1", h.nasa.cancels)
+	}
+	if keys := h.mr.Keys(); len(keys) != 0 {
+		t.Errorf("state or slots left in Redis: %v", keys)
+	}
+}
+
+func TestInWords(t *testing.T) {
+	for d, want := range map[time.Duration]string{
+		40 * time.Minute: "40 minutes",
+		time.Minute:      "1 minute",
+		20 * time.Second: "20 seconds",
+		90 * time.Minute: "90 minutes",
+	} {
+		if got := inWords(d); got != want {
+			t.Errorf("inWords(%s) = %q, want %q", d, got, want)
+		}
+	}
+}
+
+func TestCancelStopsTheHarmonyJob(t *testing.T) {
+	h := newHarness(t, Config{})
+	ctx := context.Background()
+	if err := h.a.Cancel(ctx, task(77)); err != nil || h.nasa.cancels != 0 {
+		t.Fatalf("cancel with no job: %v, %d calls", err, h.nasa.cancels)
+	}
+	_, err := h.a.Fetch(ctx, task(77), newSink())
+	wantPending(t, err)
+	if err := h.a.Cancel(ctx, task(77)); err != nil {
+		t.Fatal(err)
+	}
+	if h.nasa.cancels != 1 {
+		t.Errorf("cancelled %d times at NASA, want 1", h.nasa.cancels)
+	}
+	if keys := h.mr.Keys(); len(keys) != 0 {
+		t.Errorf("state or slots left in Redis: %v", keys)
 	}
 }
 

@@ -81,3 +81,28 @@ func TestWatchStopsWhenTheClientLeaves(t *testing.T) {
 		t.Fatal("Watch kept running after its context ended")
 	}
 }
+
+// A job can sit in NASA's queue for many minutes with nothing to report.
+// Resending it keeps the stream from looking idle to clients and proxies.
+func TestWatchResendsAQuietJob(t *testing.T) {
+	h := newHarness(t)
+	h.o.watchPoll = 10 * time.Millisecond
+	h.o.watchKeepalive = 50 * time.Millisecond
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	job, err := h.o.CreateJob(ctx, spec(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sent := make(chan *gatewayv1.Job, 100)
+	go func() { _ = h.o.Watch(ctx, job.GetId(), func(j *gatewayv1.Job) error { sent <- j; return nil }) }()
+	<-sent
+	select {
+	case again := <-sent:
+		if again.GetId() != job.GetId() {
+			t.Errorf("resent a different job: %v", again.GetId())
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("no keepalive while the job was quiet")
+	}
+}

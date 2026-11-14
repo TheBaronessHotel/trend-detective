@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { Variable } from "@gen/gateway/v1/gateway_pb";
 import { Stage } from "@gen/gateway/v1/task_pb";
 import { Source } from "@gen/ingest/v1/ingest_pb";
-import { JobState } from "@gen/gateway/v1/gateway_pb";
+import { type Job, JobState } from "@gen/gateway/v1/gateway_pb";
 import { errorMessage, gateway, loadSeries, saveSeriesCsv, uploadCsv } from "./api";
 import { DatesPicker } from "./components/DatesPicker";
 import { JobPanel, type Run } from "./components/JobPanel";
@@ -20,6 +20,34 @@ const STOP_AFTER = Stage.PREPROCESS;
 
 // MapLibre is most of the bundle, so the map loads on its own after the page.
 const MapView = lazy(() => import("./components/MapView").then((m) => ({ default: m.MapView })));
+
+/**
+ * Follows a job until it finishes. The stream ends by itself then; if it
+ * drops first, say on a network blip, the job carries on at the gateway, so
+ * this asks for it and watches again, waiting a little longer each time.
+ */
+async function watchUntilFinished(job: Job, signal: AbortSignal, onJob: (j: Job) => void): Promise<Job> {
+  let last = job;
+  for (let failures = 0; ; ) {
+    try {
+      for await (const res of gateway.watchJob({ jobId: job.id }, { signal })) {
+        if (res.job) {
+          last = res.job;
+          failures = 0;
+          onJob(last);
+        }
+      }
+    } catch (err) {
+      if (signal.aborted || ++failures > 8) throw err;
+      await new Promise((r) => setTimeout(r, Math.min(1000 * 2 ** failures, 15_000)));
+    }
+    if (isFinished(last)) return last;
+    // Ended or dropped early: read the job once, then watch again.
+    last = (await gateway.getJob({ jobId: job.id }, { signal })).job ?? last;
+    onJob(last);
+    if (isFinished(last)) return last;
+  }
+}
 
 export function App() {
   const [variables, setVariables] = useState<Variable[]>();
@@ -85,15 +113,7 @@ export function App() {
       );
       if (!job) throw new Error("The gateway started no job.");
       setRun({ phase: "watching", job });
-      let last = job;
-      for await (const res of gateway.watchJob({ jobId: job.id }, { signal })) {
-        if (res.job) {
-          last = res.job;
-          setRun({ phase: "watching", job: last });
-        }
-      }
-      // The stream ends when the job finishes. If it broke off early, ask once.
-      if (!isFinished(last)) last = (await gateway.getJob({ jobId: job.id }, { signal })).job ?? last;
+      const last = await watchUntilFinished(job, signal, (j) => setRun({ phase: "watching", job: j }));
       const hasSeries = last.state === JobState.SUCCEEDED && !!last.results?.preprocess?.series;
       setRun({ phase: "done", job: last, loadingSeries: hasSeries });
       if (!hasSeries) return;
@@ -111,6 +131,17 @@ export function App() {
   }
 
   const seriesTitle = (id: string) => variables?.find((v) => v.id === id)?.name ?? id;
+
+  // The watch ends by itself once the gateway marks the job cancelled.
+  async function stopJob() {
+    const job = run?.job;
+    if (!job) return;
+    try {
+      await gateway.cancelJob({ jobId: job.id });
+    } catch (err) {
+      setRun((r) => (r ? { ...r, error: `Couldn't stop the job. ${errorMessage(err)}` } : r));
+    }
+  }
 
   function saveCsv() {
     const job = run?.job;
@@ -156,7 +187,7 @@ export function App() {
         <Suspense fallback={<div className="map-wrap" />}>
           <MapView box={box} onBox={setBox} />
         </Suspense>
-        <JobPanel run={run} stopAfter={STOP_AFTER} seriesTitle={seriesTitle} onSaveCsv={saveCsv} />
+        <JobPanel run={run} stopAfter={STOP_AFTER} seriesTitle={seriesTitle} onSaveCsv={saveCsv} onStop={stopJob} />
       </main>
     </div>
   );

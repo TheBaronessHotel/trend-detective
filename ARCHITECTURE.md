@@ -136,10 +136,11 @@ Result messages hold only `BlobRef`s. The documents themselves are protojson fil
 - `ListVariables`
 - `CreateJob`: variable, rectangle, dates, source, stages to run, filter chain, test list
 - `GetJob`, plus `WatchJob` as a stream
+- `CancelJob`: stops a job, and its Harmony job at NASA
 - `GetResultURL`: presigned JSON or CSV
 - `CreateUploadURL`: presigned PUT for CSV uploads
 - `Narrate`: a stream that takes the job, the question and the chat history
-- `GetQuota`
+- `GetQuota`: the Giovanni quota used, and Harmony jobs running against the limit
 
 ## Data sources
 
@@ -153,7 +154,7 @@ Each source is an ingest adapter, chosen per request. Each catalog entry sets it
 | `power` | Point JSON | NASA POWER, no login. The gateway sets the point to the middle of the rectangle |
 | `csv-upload` | User CSV | The user's own data, or exports from Giovanni, Hydrology Time Series and AppEEARS. Ingest checks the file, stores a cleaned-up `date,value` copy and finds the time step. Catalog entry `user-csv` |
 | `bundle` | Files shipped with the app | Offline demos and the video recording |
-| `appeears` | MODIS NDVI and land surface temperature | Later |
+| `appeears` | Area-average CSV | NASA AppEEARS: 1 km MODIS plant greenness (NDVI, monthly) and daytime ground temperature (8-day), averaged over the rectangle. Logs in with an Earthdata username and password. Queued, so a job takes minutes |
 
 - Earthdata login uses the team's token from an env var by default. Users can paste their own token to use their own quota.
 - Each catalog entry carries `grid: true/false`. Series-only sources hide the slider and heatmap.
@@ -223,6 +224,7 @@ Settings are env vars per service, set in `compose.yaml` and read from `.env`. T
 |---|---|
 | `TASK_CAP` | 256 |
 | `HARMONY_CONCURRENCY` | 4. Harmony jobs in flight per Earthdata token |
+| `HARMONY_MAX_WAIT` | `40m`. A Harmony job NASA hasn't finished by then is cancelled and the task fails |
 | `QUOTA_CUTOFF` | 0.9 |
 | `MAX_GRANULES` | 1000 |
 | `MAX_GRID` | 128 |
@@ -294,7 +296,6 @@ Each service has its own Dockerfile in its folder. Compose builds with the repo 
 ## Later, not a priority
 
 - Dynamic regression and prediction. The model parameters are already in the results.
-- The AppEEARS adapter for MODIS NDVI and land surface temperature.
 - Polygon regions. HOSS already accepts shapes.
 - Images on GHCR.
 - Demo cases for the video. Candidates:

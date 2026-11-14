@@ -17,6 +17,7 @@ The service is hexagonal: the core knows nothing about NATS or S3, and each side
 | `internal/csvupload` | The `csv-upload` adapter |
 | `internal/earthdata` | Picks a task's Earthdata token: the user's own if the gateway stored one, else the team's |
 | `internal/power` | The `power` adapter |
+| `internal/appeears` | The `appeears` adapter |
 | `bundle/` | Datasets shipped with the app. See [bundle/README.md](bundle/README.md) |
 
 To add a source, write a `core.Adapter` and pass it to `core.New` in `cmd/ingest`. An adapter:
@@ -43,7 +44,7 @@ Asks NASA Harmony's HOSS service for the task's variables, rectangle and dates, 
    - Count the granules in CMR. Zero fails with `NO_DATA`, and more than the task's `max_granules` fails with `TOO_LARGE`.
    - Take one of the token's `HARMONY_CONCURRENCY` slots. If none is free, check again in 30 seconds.
    - Submit with `forceAsync=true&skipPreview=true`, save the job ID, and check again in 10 seconds.
-2. **Running.** Check again in 15 seconds.
+2. **Running.** Check again in 15 seconds. If NASA is still working after `HARMONY_MAX_WAIT` (40 minutes), cancel the job at Harmony, free the slot, and fail with `UPSTREAM` and a message to try again or ask for less. A stalled job would otherwise hold one of the few slots for hours.
 3. **Done.** Free the slot, then download every output file, 4 at a time. Each file carries the dates its granule covers.
 4. **Failed.** Free the slot and report `UPSTREAM`.
 
@@ -123,7 +124,18 @@ Fetches NASA POWER monthly means for one point, with no login. The gateway sets 
 - Any other error publishes a `StageDone` with a `TaskError` and acks.
 - Failed attempts are counted in Redis, not by JetStream. Every Harmony poll is a JetStream delivery too, so the consumer's delivery limit is only a ceiling, at 2000.
 - While a task runs, the worker sends a heartbeat every third of `INGEST_ACK_WAIT`, so a long download isn't redelivered.
+- Before each delivery it checks the job's cancel flag, `td:job:{<id>}:canceled`, which the gateway raises on `CancelJob`. For a cancelled job it asks the adapter to stop what it has running, so the Harmony adapter cancels the job at NASA and frees the slot, then drops the message without a `StageDone`. The gateway has already settled the task.
 - It also publishes `TaskProgress` on `events.task.progress`: once on a task's first delivery, then whatever the adapter reports through `core.ReportProgress`, at most every 2 seconds, plus the newest update before a task goes back to wait. The Harmony adapter reports Harmony's own percent while NASA works, then a count of files as it downloads them. Other adapters report nothing yet, and the app shows elapsed time for them instead.
+
+## appeears
+
+Asks NASA AppEEARS for one MODIS layer over the rectangle and dates, and keeps the mean over the rectangle for each date. Serves `vegetation-modis` (MOD13A3 monthly NDVI) and `land-surface-temperature-modis` (MOD11A2 8-day daytime ground temperature), both at 1 km.
+
+- AppEEARS doesn't take Earthdata tokens. It logs in with an Earthdata username and password, `EARTHDATA_USERNAME` and `EARTHDATA_PASSWORD`, and hands back its own token. That's cached in Redis under `td:ingest:appeears:token` until an hour before it expires, and dropped and renewed if AppEEARS rejects it.
+- It submits an area request: the rectangle as a GeoJSON polygon, the dates as `MM-DD-YYYY`, one product and layer, NetCDF output. It then polls like Harmony, every 30 seconds, keeping the task ID in `td:ingest:appeears:task:<cache key>`. AppEEARS takes requests in turn, so a job waits in line first; a two-year request near Delhi took 3 to 13 minutes. Its progress steps (initializing, downloading, subsetting, generating files) become `TaskProgress`.
+- When the request is done, it downloads only `<product>-Statistics.csv`, which AppEEARS writes for every area request: per date, the pixel count, mean, spread and quartiles, already scaled. It keeps `Date` and `Mean` for the requested layer, treats a count of 0 as missing, and stores the result as the same cleaned `date,value` CSV as an upload, with `FORMAT_USER_CSV` and the time step found from the dates. 8-day composites count as weekly; the catalog's `monthly_mean` averages them into months.
+- A request still unfinished after `APPEEARS_MAX_WAIT` (2 hours) is deleted at AppEEARS and the task fails. `CancelJob` deletes it too.
+- Wrong credentials are `UNAUTHENTICATED`, with a message naming the two settings. A rectangle with no valid pixel on any date, such as one over water, is `NO_DATA`.
 
 ## Settings
 
@@ -132,10 +144,14 @@ Fetches NASA POWER monthly means for one point, with no login. The gateway sets 
 | `NATS_URL`, `REDIS_URL`, `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | required | Set by compose |
 | `EARTHDATA_TOKEN` | empty | The team's token, from `.env`. Without it, Harmony and Giovanni tasks fail unless the user gave their own |
 | `HARMONY_CONCURRENCY` | 4 | Harmony jobs in flight per token |
+| `HARMONY_MAX_WAIT` | `40m` | How long NASA may work on a Harmony job before it's cancelled. Downloading afterwards doesn't count |
 | `HARMONY_URL` | `https://harmony.earthdata.nasa.gov` | |
 | `CMR_URL` | `https://cmr.earthdata.nasa.gov` | |
 | `POWER_URL` | `https://power.larc.nasa.gov` | |
 | `GIOVANNI_URL` | `https://api.giovanni.earthdata.nasa.gov` | For `giovanni-point` |
+| `EARTHDATA_USERNAME`, `EARTHDATA_PASSWORD` | empty | An Earthdata Login account, from `.env`, for AppEEARS. Without them, AppEEARS tasks fail |
+| `APPEEARS_URL` | `https://appeears.earthdatacloud.nasa.gov/api` | |
+| `APPEEARS_MAX_WAIT` | `2h` | How long AppEEARS may queue and process a request before it's deleted |
 | `MAX_UPLOAD_MB` | 20 | Largest CSV upload. Keep it the same as the gateway's |
 | `BUNDLE_DIR` | `/bundle` | Compose mounts `services/ingest/bundle` here |
 | `INGEST_CONCURRENCY` | 4 | Tasks in flight at once |

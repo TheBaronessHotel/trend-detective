@@ -10,6 +10,7 @@ import (
 	"time"
 
 	gatewayv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/gateway/v1"
+	"github.com/TheBaronessHotel/trend-detective/internal/jobcancel"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -102,6 +103,7 @@ var recordDoneScript = redis.NewScript(`
 local done, tasks, stage, job = KEYS[1], KEYS[2], KEYS[3], KEYS[4]
 local task_id, done_json, status_json, outcome, now, ttl = ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5], ARGV[6]
 if redis.call('EXISTS', job) == 0 then return {-1, -1} end
+if redis.call('HGET', job, 'state') == 'JOB_STATE_CANCELED' then return {-2, -2} end
 if redis.call('HSETNX', done, task_id, done_json) == 1 then
   redis.call('HSET', tasks, task_id, status_json)
   redis.call('HINCRBY', stage, 'finished', 1)
@@ -136,8 +138,11 @@ func (s *Store) recordDone(ctx context.Context, d *gatewayv1.StageDone, status *
 	if err != nil {
 		return 0, 0, err
 	}
-	if res[0] < 0 {
+	switch res[0] {
+	case -1:
 		return 0, 0, ErrNotFound
+	case -2:
+		return 0, 0, errCanceled
 	}
 	return res[0], res[1], nil
 }
@@ -204,6 +209,7 @@ func (s *Store) recordProgress(ctx context.Context, p *gatewayv1.TaskProgress, n
 var addStageScript = redis.NewScript(`
 local job, tasks, stage = KEYS[1], KEYS[2], KEYS[3]
 local n, stage_num, now, ttl = ARGV[1], ARGV[2], ARGV[3], ARGV[4]
+if redis.call('HGET', job, 'state') == 'JOB_STATE_CANCELED' then return -1 end
 if redis.call('HSETNX', stage, 'total', n) == 0 then return 0 end
 redis.call('HSET', stage, 'finished', 0)
 redis.call('PEXPIRE', stage, ttl)
@@ -225,6 +231,9 @@ func (s *Store) addStage(ctx context.Context, id string, stage int32, tasks []*g
 		args = append(args, t.GetMeta().GetTaskId(), b)
 	}
 	created, err := addStageScript.Run(ctx, s.rdb, []string{jobKey(id), tasksKey(id), stageKey(id, stage)}, args...).Int()
+	if created < 0 {
+		return false, errCanceled
+	}
 	return created == 1, err
 }
 
@@ -233,14 +242,84 @@ func (s *Store) finish(ctx context.Context, id string, state gatewayv1.JobState,
 	return s.setResults(ctx, id, results, now, "state", state.String())
 }
 
-// setResults stores the job's results so far, plus any extra fields.
+// setResultsScript writes job fields unless the job was cancelled, so a
+// stage finishing late can't turn a cancelled job into a finished one.
+var setResultsScript = redis.NewScript(`
+if redis.call('HGET', KEYS[1], 'state') == 'JOB_STATE_CANCELED' then return 0 end
+redis.call('HSET', KEYS[1], unpack(ARGV))
+return 1
+`)
+
+// setResults stores the job's results so far, plus any extra fields. It
+// changes nothing on a cancelled job.
 func (s *Store) setResults(ctx context.Context, id string, results *gatewayv1.JobResults, now time.Time, extra ...any) error {
 	b, err := marshal.Marshal(results)
 	if err != nil {
 		return err
 	}
 	fields := append([]any{"results", b, "updated_at", now.UTC().Format(time.RFC3339Nano)}, extra...)
-	return s.rdb.HSet(ctx, jobKey(id), fields...).Err()
+	return setResultsScript.Run(ctx, s.rdb, []string{jobKey(id)}, fields...).Err()
+}
+
+// cancel marks a job cancelled, and its unfinished tasks with it, and raises
+// the flag stages check. It reports whether it changed anything: a job that
+// already finished stays as it is.
+func (s *Store) cancel(ctx context.Context, id string, now time.Time) (bool, error) {
+	at := now.UTC().Format(time.RFC3339Nano)
+	changed := false
+	update := func(tx *redis.Tx) error {
+		changed = false
+		state, err := tx.HGet(ctx, jobKey(id), "state").Result()
+		if errors.Is(err, redis.Nil) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		if isFinal(gatewayv1.JobState(gatewayv1.JobState_value[state])) {
+			return nil
+		}
+		raw, err := tx.HGetAll(ctx, tasksKey(id)).Result()
+		if err != nil {
+			return err
+		}
+		tasks := map[string]any{}
+		for taskID, r := range raw {
+			t := &gatewayv1.TaskStatus{}
+			if err := unmarshal.Unmarshal([]byte(r), t); err != nil {
+				return fmt.Errorf("decode task: %w", err)
+			}
+			if t.GetState() == gatewayv1.TaskState_TASK_STATE_SUCCEEDED || t.GetState() == gatewayv1.TaskState_TASK_STATE_FAILED {
+				continue
+			}
+			t.State = gatewayv1.TaskState_TASK_STATE_CANCELED
+			t.FinishedAt = timestamppb.New(now)
+			t.Activity = ""
+			b, err := marshal.Marshal(t)
+			if err != nil {
+				return err
+			}
+			tasks[taskID] = b
+		}
+		_, err = tx.TxPipelined(ctx, func(p redis.Pipeliner) error {
+			p.HSet(ctx, jobKey(id), "state", gatewayv1.JobState_JOB_STATE_CANCELED.String(), "updated_at", at)
+			if len(tasks) > 0 {
+				p.HSet(ctx, tasksKey(id), tasks)
+			}
+			p.Set(ctx, jobcancel.Key(id), "1", s.ttl)
+			return nil
+		})
+		changed = err == nil
+		return err
+	}
+	// A StageDone landing in between changes the job; read it again.
+	for range 3 {
+		err := s.rdb.Watch(ctx, update, jobKey(id), tasksKey(id))
+		if !errors.Is(err, redis.TxFailedErr) {
+			return changed, err
+		}
+	}
+	return false, redis.TxFailedErr
 }
 
 // stageDones returns every StageDone recorded for a stage, by task ID.

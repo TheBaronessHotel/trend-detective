@@ -30,6 +30,7 @@ class JobState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     JOB_STATE_RUNNING: _ClassVar[JobState]
     JOB_STATE_SUCCEEDED: _ClassVar[JobState]
     JOB_STATE_FAILED: _ClassVar[JobState]
+    JOB_STATE_CANCELED: _ClassVar[JobState]
 
 class TaskState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -38,6 +39,7 @@ class TaskState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     TASK_STATE_RUNNING: _ClassVar[TaskState]
     TASK_STATE_SUCCEEDED: _ClassVar[TaskState]
     TASK_STATE_FAILED: _ClassVar[TaskState]
+    TASK_STATE_CANCELED: _ClassVar[TaskState]
 
 class Artifact(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -57,11 +59,13 @@ JOB_STATE_PENDING: JobState
 JOB_STATE_RUNNING: JobState
 JOB_STATE_SUCCEEDED: JobState
 JOB_STATE_FAILED: JobState
+JOB_STATE_CANCELED: JobState
 TASK_STATE_UNSPECIFIED: TaskState
 TASK_STATE_QUEUED: TaskState
 TASK_STATE_RUNNING: TaskState
 TASK_STATE_SUCCEEDED: TaskState
 TASK_STATE_FAILED: TaskState
+TASK_STATE_CANCELED: TaskState
 ARTIFACT_UNSPECIFIED: Artifact
 ARTIFACT_SERIES: Artifact
 ARTIFACT_SERIES_CSV: Artifact
@@ -203,6 +207,18 @@ class GetJobRequest(_message.Message):
     def __init__(self, job_id: _Optional[str] = ...) -> None: ...
 
 class GetJobResponse(_message.Message):
+    __slots__ = ("job",)
+    JOB_FIELD_NUMBER: _ClassVar[int]
+    job: Job
+    def __init__(self, job: _Optional[_Union[Job, _Mapping]] = ...) -> None: ...
+
+class CancelJobRequest(_message.Message):
+    __slots__ = ("job_id",)
+    JOB_ID_FIELD_NUMBER: _ClassVar[int]
+    job_id: str
+    def __init__(self, job_id: _Optional[str] = ...) -> None: ...
+
+class CancelJobResponse(_message.Message):
     __slots__ = ("job",)
     JOB_FIELD_NUMBER: _ClassVar[int]
     job: Job

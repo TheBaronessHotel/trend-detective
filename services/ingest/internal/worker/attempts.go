@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/TheBaronessHotel/trend-detective/internal/jobcancel"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -44,4 +45,15 @@ func (r *RedisAttempts) Failed(ctx context.Context, taskID string) (int, error) 
 // Clear implements Attempts.
 func (r *RedisAttempts) Clear(ctx context.Context, taskID string) error {
 	return r.rdb.Del(ctx, attemptsKey(taskID)).Err()
+}
+
+// RedisCancels reads the cancel flag the gateway raises in Redis.
+type RedisCancels struct{ rdb *redis.Client }
+
+// NewRedisCancels returns a Cancels backed by rdb.
+func NewRedisCancels(rdb *redis.Client) RedisCancels { return RedisCancels{rdb: rdb} }
+
+// Canceled implements Cancels.
+func (c RedisCancels) Canceled(ctx context.Context, jobID string) (bool, error) {
+	return jobcancel.Canceled(ctx, c.rdb, jobID)
 }

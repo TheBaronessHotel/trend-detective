@@ -34,6 +34,8 @@ const (
 	GatewayServiceGetJobProcedure = "/trenddetective.gateway.v1.GatewayService/GetJob"
 	// GatewayServiceWatchJobProcedure is the procedure name of the GatewayService's WatchJob RPC.
 	GatewayServiceWatchJobProcedure = "/trenddetective.gateway.v1.GatewayService/WatchJob"
+	// GatewayServiceCancelJobProcedure is the procedure name of the GatewayService's CancelJob RPC.
+	GatewayServiceCancelJobProcedure = "/trenddetective.gateway.v1.GatewayService/CancelJob"
 	// GatewayServiceGetResultURLProcedure is the procedure name of the GatewayService's GetResultURL
 	// RPC.
 	GatewayServiceGetResultURLProcedure = "/trenddetective.gateway.v1.GatewayService/GetResultURL"
@@ -73,6 +75,13 @@ var (
 			StreamType: connect.StreamTypeServer,
 			Schema:     v1.File_trenddetective_gateway_v1_gateway_proto.Services().ByName("GatewayService").Methods().ByName("WatchJob"),
 			Procedure:  GatewayServiceWatchJobProcedure,
+		}
+	})
+	gatewayServiceCancelJobSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_trenddetective_gateway_v1_gateway_proto.Services().ByName("GatewayService").Methods().ByName("CancelJob"),
+			Procedure:  GatewayServiceCancelJobProcedure,
 		}
 	})
 	gatewayServiceGetResultURLSpec = sync.OnceValue(func() connect.Spec {
@@ -115,6 +124,9 @@ type GatewayServiceClient interface {
 	GetJob(context.Context, *v1.GetJobRequest) (*v1.GetJobResponse, error)
 	// Streams the job each time it changes, until it finishes.
 	WatchJob(context.Context, *v1.WatchJobRequest) (GatewayServiceWatchJobClientStream, error)
+	// Stops a job that hasn't finished. Its running Harmony job is cancelled at
+	// NASA and its slot freed. A finished job is returned unchanged.
+	CancelJob(context.Context, *v1.CancelJobRequest) (*v1.CancelJobResponse, error)
 	// A presigned download URL for one of a finished job's outputs.
 	GetResultURL(context.Context, *v1.GetResultURLRequest) (*v1.GetResultURLResponse, error)
 	// A presigned upload URL for a user CSV.
@@ -183,6 +195,9 @@ type GatewayServiceHandler interface {
 	GetJob(context.Context, *v1.GetJobRequest) (*v1.GetJobResponse, error)
 	// Streams the job each time it changes, until it finishes.
 	WatchJob(context.Context, *v1.WatchJobRequest, GatewayServiceWatchJobServerStream) error
+	// Stops a job that hasn't finished. Its running Harmony job is cancelled at
+	// NASA and its slot freed. A finished job is returned unchanged.
+	CancelJob(context.Context, *v1.CancelJobRequest) (*v1.CancelJobResponse, error)
 	// A presigned download URL for one of a finished job's outputs.
 	GetResultURL(context.Context, *v1.GetResultURLRequest) (*v1.GetResultURLResponse, error)
 	// A presigned upload URL for a user CSV.
@@ -203,6 +218,7 @@ func RegisterGatewayServiceHandler(server *connect.Server, svc GatewayServiceHan
 		connect.Method{Spec: gatewayServiceCreateJobSpec(), Handler: adapter.createJob},
 		connect.Method{Spec: gatewayServiceGetJobSpec(), Handler: adapter.getJob},
 		connect.Method{Spec: gatewayServiceWatchJobSpec(), Handler: adapter.watchJob},
+		connect.Method{Spec: gatewayServiceCancelJobSpec(), Handler: adapter.cancelJob},
 		connect.Method{Spec: gatewayServiceGetResultURLSpec(), Handler: adapter.getResultURL},
 		connect.Method{Spec: gatewayServiceCreateUploadURLSpec(), Handler: adapter.createUploadURL},
 		connect.Method{Spec: gatewayServiceNarrateSpec(), Handler: adapter.narrate},
@@ -259,6 +275,10 @@ func (UnimplementedGatewayServiceHandler) WatchJob(context.Context, *v1.WatchJob
 	return connect.NewError(connect.CodeUnimplemented, "trenddetective.gateway.v1.GatewayService.WatchJob is not implemented")
 }
 
+func (UnimplementedGatewayServiceHandler) CancelJob(context.Context, *v1.CancelJobRequest) (*v1.CancelJobResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "trenddetective.gateway.v1.GatewayService.CancelJob is not implemented")
+}
+
 func (UnimplementedGatewayServiceHandler) GetResultURL(context.Context, *v1.GetResultURLRequest) (*v1.GetResultURLResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "trenddetective.gateway.v1.GatewayService.GetResultURL is not implemented")
 }
@@ -309,6 +329,14 @@ func (c *gatewayServiceClient) WatchJob(ctx context.Context, req *v1.WatchJobReq
 		return GatewayServiceWatchJobClientStream{}, err
 	}
 	return GatewayServiceWatchJobClientStream{stream: stream}, nil
+}
+
+func (c *gatewayServiceClient) CancelJob(ctx context.Context, req *v1.CancelJobRequest) (*v1.CancelJobResponse, error) {
+	var res v1.CancelJobResponse
+	if err := c.client.CallUnary(ctx, gatewayServiceCancelJobSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
 }
 
 func (c *gatewayServiceClient) GetResultURL(ctx context.Context, req *v1.GetResultURLRequest) (*v1.GetResultURLResponse, error) {
@@ -387,6 +415,18 @@ func (h gatewayServiceHandler) watchJob(ctx context.Context, _ connect.Spec, str
 		return err
 	}
 	return h.svc.WatchJob(ctx, &req, GatewayServiceWatchJobServerStream{stream: stream})
+}
+
+func (h gatewayServiceHandler) cancelJob(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.CancelJobRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.CancelJob(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
 }
 
 func (h gatewayServiceHandler) getResultURL(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {

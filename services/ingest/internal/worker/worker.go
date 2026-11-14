@@ -64,11 +64,17 @@ type Attempts interface {
 	Clear(ctx context.Context, taskID string) error
 }
 
+// Cancels says whether a task's job has been cancelled.
+type Cancels interface {
+	Canceled(ctx context.Context, jobID string) (bool, error)
+}
+
 // Worker consumes tasks.ingest.
 type Worker struct {
 	js       jetstream.JetStream
 	svc      *core.Service
 	attempts Attempts
+	cancels  Cancels
 	log      logging.Logger
 	kit      *redkit.Kit
 	scope    tracing.Scope
@@ -77,11 +83,12 @@ type Worker struct {
 }
 
 // New returns a Worker.
-func New(js jetstream.JetStream, svc *core.Service, attempts Attempts, util *observability.Utility, kit *redkit.Kit, cfg Config) *Worker {
+func New(js jetstream.JetStream, svc *core.Service, attempts Attempts, cancels Cancels, util *observability.Utility, kit *redkit.Kit, cfg Config) *Worker {
 	return &Worker{
 		js:       js,
 		svc:      svc,
 		attempts: attempts,
+		cancels:  cancels,
 		log:      util.Logger.With("component", "worker"),
 		kit:      kit,
 		scope:    tracing.Scope{Manager: util.TracerManager, TracerName: tracerName},
@@ -148,6 +155,9 @@ func (w *Worker) handle(ctx context.Context, msg jetstream.Msg) {
 	}
 	meta := task.GetMeta()
 	ctx = obs.WithTask(ctx, meta.GetJobId(), meta.GetTaskId())
+	if w.dropCanceled(ctx, msg, task) {
+		return
+	}
 	operation := sources.Name(core.SourceOf(task.GetIngest()))
 	failures, err := w.attempts.Count(ctx, meta.GetTaskId())
 	if err != nil {
@@ -246,6 +256,31 @@ func (w *Worker) backoff(attempt int) time.Duration {
 		return 10 * time.Second
 	}
 	return w.cfg.Backoff[min(attempt-1, len(w.cfg.Backoff)-1)]
+}
+
+// dropCanceled stops a task whose job was cancelled: whatever its adapter has
+// running at NASA is cancelled too, and the message is dropped without a
+// StageDone, since the gateway has already settled the task. If the flag
+// can't be read, the task carries on.
+func (w *Worker) dropCanceled(ctx context.Context, msg jetstream.Msg, task *gatewayv1.Task) bool {
+	if w.cancels == nil {
+		return false
+	}
+	canceled, err := w.cancels.Canceled(ctx, task.GetMeta().GetJobId())
+	if err != nil {
+		w.log.Warn(ctx, "couldn't read the cancel flag", logging.Err(err))
+		return false
+	}
+	if !canceled {
+		return false
+	}
+	if err := w.svc.Cancel(ctx, task.GetIngest()); err != nil {
+		w.log.Warn(ctx, "couldn't stop the task's work at NASA", logging.Err(err))
+	}
+	_ = w.attempts.Clear(ctx, task.GetMeta().GetTaskId())
+	_ = msg.Term()
+	w.log.Info(ctx, "dropped a task of a cancelled job")
+	return true
 }
 
 // reporter publishes TaskProgress for one delivery of a task. It's best effort:

@@ -95,6 +95,21 @@ func New(store Store, adapters ...Adapter) *Service {
 
 // Ingest fetches the task's data, or returns the copy already in the raw
 // bucket. cacheHit reports which one happened.
+// Canceler is an adapter with work running elsewhere, such as a Harmony job,
+// that it can stop when the task's job is cancelled.
+type Canceler interface {
+	Cancel(ctx context.Context, task *ingestv1.IngestTask) error
+}
+
+// Cancel stops whatever the task's adapter has running for it. Adapters with
+// nothing running elsewhere have nothing to stop.
+func (s *Service) Cancel(ctx context.Context, task *ingestv1.IngestTask) error {
+	if c, ok := s.adapters[SourceOf(task)].(Canceler); ok {
+		return c.Cancel(ctx, task)
+	}
+	return nil
+}
+
 func (s *Service) Ingest(ctx context.Context, task *ingestv1.IngestTask) (ds *ingestv1.RawDataset, cacheHit bool, err error) {
 	source := SourceOf(task)
 	adapter, ok := s.adapters[source]

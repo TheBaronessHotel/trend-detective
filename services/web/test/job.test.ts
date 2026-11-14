@@ -91,6 +91,17 @@ describe("stageViews", () => {
     expect(stageViews(j, Stage.INGEST)[0]?.percent).toBe(75);
   });
 
+  test("a cancelled task shows as stopped", () => {
+    const views = stageViews(
+      job([
+        { stage: Stage.INGEST, state: TaskState.SUCCEEDED },
+        { stage: Stage.PREPROCESS, state: TaskState.CANCELED },
+      ]),
+      Stage.PREPROCESS,
+    );
+    expect(views.map((v) => v.state)).toEqual(["done", "stopped"]);
+  });
+
   test("some tasks done and some queued is running", () => {
     const views = stageViews(
       job([
@@ -106,5 +117,6 @@ describe("stageViews", () => {
 test("isFinished", () => {
   expect(isFinished(undefined)).toBe(false);
   expect(isFinished(create(JobSchema, { state: JobState.RUNNING }))).toBe(false);
+  expect(isFinished(create(JobSchema, { state: JobState.CANCELED }))).toBe(true);
   expect(isFinished(create(JobSchema, { state: JobState.FAILED }))).toBe(true);
 });

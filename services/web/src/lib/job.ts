@@ -5,7 +5,7 @@ import { JobState, TaskState } from "@gen/gateway/v1/gateway_pb";
 import { Stage } from "@gen/gateway/v1/task_pb";
 import { timestampMs } from "@bufbuild/protobuf/wkt";
 
-export type StepState = "waiting" | "running" | "done" | "failed";
+export type StepState = "waiting" | "running" | "done" | "failed" | "stopped";
 
 export interface StageView {
   stage: Stage;
@@ -36,7 +36,7 @@ const stageLabels: Record<number, string> = {
 const order = [Stage.INGEST, Stage.PREPROCESS, Stage.ANALYSIS];
 
 export function isFinished(job: Job | undefined): boolean {
-  return job?.state === JobState.SUCCEEDED || job?.state === JobState.FAILED;
+  return job?.state === JobState.SUCCEEDED || job?.state === JobState.FAILED || job?.state === JobState.CANCELED;
 }
 
 // Only ingest reports when a task starts, so a task the gateway lists as
@@ -46,6 +46,7 @@ function stateOf(tasks: TaskStatus[]): StepState {
   if (tasks.length === 0) return "waiting";
   if (tasks.some((t) => t.state === TaskState.FAILED)) return "failed";
   if (tasks.every((t) => t.state === TaskState.SUCCEEDED)) return "done";
+  if (tasks.some((t) => t.state === TaskState.CANCELED)) return "stopped";
   return "running";
 }
 

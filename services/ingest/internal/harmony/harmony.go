@@ -16,8 +16,6 @@ package harmony
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,6 +32,7 @@ import (
 	commonv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/common/v1"
 	gatewayv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/gateway/v1"
 	ingestv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/ingest/v1"
+	"github.com/TheBaronessHotel/trend-detective/internal/harmonyslots"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/core"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/earthdata"
 	"github.com/redis/go-redis/v9"
@@ -61,10 +60,7 @@ const (
 	submitCheck = 10 * time.Second
 	pollEvery   = 15 * time.Second
 	slotWait    = 30 * time.Second
-	// A slot older than this is assumed abandoned, for example by a task
-	// that expired, and is freed.
-	slotStale = 6 * time.Hour
-	stateTTL  = 24 * time.Hour
+	stateTTL    = 24 * time.Hour
 )
 
 // Config holds the adapter's settings.
@@ -79,6 +75,10 @@ type Config struct {
 	Concurrency int
 	// Files downloaded at once per job.
 	Downloads int
+	// How long NASA may work on a job before it's cancelled and the task
+	// fails. Downloading afterwards doesn't count. HARMONY_MAX_WAIT; zero
+	// means no limit.
+	MaxWait time.Duration
 }
 
 // Adapter implements core.Adapter for SOURCE_HARMONY_SUBSET, or for
@@ -89,6 +89,7 @@ type Adapter struct {
 	tokens *earthdata.Tokens
 	http   *http.Client
 	mode   mode
+	now    func() time.Time
 }
 
 // errLogin means Earthdata sent us to its login page, which happens when the
@@ -110,6 +111,7 @@ func NewAreaAverage(cfg Config, rdb *redis.Client) *Adapter {
 
 func newAdapter(cfg Config, rdb *redis.Client, m mode) *Adapter {
 	return &Adapter{
+		now:    time.Now,
 		cfg:    cfg,
 		rdb:    rdb,
 		tokens: earthdata.NewTokens(rdb, cfg.TeamToken),
@@ -184,8 +186,80 @@ func (a *Adapter) Fetch(ctx context.Context, task *ingestv1.IngestTask, sink cor
 		_ = a.rdb.Del(ctx, stateKey).Err()
 		return nil, failure(job, req.collection)
 	}
+	if waited := a.waited(ctx, stateKey); a.cfg.MaxWait > 0 && waited > a.cfg.MaxWait {
+		a.stop(ctx, token, jobID, req.key, stateKey)
+		return nil, core.Errorf(gatewayv1.ErrorCode_ERROR_CODE_UPSTREAM, false,
+			fmt.Sprintf("NASA's service worked on this for more than %s without finishing, so it was stopped. Try again, or pick a shorter date range or a smaller rectangle.", inWords(a.cfg.MaxWait)),
+			"Harmony job %s still %s at %d%% after %s", jobID, job.Status, job.Progress, waited.Round(time.Second))
+	}
 	core.ReportProgress(ctx, job.Progress, a.mode.working())
 	return nil, core.Pending(pollEvery, fmt.Sprintf("Harmony job %s is %s, %d%%", jobID, job.Status, job.Progress))
+}
+
+// inWords says a duration for people: "40 minutes", "1 minute", "20 seconds".
+func inWords(d time.Duration) string {
+	if d < time.Minute {
+		return plural(int(d.Round(time.Second).Seconds()), "second")
+	}
+	return plural(int(d.Round(time.Minute).Minutes()), "minute")
+}
+
+func plural(n int, unit string) string {
+	if n == 1 {
+		return "1 " + unit
+	}
+	return fmt.Sprintf("%d %ss", n, unit)
+}
+
+// waited is how long ago the task's Harmony job was submitted. A job from
+// before the time was recorded starts its clock now.
+func (a *Adapter) waited(ctx context.Context, stateKey string) time.Duration {
+	now := a.now()
+	_ = a.rdb.HSetNX(ctx, stateKey, "submitted_at", now.Unix()).Err()
+	at, err := a.rdb.HGet(ctx, stateKey, "submitted_at").Int64()
+	if err != nil {
+		return 0
+	}
+	return now.Sub(time.Unix(at, 0))
+}
+
+// Cancel stops the task's Harmony job, if it has one, and frees its slot.
+// The task's files are never fetched.
+func (a *Adapter) Cancel(ctx context.Context, task *ingestv1.IngestTask) error {
+	req, err := newRequest(task, a.mode)
+	if err != nil {
+		return err
+	}
+	token, err := a.tokens.For(ctx, task)
+	if err != nil {
+		return err
+	}
+	stateKey := "td:ingest:harmony:job:" + req.key
+	jobID, err := a.rdb.HGet(ctx, stateKey, "job_id").Result()
+	if errors.Is(err, redis.Nil) {
+		a.freeSlot(ctx, token, req.key)
+		return nil
+	}
+	if err != nil {
+		return core.Transient(err)
+	}
+	a.stop(ctx, token, jobID, req.key, stateKey)
+	return nil
+}
+
+// stop cancels a Harmony job, frees its slot and forgets it. Cancelling is
+// best effort: Harmony ends a job it never hears about on its own.
+func (a *Adapter) stop(ctx context.Context, token, jobID, member, stateKey string) {
+	u := a.cfg.HarmonyURL + "/jobs/" + url.PathEscape(jobID) + "/cancel"
+	if req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, nil); err == nil {
+		req.Header.Set("Authorization", "Bearer "+token)
+		if resp, err := a.http.Do(req); err == nil {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close()
+		}
+	}
+	a.freeSlot(ctx, token, member)
+	_ = a.rdb.Del(ctx, stateKey).Err()
 }
 
 // working says what NASA is doing with a submitted job, for people.
@@ -267,7 +341,7 @@ func (a *Adapter) start(ctx context.Context, req *request, token, stateKey strin
 		a.freeSlot(ctx, token, req.key)
 		return err
 	}
-	if err := a.rdb.HSet(ctx, stateKey, "job_id", jobID, "granules", hits).Err(); err != nil {
+	if err := a.rdb.HSet(ctx, stateKey, "job_id", jobID, "granules", hits, "submitted_at", a.now().Unix()).Err(); err != nil {
 		return core.Transient(err)
 	}
 	_ = a.rdb.Expire(ctx, stateKey, stateTTL).Err()
@@ -614,18 +688,11 @@ return 1
 `)
 
 func (a *Adapter) takeSlot(ctx context.Context, token, member string) (bool, error) {
-	ok, err := takeSlotScript.Run(ctx, a.rdb, []string{slotsKey(token)},
-		member, time.Now().Unix(), int64(slotStale.Seconds()), max(a.cfg.Concurrency, 1)).Int()
+	ok, err := takeSlotScript.Run(ctx, a.rdb, []string{harmonyslots.Key(token)},
+		member, time.Now().Unix(), int64(harmonyslots.Stale.Seconds()), max(a.cfg.Concurrency, 1)).Int()
 	return ok == 1, err
 }
 
 func (a *Adapter) freeSlot(ctx context.Context, token, member string) {
-	_ = a.rdb.ZRem(ctx, slotsKey(token), member).Err()
-}
-
-// slotsKey names a token's slots by a hash, so the token never appears in
-// Redis keys.
-func slotsKey(token string) string {
-	sum := sha256.Sum256([]byte(token))
-	return "td:ingest:harmony:slots:" + hex.EncodeToString(sum[:8])
+	_ = a.rdb.ZRem(ctx, harmonyslots.Key(token), member).Err()
 }

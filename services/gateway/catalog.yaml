@@ -462,6 +462,73 @@ variables:
   # a cleaned-up copy with a date and a value column, and finds the time step
   # from the dates. The step below is only a placeholder: RawDataset.step has
   # the real one.
+  # NASA AppEEARS averages 1 km MODIS images over the rectangle. It takes
+  # requests in turn, so a job takes a few minutes, longer when it's busy.
+  # It logs in with EARTHDATA_USERNAME and EARTHDATA_PASSWORD.
+  - id: vegetation-modis
+    name: Plant greenness, NDVI (area average)
+    definition: >-
+      How green and dense the plants are, from bare ground near 0 to thick
+      forest near 0.9, averaged over the rectangle for each month. It comes
+      from the MODIS instrument on NASA's Terra satellite, which compares the
+      red light that leaves absorb with the near-infrared light they reflect.
+    units: NDVI
+    step: monthly
+    available: { start: 2000-02-01, end: 2026-09-30 }
+    grid: false
+    domain: land
+    default_source: appeears
+    sources:
+      appeears: { product: MOD13A3.061, layers: [_1_km_monthly_NDVI] }
+    filters:
+      ops:
+        - qc_range: { min: -0.2, max: 1 }
+        # AppEEARS already scales the values. This only names the units,
+        # which a CSV doesn't carry.
+        - linear: { scale: 1, offset: 0, units: NDVI }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *series-tests
+    llm_hints: >-
+      NDVI follows the seasons: crops green up and are harvested, and forests
+      leaf out and drop their leaves. A trend in it can mean irrigation, new
+      farmland, forest loss or regrowth, or a drying climate. Values near 0
+      are bare soil, rock, snow or water.
+    dataset_url: https://lpdaac.usgs.gov/products/mod13a3v061/
+
+  - id: land-surface-temperature-modis
+    name: Ground temperature, daytime (area average)
+    definition: >-
+      How hot the ground itself gets in the daytime, around half past ten in
+      the morning when the Terra satellite passes over, averaged over the
+      rectangle and over each month. Bare soil and cities heat up far more
+      than the air above them, while forests and water stay cooler.
+    units: °C
+    step: monthly
+    available: { start: 2000-02-18, end: 2026-10-31 }
+    grid: false
+    domain: land
+    default_source: appeears
+    sources:
+      appeears: { product: MOD11A2.061, layers: [LST_Day_1km] }
+    source_units: K
+    filters:
+      ops:
+        - qc_range: { min: 200, max: 360 }
+        - linear: { scale: 1, offset: -273.15, units: °C }
+        # 8-day composites, about four a month. Clouds blank some of them.
+        - monthly_mean: { min_valid_days: 2 }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *series-tests
+    llm_hints: >-
+      This is the temperature of the surface, not the air temperature weather
+      stations report, and on sunny days it can be 10 to 20 degrees hotter.
+      Each value comes from the clear days of an 8-day period, so very cloudy
+      months rest on few days. Cities, forest loss and drought warm it, and
+      irrigation and plants cool it.
+    dataset_url: https://lpdaac.usgs.gov/products/mod11a2v061/
+
   - id: user-csv
     name: Your own data (CSV upload)
     definition: >-

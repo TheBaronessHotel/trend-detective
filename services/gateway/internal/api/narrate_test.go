@@ -164,7 +164,7 @@ func newNarrateEnv(t *testing.T, narratorURL string, timeout time.Duration) *nar
 		t.Fatal(err)
 	}
 	cs := connect.NewServer()
-	gatewayv1connect.RegisterGatewayServiceHandler(cs, New(cat, e.orch, nil, narrate.New(e.orch, cat, nc, timeout, log), log))
+	gatewayv1connect.RegisterGatewayServiceHandler(cs, New(cat, e.orch, nil, narrate.New(e.orch, cat, nc, timeout, log), nil, log))
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, cs)
 	hs := httptest.NewServer(mux)
