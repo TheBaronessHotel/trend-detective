@@ -29,9 +29,16 @@ def test_delhi_temperature_with_the_catalog_plan():
     assert out.variable_id == "T2M" and out.units == "C"
     assert out.n_valid == out.n_total == 528
     assert out.field == analysis_pb2.SERIES_FIELD_ANOMALIES
-    # Preprocess doesn't make anomalies yet, so analysis did. January and
-    # December cool on their own, which gets the caveat about twelve tests.
-    assert list(out.warnings) == [series_mod.OWN_ANOMALIES, suite.MONTHS_BY_CHANCE]
+    # Preprocess doesn't make anomalies yet, so analysis did. POWER's values
+    # step down in mid-2010. January and December cool on their own, which
+    # gets the caveat about twelve tests. The residuals aren't normal.
+    assert list(out.warnings) == [
+        series_mod.OWN_ANOMALIES,
+        "The values jump around July 2010 instead of changing steadily. "
+        "A sudden step, like a new sensor or a new dam, can look like a trend.",
+        suite.MONTHS_BY_CHANCE,
+        suite.NOT_BELL_SHAPED_MK,
+    ]
 
     reg, mk = out.regression, out.mann_kendall
     assert reg.slope_ci_low < reg.slope_per_decade < reg.slope_ci_high
@@ -44,12 +51,10 @@ def test_delhi_temperature_with_the_catalog_plan():
     assert reg.model.time_origin.ToJsonString() == "2002-12-16T12:00:00Z"
     assert reg.model.intercept == pytest.approx(0, abs=1e-9)
 
-    # The ANA-4 extras are in, and the ANA-3 diagnostics stay unset.
-    for name in ("shuffle", "trend_triangle", "years_to_significance"):
+    # Every series test of the plan is in.
+    for name in ("shuffle", "trend_triangle", "years_to_significance", "pettitt", "residual_checks", "outliers"):
         assert out.HasField(name)
     assert [t.month for t in out.monthly_trends] == list(range(1, 13))
-    for name in ("pettitt", "residual_checks", "outliers"):
-        assert not out.HasField(name)
 
 
 def test_autocorrelation_correction_changes_the_delhi_verdict():

@@ -6,10 +6,13 @@ See the Analysis section of [ARCHITECTURE.md](../../ARCHITECTURE.md), and the [s
 
 ## Status
 
-ANA-1 is in: regression, Mann-Kendall with Sen's slope, and the agreement check. So is ANA-4: the shuffle test, the trend triangle, the monthly trends and the years to significance. Still to come:
+Every series test of the plan is in:
 
-- **ANA-2, the grid tests.** `TestPlan.grid` is logged and skipped, and `AnalysisResult.grid` stays unset.
-- **ANA-3, diagnostics.** Pettitt, residual checks and outliers are logged and skipped.
+- ANA-1: regression, Mann-Kendall with Sen's slope, and the agreement check.
+- ANA-3: the Pettitt change-point test, the residual checks and the outlier months.
+- ANA-4: the shuffle test, the trend triangle, the monthly trends and the years to significance.
+
+Still to come is ANA-2, the grid tests. `TestPlan.grid` is logged and skipped, and `AnalysisResult.grid` stays unset.
 
 Skipped tests leave their fields unset, so the web app and the narrator should check a field is there before using it.
 
@@ -25,6 +28,7 @@ Skipped tests leave their fields unset, so the web app and the narrator should c
 | `src/analysis/regression.py` | Least squares with the effective sample size correction |
 | `src/analysis/kendall.py` | Mann-Kendall (original, Hamed and Rao, seasonal), Sen's slope and its interval |
 | `src/analysis/extras.py` | The shuffle test, the trend triangle, the monthly trends and the years to significance |
+| `src/analysis/diagnostics.py` | The Pettitt test, the residual checks and the robust z-scores for outliers |
 | `src/analysis/storage.py` | S3 through boto3, plus an in-memory store for tests |
 
 ## What the tests run on
@@ -67,9 +71,29 @@ They test the same field as the regression. Where they need a p-value, they use 
 
 **Trend triangle** (`TrendTriangleResult`). The trend of every window of whole calendar years at least `min_years` long, 10 by default. It shows whether a trend depends on where the record starts and ends. Rows are `start_years` and columns `end_years`, and both matrices are row-major `[start][end]`. A cell is NaN when its window is shorter than `min_years` or has fewer than 12 values. The cell for the first and the last year is the whole record, the same as `regression`. A record spanning fewer calendar years than `min_years` skips it with a caveat.
 
-**Monthly trends** (`monthly_trends`). A least-squares trend for each calendar month from its values across the years, January first. A month seen in fewer than 5 years gets NaN. When one or two months come out significant, a caveat says that twelve separate tests can produce that by chance: 46% of trendless series show at least one significant month at alpha 0.05, but only 2% show three.
+**Monthly trends** (`monthly_trends`). A least-squares trend for each calendar month from its values across the years, January first. A month seen in fewer than 5 years gets NaN. When one or two months come out significant, a caveat says that twelve separate tests can produce that by chance: 46% of trendless series show at least one significant month at alpha 0.05, but only 2% show three or more.
 
 **Years to significance** (`YearsToSignificanceResult`). Weatherhead et al. (1998): the years of monthly data needed to detect the fitted trend with 90% probability, `n* = [3.3 * noise_sd / |trend_per_year| * sqrt((1 + phi) / (1 - phi))] ^ (2/3)`. `noise_sd` is the spread of the regression's residuals and `phi` their lag-1 autocorrelation, which the formula clips to ±0.99. A flat line gives `Infinity`. `years_so_far` runs from the first valid month to the last, and `already_significant` is the regression's verdict.
+
+### Diagnostics
+
+They look at the same field as the regression, and use the regression's fit where they need one. Outliers are flagged, never dropped: every test uses every value.
+
+**Pettitt** (`PettittResult`). Pettitt's (1979) test for one change in level. `U_t` sums `sign(x_i - x_j)` over every value `i` up to `t` and `j` after it, `K` is the largest `|U_t|`, and `p` is about `2 exp(-6 K^2 / (n^3 + n^2))`. Gaps are squeezed out. `change_time` is the first month after the change, and `mean_before` and `mean_after` are the levels on either side. A steady trend makes Pettitt significant too, at its middle. So the caveat about a jump comes only when Pettitt is significant and a step at the change point fits the values better than the regression's straight line, both with two parameters.
+
+**Residual checks** (`ResidualChecksResult`). On the regression's residuals:
+
+- `autocorrelation` warns when the lag-1 autocorrelation is outside the 1 - alpha band for white noise, `±z / sqrt(n)`. Monthly anomalies nearly always warn. That's what the regression's correction is for, so the caveat comes only when the plan's regression runs without it.
+- `normality` warns when Shapiro-Wilk rejects normal residuals at alpha. The caveat then points to Mann-Kendall, which doesn't assume normality, when it ran.
+
+**Outliers** (`OutliersResult`). Iglewicz and Hoaglin's (1993) robust z-score, `0.6745 (x - median) / MAD`, above `robust_z_threshold`, 3.5 by default.
+
+- Each month is judged against the same calendar month in the other years, because months can scatter very differently, like monsoon and dry months for rain. A month's own spread can be tiny, though, like a November that is nearly always dry, so it's never taken as smaller than the whole series' spread.
+- A calendar month seen in fewer than 5 years isn't scored. When no month has 5 years, every value is scored against the whole series. When the MAD is 0, the mean absolute deviation times 1.253314 stands in.
+- `highest` and `lowest` are the months furthest above and below normal, with their scores.
+- The trend tests keep the outliers. When dropping them would flip the regression's verdict, a caveat says so: single months can swing a trend, as flood months did in the SeaWiFS paper.
+
+Values, `highest` and `lowest` are in the tested field's `units`, so anomalies by default.
 
 ## Drawing the trend line and its band
 
@@ -82,7 +106,7 @@ They test the same field as the regression. Where they need a p-value, they use 
 
 ## Caveats in `warnings`
 
-Plain sentences for the user and the narrator. In order:
+Plain sentences for the user and the narrator. The caveats about the data come first, then each test's in the plan's order, and the disagreement and residual caveats last:
 
 | When | Text, roughly |
 |---|---|
@@ -96,6 +120,11 @@ Plain sentences for the user and the narrator. In order:
 | Fewer than 5 whole shuffle blocks | The record is too short for the shuffle test, which needs at least N months |
 | Fewer calendar years than the triangle's `min_years` | The record is shorter than the N years the trend triangle's shortest window needs |
 | One or two months significant on their own | Each month of the year was tested on its own, and with twelve tests one or two can look significant just by chance |
+| Pettitt significant, and a step fits better than the line | The values jump around July 2010 instead of changing steadily. A sudden step, like a new sensor or a new dam, can look like a trend |
+| Dropping the outliers would make the trend not significant | The trend rests on N unusual months: without them, the trend isn't significant |
+| Dropping the outliers would make the trend significant | N unusual months hide the trend: without them, the trend would be significant |
+| Residuals autocorrelated, and the regression runs without the correction | Neighboring months are alike, and the regression doesn't allow for that, so its p-value comes out too small |
+| Residuals not normal | The scatter around the trend line isn't bell-shaped, so the Mann-Kendall test... is the safer guide. Without Mann-Kendall: ...so the regression's p-value is only rough |
 
 Two tests that both find nothing get no caveat, even when their small slopes point different ways.
 
@@ -114,7 +143,7 @@ If `result.json` exists, the task reuses it and reports `cache_hit: true`. Bump 
 
 | Error | Code |
 |---|---|
-| A daily or weekly series, more than one value in a month, a bad `alpha`, an unknown variant, or shuffle or triangle settings out of range | `INVALID_REQUEST` |
+| A daily or weekly series, more than one value in a month, a bad `alpha`, an unknown variant, shuffle or triangle settings out of range, or an outlier threshold not above 0 | `INVALID_REQUEST` |
 | Fewer than 12 values, or less than 2 years between the first and the last | `NO_DATA` |
 | A `Series` that isn't valid protojson | `INTERNAL` |
 | SeaweedFS errors, including a missing `Series` | Retried after 10 s, then 1 min, and reported as `INTERNAL` after 3 attempts |
@@ -136,4 +165,4 @@ Logs are `key=value` lines with `time`, `level` and `msg`, plus `job_id`, `task_
 - `make test-analysis` runs what CI's `analysis` workflow runs, in a few seconds: the lockfile check, ruff with bug rules only, and the unit tests. It needs uv.
 - pymannkendall is a dev dependency only. The service doesn't import it.
 - A calibration test runs the shuffle test on 100 trendless autocorrelated series and expects about 5% false alarms. The same series give a plain t-test about 21%.
-- `make smoke`, with the stack up, runs the Delhi bundle through every stage and checks the trend analysis has the regression, Mann-Kendall and extras results.
+- `make smoke`, with the stack up, runs the Delhi bundle through every stage and checks the trend analysis has the regression, Mann-Kendall, extras and diagnostics results.
