@@ -3,12 +3,14 @@ import { type Job, JobState } from "@gen/gateway/v1/gateway_pb";
 import { Stage } from "@gen/gateway/v1/task_pb";
 import type { RawDataset } from "@gen/ingest/v1/ingest_pb";
 import type { Series } from "@gen/preprocess/v1/data_pb";
+import type { SeriesAnalysis } from "@gen/analysis/v1/results_pb";
 import { errorMessage } from "../api";
 import { describePoint } from "../lib/bbox";
 import { compare, type Day, formatMonth } from "../lib/dates";
 import { type StageView, stageViews } from "../lib/job";
 import { formatLabel, sourceLabel, stepLabel } from "../lib/sources";
 import { SeriesChart } from "./SeriesChart";
+import { VerdictPanel } from "./VerdictPanel";
 
 export type Phase = "uploading" | "creating" | "watching" | "done";
 
@@ -21,6 +23,9 @@ export interface Run {
   /** Set while the series downloads. */
   loadingSeries?: boolean;
   seriesError?: string;
+  /** The trend tests, when analysis ran and they downloaded. */
+  analysis?: SeriesAnalysis;
+  analysisError?: string;
 }
 
 interface Props {
@@ -153,7 +158,17 @@ function Alert({ children }: { children: React.ReactNode }) {
 }
 
 /** The series chart, and the same numbers as a CSV file. */
-function Results({ series, title, onSaveCsv }: { series: Series; title: string; onSaveCsv: () => Promise<void> }) {
+function Results({
+  series,
+  analysis,
+  title,
+  onSaveCsv,
+}: {
+  series: Series;
+  analysis: SeriesAnalysis | undefined;
+  title: string;
+  onSaveCsv: () => Promise<void>;
+}) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string>();
 
@@ -171,8 +186,10 @@ function Results({ series, title, onSaveCsv }: { series: Series; title: string; 
 
   return (
     <div className="job-chart">
+      {analysis && <VerdictPanel analysis={analysis} />}
       <SeriesChart
         series={series}
+        analysis={analysis}
         title={title}
         actions={
           <button type="button" className="action" onClick={save} disabled={saving}>
@@ -236,8 +253,16 @@ export function JobPanel({ run, stopAfter, seriesTitle, onSaveCsv, onStop }: Pro
         {raw && <Fetched ds={raw} />}
         {run.loadingSeries && <p className="note">Loading the chart…</p>}
         {run.seriesError && <Alert>{run.seriesError}</Alert>}
+        {run.analysisError && <Alert>{run.analysisError}</Alert>}
       </div>
-      {run.series && <Results series={run.series} title={seriesTitle(run.series.variableId)} onSaveCsv={onSaveCsv} />}
+      {run.series && (
+        <Results
+          series={run.series}
+          analysis={run.analysis}
+          title={seriesTitle(run.series.variableId)}
+          onSaveCsv={onSaveCsv}
+        />
+      )}
     </section>
   );
 }
