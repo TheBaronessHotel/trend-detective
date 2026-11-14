@@ -5,6 +5,7 @@ package worker
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -29,6 +30,9 @@ const (
 	durable     = "ingest"
 	tracerName  = "github.com/TheBaronessHotel/trend-detective/services/ingest/internal/worker"
 	publishWait = 5 * time.Second
+	// Adapters can report often, such as once per downloaded file, so
+	// progress goes out at most this often.
+	progressEvery = 2 * time.Second
 )
 
 // Config holds the worker's JetStream settings.
@@ -160,12 +164,17 @@ func (w *Worker) handle(ctx context.Context, msg jetstream.Msg) {
 		done := w.kit.Start(ctx, operation)
 		defer func() { done(err == nil) }()
 
+		progress := &reporter{w: w, ctx: ctx, meta: meta}
+		if md, err := msg.Metadata(); err == nil && md.NumDelivered == 1 {
+			progress.started()
+		}
 		stopHeartbeat := heartbeat(msg, w.cfg.AckWait/3)
-		ds, cacheHit, err := w.ingest(ctx, task)
+		ds, cacheHit, err := w.ingest(core.WithProgress(ctx, progress.report), task)
 		stopHeartbeat()
 
 		if p, ok := core.AsPending(err); ok {
 			// Not done yet, and not a failure. Check again later.
+			progress.flush()
 			w.log.Debug(ctx, "waiting", "reason", p.Reason, "after", p.After)
 			_ = msg.NakWithDelay(p.After)
 			return nil
@@ -237,6 +246,64 @@ func (w *Worker) backoff(attempt int) time.Duration {
 		return 10 * time.Second
 	}
 	return w.cfg.Backoff[min(attempt-1, len(w.cfg.Backoff)-1)]
+}
+
+// reporter publishes TaskProgress for one delivery of a task. It's best effort:
+// a failed publish is logged and forgotten, and StageDone always follows.
+type reporter struct {
+	w    *Worker
+	ctx  context.Context
+	meta *gatewayv1.TaskMeta
+
+	mu   sync.Mutex
+	last time.Time
+	// The newest update, held back by the rate limit until flush or the next
+	// update after it.
+	held *gatewayv1.TaskProgress
+}
+
+// started says the task has begun, so the gateway shows it running.
+func (r *reporter) started() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.publish(&gatewayv1.TaskProgress{Meta: r.meta, StartedAt: timestamppb.New(r.w.now())})
+}
+
+// report is the core.ProgressFunc adapters call, from any goroutine.
+func (r *reporter) report(percent int, activity string) {
+	p := &gatewayv1.TaskProgress{Meta: r.meta, Activity: activity}
+	if percent >= 0 {
+		v := int32(min(percent, 100))
+		p.Percent = &v
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.w.now().Sub(r.last) < progressEvery {
+		r.held = p
+		return
+	}
+	r.publish(p)
+}
+
+// flush sends an update the rate limit held back.
+func (r *reporter) flush() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.held != nil {
+		r.publish(r.held)
+	}
+}
+
+// publish sends p. The caller holds mu.
+func (r *reporter) publish(p *gatewayv1.TaskProgress) {
+	r.held = nil
+	r.last = r.w.now()
+	ctx, cancel := context.WithTimeout(r.ctx, publishWait)
+	defer cancel()
+	msgID := fmt.Sprintf("%s.progress.%d", r.meta.GetTaskId(), r.last.UnixNano())
+	if err := natsx.Publish(ctx, r.w.js, natsx.SubjectTaskProgress, msgID, p); err != nil {
+		r.w.log.Debug(r.ctx, "couldn't publish progress", logging.Err(err))
+	}
 }
 
 // heartbeat tells JetStream the task is still being worked on, every interval,

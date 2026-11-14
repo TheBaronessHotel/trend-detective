@@ -12,11 +12,13 @@ Go. The public Connect API on port 8080, and the orchestrator of every job. It p
 | `internal/jobs` | The orchestrator, and the Redis store it uses |
 | `internal/api` | The Connect handlers. They turn errors into codes the web app can show |
 | `internal/narrate` | The `Narrate` proxy to the narrator service |
-| `internal/events` | The consumer of `events.stage.done` |
+| `internal/events` | The consumers of `events.stage.done` and `events.task.progress` |
 
 ## API
 
 So far: `ListVariables`, `CreateJob`, `GetJob`, `WatchJob`, `GetResultURL`, `CreateUploadURL` and `Narrate`. `GetQuota` still returns `unimplemented`.
+
+A task's `TaskProgress` updates mark it running and set its `started_at`, `percent` and `activity`, which `WatchJob` passes on, so the app can show "working, 35%" while NASA works. A finished task is never changed by a late update.
 
 `WatchJob` sends the job right away and again after every change, then ends the stream once the job succeeds or fails. Every write to a job wakes its watchers at once, and they also re-read the job every 5 seconds in case a wake-up was missed. In the browser, connect-es handles the stream. `deploy/smoke/watch.py` is a small client that uses only the Python standard library.
 

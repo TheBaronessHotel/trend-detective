@@ -801,9 +801,14 @@ type TaskStatus struct {
 	Attempts int32 `protobuf:"varint,3,opt,name=attempts,proto3" json:"attempts,omitempty"`
 	CacheHit bool  `protobuf:"varint,4,opt,name=cache_hit,json=cacheHit,proto3" json:"cache_hit,omitempty"`
 	// Set when state is TASK_STATE_FAILED.
-	Error         *TaskError             `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`
-	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
-	FinishedAt    *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
+	Error *TaskError `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`
+	// When a stage started on the task, from its first TaskProgress.
+	StartedAt  *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	FinishedAt *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
+	// Share of the task done, 0 to 100, while it runs, when the stage says.
+	Percent *int32 `protobuf:"varint,8,opt,name=percent,proto3,oneof" json:"percent,omitempty"`
+	// What a running task is doing, for people, from TaskProgress.activity.
+	Activity      string `protobuf:"bytes,9,opt,name=activity,proto3" json:"activity,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -885,6 +890,20 @@ func (x *TaskStatus) GetFinishedAt() *timestamppb.Timestamp {
 		return x.FinishedAt
 	}
 	return nil
+}
+
+func (x *TaskStatus) GetPercent() int32 {
+	if x != nil && x.Percent != nil {
+		return *x.Percent
+	}
+	return 0
+}
+
+func (x *TaskStatus) GetActivity() string {
+	if x != nil {
+		return x.Activity
+	}
+	return ""
 }
 
 // What a job has produced.
@@ -1627,7 +1646,7 @@ const file_trenddetective_gateway_v1_gateway_proto_rawDesc = "" +
 	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xee\x02\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xb5\x03\n" +
 	"\n" +
 	"TaskStatus\x127\n" +
 	"\x04meta\x18\x01 \x01(\v2#.trenddetective.gateway.v1.TaskMetaR\x04meta\x12:\n" +
@@ -1638,7 +1657,11 @@ const file_trenddetective_gateway_v1_gateway_proto_rawDesc = "" +
 	"\n" +
 	"started_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12;\n" +
 	"\vfinished_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"finishedAt\"\xdc\x01\n" +
+	"finishedAt\x12\x1d\n" +
+	"\apercent\x18\b \x01(\x05H\x00R\apercent\x88\x01\x01\x12\x1a\n" +
+	"\bactivity\x18\t \x01(\tR\bactivityB\n" +
+	"\n" +
+	"\b_percent\"\xdc\x01\n" +
 	"\n" +
 	"JobResults\x126\n" +
 	"\x03raw\x18\x01 \x03(\v2$.trenddetective.ingest.v1.RawDatasetR\x03raw\x12N\n" +
@@ -1848,6 +1871,7 @@ func file_trenddetective_gateway_v1_gateway_proto_init() {
 		return
 	}
 	file_trenddetective_gateway_v1_task_proto_init()
+	file_trenddetective_gateway_v1_gateway_proto_msgTypes[7].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

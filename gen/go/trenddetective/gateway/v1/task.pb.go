@@ -491,6 +491,82 @@ func (*StageDone_Analysis) isStageDone_Result() {}
 
 func (*StageDone_Error) isStageDone_Result() {}
 
+// What a stage publishes on events.task.progress while a task runs: once when
+// it starts, then whenever it knows more, such as a Harmony job's percent.
+// Progress is best effort. The gateway may drop an update, and it never lets
+// one overwrite a task that has already finished.
+type TaskProgress struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Meta  *TaskMeta              `protobuf:"bytes,1,opt,name=meta,proto3" json:"meta,omitempty"`
+	// When the stage started on the task. Set on the first update.
+	StartedAt *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	// Share of the task done, 0 to 100. Unset when the stage can't tell.
+	Percent *int32 `protobuf:"varint,3,opt,name=percent,proto3,oneof" json:"percent,omitempty"`
+	// What the task is doing, for people, such as "NASA is preparing the
+	// files". Shown as written, like TaskError.user_message.
+	Activity      string `protobuf:"bytes,4,opt,name=activity,proto3" json:"activity,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TaskProgress) Reset() {
+	*x = TaskProgress{}
+	mi := &file_trenddetective_gateway_v1_task_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TaskProgress) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TaskProgress) ProtoMessage() {}
+
+func (x *TaskProgress) ProtoReflect() protoreflect.Message {
+	mi := &file_trenddetective_gateway_v1_task_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TaskProgress.ProtoReflect.Descriptor instead.
+func (*TaskProgress) Descriptor() ([]byte, []int) {
+	return file_trenddetective_gateway_v1_task_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *TaskProgress) GetMeta() *TaskMeta {
+	if x != nil {
+		return x.Meta
+	}
+	return nil
+}
+
+func (x *TaskProgress) GetStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartedAt
+	}
+	return nil
+}
+
+func (x *TaskProgress) GetPercent() int32 {
+	if x != nil && x.Percent != nil {
+		return *x.Percent
+	}
+	return 0
+}
+
+func (x *TaskProgress) GetActivity() string {
+	if x != nil {
+		return x.Activity
+	}
+	return ""
+}
+
 // Why a task failed.
 type TaskError struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -509,7 +585,7 @@ type TaskError struct {
 
 func (x *TaskError) Reset() {
 	*x = TaskError{}
-	mi := &file_trenddetective_gateway_v1_task_proto_msgTypes[3]
+	mi := &file_trenddetective_gateway_v1_task_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -521,7 +597,7 @@ func (x *TaskError) String() string {
 func (*TaskError) ProtoMessage() {}
 
 func (x *TaskError) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_task_proto_msgTypes[3]
+	mi := &file_trenddetective_gateway_v1_task_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -534,7 +610,7 @@ func (x *TaskError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TaskError.ProtoReflect.Descriptor instead.
 func (*TaskError) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_task_proto_rawDescGZIP(), []int{3}
+	return file_trenddetective_gateway_v1_task_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *TaskError) GetCode() ErrorCode {
@@ -596,7 +672,15 @@ const file_trenddetective_gateway_v1_task_proto_rawDesc = "" +
 	"preprocess\x12H\n" +
 	"\banalysis\x18\f \x01(\v2*.trenddetective.analysis.v1.AnalysisResultH\x00R\banalysis\x12<\n" +
 	"\x05error\x18\x14 \x01(\v2$.trenddetective.gateway.v1.TaskErrorH\x00R\x05errorB\b\n" +
-	"\x06result\"\x9e\x01\n" +
+	"\x06result\"\xc9\x01\n" +
+	"\fTaskProgress\x127\n" +
+	"\x04meta\x18\x01 \x01(\v2#.trenddetective.gateway.v1.TaskMetaR\x04meta\x129\n" +
+	"\n" +
+	"started_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12\x1d\n" +
+	"\apercent\x18\x03 \x01(\x05H\x00R\apercent\x88\x01\x01\x12\x1a\n" +
+	"\bactivity\x18\x04 \x01(\tR\bactivityB\n" +
+	"\n" +
+	"\b_percent\"\x9e\x01\n" +
 	"\tTaskError\x128\n" +
 	"\x04code\x18\x01 \x01(\x0e2$.trenddetective.gateway.v1.ErrorCodeR\x04code\x12\x1c\n" +
 	"\tretryable\x18\x02 \x01(\bR\tretryable\x12!\n" +
@@ -633,40 +717,43 @@ func file_trenddetective_gateway_v1_task_proto_rawDescGZIP() []byte {
 }
 
 var file_trenddetective_gateway_v1_task_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_trenddetective_gateway_v1_task_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_trenddetective_gateway_v1_task_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_trenddetective_gateway_v1_task_proto_goTypes = []any{
 	(Stage)(0),                    // 0: trenddetective.gateway.v1.Stage
 	(ErrorCode)(0),                // 1: trenddetective.gateway.v1.ErrorCode
 	(*TaskMeta)(nil),              // 2: trenddetective.gateway.v1.TaskMeta
 	(*Task)(nil),                  // 3: trenddetective.gateway.v1.Task
 	(*StageDone)(nil),             // 4: trenddetective.gateway.v1.StageDone
-	(*TaskError)(nil),             // 5: trenddetective.gateway.v1.TaskError
-	(*v1.IngestTask)(nil),         // 6: trenddetective.ingest.v1.IngestTask
-	(*v11.PreprocessTask)(nil),    // 7: trenddetective.preprocess.v1.PreprocessTask
-	(*v12.AnalysisTask)(nil),      // 8: trenddetective.analysis.v1.AnalysisTask
-	(*timestamppb.Timestamp)(nil), // 9: google.protobuf.Timestamp
-	(*v1.RawDataset)(nil),         // 10: trenddetective.ingest.v1.RawDataset
-	(*v11.PreprocessResult)(nil),  // 11: trenddetective.preprocess.v1.PreprocessResult
-	(*v12.AnalysisResult)(nil),    // 12: trenddetective.analysis.v1.AnalysisResult
+	(*TaskProgress)(nil),          // 5: trenddetective.gateway.v1.TaskProgress
+	(*TaskError)(nil),             // 6: trenddetective.gateway.v1.TaskError
+	(*v1.IngestTask)(nil),         // 7: trenddetective.ingest.v1.IngestTask
+	(*v11.PreprocessTask)(nil),    // 8: trenddetective.preprocess.v1.PreprocessTask
+	(*v12.AnalysisTask)(nil),      // 9: trenddetective.analysis.v1.AnalysisTask
+	(*timestamppb.Timestamp)(nil), // 10: google.protobuf.Timestamp
+	(*v1.RawDataset)(nil),         // 11: trenddetective.ingest.v1.RawDataset
+	(*v11.PreprocessResult)(nil),  // 12: trenddetective.preprocess.v1.PreprocessResult
+	(*v12.AnalysisResult)(nil),    // 13: trenddetective.analysis.v1.AnalysisResult
 }
 var file_trenddetective_gateway_v1_task_proto_depIdxs = []int32{
 	0,  // 0: trenddetective.gateway.v1.TaskMeta.stage:type_name -> trenddetective.gateway.v1.Stage
 	2,  // 1: trenddetective.gateway.v1.Task.meta:type_name -> trenddetective.gateway.v1.TaskMeta
-	6,  // 2: trenddetective.gateway.v1.Task.ingest:type_name -> trenddetective.ingest.v1.IngestTask
-	7,  // 3: trenddetective.gateway.v1.Task.preprocess:type_name -> trenddetective.preprocess.v1.PreprocessTask
-	8,  // 4: trenddetective.gateway.v1.Task.analysis:type_name -> trenddetective.analysis.v1.AnalysisTask
+	7,  // 2: trenddetective.gateway.v1.Task.ingest:type_name -> trenddetective.ingest.v1.IngestTask
+	8,  // 3: trenddetective.gateway.v1.Task.preprocess:type_name -> trenddetective.preprocess.v1.PreprocessTask
+	9,  // 4: trenddetective.gateway.v1.Task.analysis:type_name -> trenddetective.analysis.v1.AnalysisTask
 	2,  // 5: trenddetective.gateway.v1.StageDone.meta:type_name -> trenddetective.gateway.v1.TaskMeta
-	9,  // 6: trenddetective.gateway.v1.StageDone.finished_at:type_name -> google.protobuf.Timestamp
-	10, // 7: trenddetective.gateway.v1.StageDone.ingest:type_name -> trenddetective.ingest.v1.RawDataset
-	11, // 8: trenddetective.gateway.v1.StageDone.preprocess:type_name -> trenddetective.preprocess.v1.PreprocessResult
-	12, // 9: trenddetective.gateway.v1.StageDone.analysis:type_name -> trenddetective.analysis.v1.AnalysisResult
-	5,  // 10: trenddetective.gateway.v1.StageDone.error:type_name -> trenddetective.gateway.v1.TaskError
-	1,  // 11: trenddetective.gateway.v1.TaskError.code:type_name -> trenddetective.gateway.v1.ErrorCode
-	12, // [12:12] is the sub-list for method output_type
-	12, // [12:12] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	10, // 6: trenddetective.gateway.v1.StageDone.finished_at:type_name -> google.protobuf.Timestamp
+	11, // 7: trenddetective.gateway.v1.StageDone.ingest:type_name -> trenddetective.ingest.v1.RawDataset
+	12, // 8: trenddetective.gateway.v1.StageDone.preprocess:type_name -> trenddetective.preprocess.v1.PreprocessResult
+	13, // 9: trenddetective.gateway.v1.StageDone.analysis:type_name -> trenddetective.analysis.v1.AnalysisResult
+	6,  // 10: trenddetective.gateway.v1.StageDone.error:type_name -> trenddetective.gateway.v1.TaskError
+	2,  // 11: trenddetective.gateway.v1.TaskProgress.meta:type_name -> trenddetective.gateway.v1.TaskMeta
+	10, // 12: trenddetective.gateway.v1.TaskProgress.started_at:type_name -> google.protobuf.Timestamp
+	1,  // 13: trenddetective.gateway.v1.TaskError.code:type_name -> trenddetective.gateway.v1.ErrorCode
+	14, // [14:14] is the sub-list for method output_type
+	14, // [14:14] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_trenddetective_gateway_v1_task_proto_init() }
@@ -685,13 +772,14 @@ func file_trenddetective_gateway_v1_task_proto_init() {
 		(*StageDone_Analysis)(nil),
 		(*StageDone_Error)(nil),
 	}
+	file_trenddetective_gateway_v1_task_proto_msgTypes[3].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_trenddetective_gateway_v1_task_proto_rawDesc), len(file_trenddetective_gateway_v1_task_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   4,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

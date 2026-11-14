@@ -224,6 +224,33 @@ func TestSubmitPollAndDownload(t *testing.T) {
 	}
 }
 
+// The worker turns these reports into TaskProgress, which the app shows as
+// "NASA is cutting the files, 50%" and then a count of files downloaded.
+func TestReportsProgress(t *testing.T) {
+	h := newHarness(t, Config{})
+	var (
+		mu      sync.Mutex
+		reports []string
+	)
+	ctx := core.WithProgress(context.Background(), func(percent int, activity string) {
+		mu.Lock()
+		defer mu.Unlock()
+		reports = append(reports, fmt.Sprintf("%d %s", percent, activity))
+	})
+	sink := newSink()
+	for range 3 { // submit, running, successful
+		_, _ = h.a.Fetch(ctx, task(77), sink)
+	}
+	cutting := "NASA's Harmony service is cutting the files to your rectangle"
+	want := []string{"0 " + cutting, "50 " + cutting, "0 Downloading the files from NASA, 0 of 2"}
+	if len(reports) != 5 || strings.Join(reports[:3], "|") != strings.Join(want, "|") {
+		t.Fatalf("reports: %q", reports)
+	}
+	if reports[4] != "100 Downloading the files from NASA, 2 of 2" {
+		t.Errorf("last report: %q", reports[4])
+	}
+}
+
 func TestGranuleChecks(t *testing.T) {
 	h := newHarness(t, Config{})
 	h.nasa.hits = 0

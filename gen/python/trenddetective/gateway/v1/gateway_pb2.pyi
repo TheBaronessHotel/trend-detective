@@ -165,7 +165,7 @@ class Job(_message.Message):
     def __init__(self, id: _Optional[str] = ..., state: _Optional[_Union[JobState, str]] = ..., spec: _Optional[_Union[JobSpec, _Mapping]] = ..., tasks: _Optional[_Iterable[_Union[TaskStatus, _Mapping]]] = ..., tasks_total: _Optional[int] = ..., tasks_succeeded: _Optional[int] = ..., tasks_failed: _Optional[int] = ..., results: _Optional[_Union[JobResults, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class TaskStatus(_message.Message):
-    __slots__ = ("meta", "state", "attempts", "cache_hit", "error", "started_at", "finished_at")
+    __slots__ = ("meta", "state", "attempts", "cache_hit", "error", "started_at", "finished_at", "percent", "activity")
     META_FIELD_NUMBER: _ClassVar[int]
     STATE_FIELD_NUMBER: _ClassVar[int]
     ATTEMPTS_FIELD_NUMBER: _ClassVar[int]
@@ -173,6 +173,8 @@ class TaskStatus(_message.Message):
     ERROR_FIELD_NUMBER: _ClassVar[int]
     STARTED_AT_FIELD_NUMBER: _ClassVar[int]
     FINISHED_AT_FIELD_NUMBER: _ClassVar[int]
+    PERCENT_FIELD_NUMBER: _ClassVar[int]
+    ACTIVITY_FIELD_NUMBER: _ClassVar[int]
     meta: _task_pb2.TaskMeta
     state: TaskState
     attempts: int
@@ -180,7 +182,9 @@ class TaskStatus(_message.Message):
     error: _task_pb2.TaskError
     started_at: _timestamp_pb2.Timestamp
     finished_at: _timestamp_pb2.Timestamp
-    def __init__(self, meta: _Optional[_Union[_task_pb2.TaskMeta, _Mapping]] = ..., state: _Optional[_Union[TaskState, str]] = ..., attempts: _Optional[int] = ..., cache_hit: _Optional[bool] = ..., error: _Optional[_Union[_task_pb2.TaskError, _Mapping]] = ..., started_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., finished_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    percent: int
+    activity: str
+    def __init__(self, meta: _Optional[_Union[_task_pb2.TaskMeta, _Mapping]] = ..., state: _Optional[_Union[TaskState, str]] = ..., attempts: _Optional[int] = ..., cache_hit: _Optional[bool] = ..., error: _Optional[_Union[_task_pb2.TaskError, _Mapping]] = ..., started_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., finished_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., percent: _Optional[int] = ..., activity: _Optional[str] = ...) -> None: ...
 
 class JobResults(_message.Message):
     __slots__ = ("raw", "preprocess", "analysis")

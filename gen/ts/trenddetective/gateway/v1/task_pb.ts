@@ -22,7 +22,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file trenddetective/gateway/v1/task.proto.
  */
 export const file_trenddetective_gateway_v1_task: GenFile = /*@__PURE__*/
-  fileDesc("CiR0cmVuZGRldGVjdGl2ZS9nYXRld2F5L3YxL3Rhc2sucHJvdG8SGXRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEiXAoIVGFza01ldGESDgoGam9iX2lkGAEgASgJEg8KB3Rhc2tfaWQYAiABKAkSLwoFc3RhZ2UYAyABKA4yIC50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLlN0YWdlIvsBCgRUYXNrEjEKBG1ldGEYASABKAsyIy50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLlRhc2tNZXRhEjYKBmluZ2VzdBgKIAEoCzIkLnRyZW5kZGV0ZWN0aXZlLmluZ2VzdC52MS5Jbmdlc3RUYXNrSAASQgoKcHJlcHJvY2VzcxgLIAEoCzIsLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEuUHJlcHJvY2Vzc1Rhc2tIABI8CghhbmFseXNpcxgMIAEoCzIoLnRyZW5kZGV0ZWN0aXZlLmFuYWx5c2lzLnYxLkFuYWx5c2lzVGFza0gAQgYKBHNwZWMikgMKCVN0YWdlRG9uZRIxCgRtZXRhGAEgASgLMiMudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5UYXNrTWV0YRIPCgdhdHRlbXB0GAIgASgFEhEKCWNhY2hlX2hpdBgDIAEoCBIvCgtmaW5pc2hlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNgoGaW5nZXN0GAogASgLMiQudHJlbmRkZXRlY3RpdmUuaW5nZXN0LnYxLlJhd0RhdGFzZXRIABJECgpwcmVwcm9jZXNzGAsgASgLMi4udHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5QcmVwcm9jZXNzUmVzdWx0SAASPgoIYW5hbHlzaXMYDCABKAsyKi50cmVuZGRldGVjdGl2ZS5hbmFseXNpcy52MS5BbmFseXNpc1Jlc3VsdEgAEjUKBWVycm9yGBQgASgLMiQudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5UYXNrRXJyb3JIAEIICgZyZXN1bHQieAoJVGFza0Vycm9yEjIKBGNvZGUYASABKA4yJC50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkVycm9yQ29kZRIRCglyZXRyeWFibGUYAiABKAgSFAoMdXNlcl9tZXNzYWdlGAMgASgJEg4KBmRldGFpbBgEIAEoCSpaCgVTdGFnZRIVChFTVEFHRV9VTlNQRUNJRklFRBAAEhAKDFNUQUdFX0lOR0VTVBABEhQKEFNUQUdFX1BSRVBST0NFU1MQAhISCg5TVEFHRV9BTkFMWVNJUxADKqgCCglFcnJvckNvZGUSGgoWRVJST1JfQ09ERV9VTlNQRUNJRklFRBAAEhcKE0VSUk9SX0NPREVfSU5URVJOQUwQARIeChpFUlJPUl9DT0RFX0lOVkFMSURfUkVRVUVTVBACEhYKEkVSUk9SX0NPREVfTk9fREFUQRADEh0KGUVSUk9SX0NPREVfUVVPVEFfRVhDRUVERUQQBBIYChRFUlJPUl9DT0RFX1RPT19MQVJHRRAFEh4KGkVSUk9SX0NPREVfVU5BVVRIRU5USUNBVEVEEAYSFwoTRVJST1JfQ09ERV9VUFNUUkVBTRAHEhoKFkVSUk9SX0NPREVfVU5TVVBQT1JURUQQCBIgChxFUlJPUl9DT0RFX1JFVFJJRVNfRVhIQVVTVEVEEAlCiAIKHWNvbS50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxQglUYXNrUHJvdG9QAVpWZ2l0aHViLmNvbS9UaGVCYXJvbmVzc0hvdGVsL3RyZW5kLWRldGVjdGl2ZS9nZW4vZ28vdHJlbmRkZXRlY3RpdmUvZ2F0ZXdheS92MTtnYXRld2F5djGiAgNUR1iqAhlUcmVuZGRldGVjdGl2ZS5HYXRld2F5LlYxygIZVHJlbmRkZXRlY3RpdmVcR2F0ZXdheVxWMeICJVRyZW5kZGV0ZWN0aXZlXEdhdGV3YXlcVjFcR1BCTWV0YWRhdGHqAhtUcmVuZGRldGVjdGl2ZTo6R2F0ZXdheTo6VjFiBnByb3RvMw", [file_google_protobuf_timestamp, file_trenddetective_analysis_v1_analysis, file_trenddetective_ingest_v1_ingest, file_trenddetective_preprocess_v1_preprocess]);
+  fileDesc("CiR0cmVuZGRldGVjdGl2ZS9nYXRld2F5L3YxL3Rhc2sucHJvdG8SGXRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEiXAoIVGFza01ldGESDgoGam9iX2lkGAEgASgJEg8KB3Rhc2tfaWQYAiABKAkSLwoFc3RhZ2UYAyABKA4yIC50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLlN0YWdlIvsBCgRUYXNrEjEKBG1ldGEYASABKAsyIy50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLlRhc2tNZXRhEjYKBmluZ2VzdBgKIAEoCzIkLnRyZW5kZGV0ZWN0aXZlLmluZ2VzdC52MS5Jbmdlc3RUYXNrSAASQgoKcHJlcHJvY2VzcxgLIAEoCzIsLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEuUHJlcHJvY2Vzc1Rhc2tIABI8CghhbmFseXNpcxgMIAEoCzIoLnRyZW5kZGV0ZWN0aXZlLmFuYWx5c2lzLnYxLkFuYWx5c2lzVGFza0gAQgYKBHNwZWMikgMKCVN0YWdlRG9uZRIxCgRtZXRhGAEgASgLMiMudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5UYXNrTWV0YRIPCgdhdHRlbXB0GAIgASgFEhEKCWNhY2hlX2hpdBgDIAEoCBIvCgtmaW5pc2hlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNgoGaW5nZXN0GAogASgLMiQudHJlbmRkZXRlY3RpdmUuaW5nZXN0LnYxLlJhd0RhdGFzZXRIABJECgpwcmVwcm9jZXNzGAsgASgLMi4udHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5QcmVwcm9jZXNzUmVzdWx0SAASPgoIYW5hbHlzaXMYDCABKAsyKi50cmVuZGRldGVjdGl2ZS5hbmFseXNpcy52MS5BbmFseXNpc1Jlc3VsdEgAEjUKBWVycm9yGBQgASgLMiQudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5UYXNrRXJyb3JIAEIICgZyZXN1bHQipQEKDFRhc2tQcm9ncmVzcxIxCgRtZXRhGAEgASgLMiMudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5UYXNrTWV0YRIuCgpzdGFydGVkX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIUCgdwZXJjZW50GAMgASgFSACIAQESEAoIYWN0aXZpdHkYBCABKAlCCgoIX3BlcmNlbnQieAoJVGFza0Vycm9yEjIKBGNvZGUYASABKA4yJC50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkVycm9yQ29kZRIRCglyZXRyeWFibGUYAiABKAgSFAoMdXNlcl9tZXNzYWdlGAMgASgJEg4KBmRldGFpbBgEIAEoCSpaCgVTdGFnZRIVChFTVEFHRV9VTlNQRUNJRklFRBAAEhAKDFNUQUdFX0lOR0VTVBABEhQKEFNUQUdFX1BSRVBST0NFU1MQAhISCg5TVEFHRV9BTkFMWVNJUxADKqgCCglFcnJvckNvZGUSGgoWRVJST1JfQ09ERV9VTlNQRUNJRklFRBAAEhcKE0VSUk9SX0NPREVfSU5URVJOQUwQARIeChpFUlJPUl9DT0RFX0lOVkFMSURfUkVRVUVTVBACEhYKEkVSUk9SX0NPREVfTk9fREFUQRADEh0KGUVSUk9SX0NPREVfUVVPVEFfRVhDRUVERUQQBBIYChRFUlJPUl9DT0RFX1RPT19MQVJHRRAFEh4KGkVSUk9SX0NPREVfVU5BVVRIRU5USUNBVEVEEAYSFwoTRVJST1JfQ09ERV9VUFNUUkVBTRAHEhoKFkVSUk9SX0NPREVfVU5TVVBQT1JURUQQCBIgChxFUlJPUl9DT0RFX1JFVFJJRVNfRVhIQVVTVEVEEAlCiAIKHWNvbS50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxQglUYXNrUHJvdG9QAVpWZ2l0aHViLmNvbS9UaGVCYXJvbmVzc0hvdGVsL3RyZW5kLWRldGVjdGl2ZS9nZW4vZ28vdHJlbmRkZXRlY3RpdmUvZ2F0ZXdheS92MTtnYXRld2F5djGiAgNUR1iqAhlUcmVuZGRldGVjdGl2ZS5HYXRld2F5LlYxygIZVHJlbmRkZXRlY3RpdmVcR2F0ZXdheVxWMeICJVRyZW5kZGV0ZWN0aXZlXEdhdGV3YXlcVjFcR1BCTWV0YWRhdGHqAhtUcmVuZGRldGVjdGl2ZTo6R2F0ZXdheTo6VjFiBnByb3RvMw", [file_google_protobuf_timestamp, file_trenddetective_analysis_v1_analysis, file_trenddetective_ingest_v1_ingest, file_trenddetective_preprocess_v1_preprocess]);
 
 /**
  * Identifies a task. Every Task and StageDone carries it. Every log line
@@ -174,6 +174,50 @@ export const StageDoneSchema: GenMessage<StageDone> = /*@__PURE__*/
   messageDesc(file_trenddetective_gateway_v1_task, 2);
 
 /**
+ * What a stage publishes on events.task.progress while a task runs: once when
+ * it starts, then whenever it knows more, such as a Harmony job's percent.
+ * Progress is best effort. The gateway may drop an update, and it never lets
+ * one overwrite a task that has already finished.
+ *
+ * @generated from message trenddetective.gateway.v1.TaskProgress
+ */
+export type TaskProgress = Message<"trenddetective.gateway.v1.TaskProgress"> & {
+  /**
+   * @generated from field: trenddetective.gateway.v1.TaskMeta meta = 1;
+   */
+  meta?: TaskMeta | undefined;
+
+  /**
+   * When the stage started on the task. Set on the first update.
+   *
+   * @generated from field: google.protobuf.Timestamp started_at = 2;
+   */
+  startedAt?: Timestamp | undefined;
+
+  /**
+   * Share of the task done, 0 to 100. Unset when the stage can't tell.
+   *
+   * @generated from field: optional int32 percent = 3;
+   */
+  percent?: number | undefined;
+
+  /**
+   * What the task is doing, for people, such as "NASA is preparing the
+   * files". Shown as written, like TaskError.user_message.
+   *
+   * @generated from field: string activity = 4;
+   */
+  activity: string;
+};
+
+/**
+ * Describes the message trenddetective.gateway.v1.TaskProgress.
+ * Use `create(TaskProgressSchema)` to create a new message.
+ */
+export const TaskProgressSchema: GenMessage<TaskProgress> = /*@__PURE__*/
+  messageDesc(file_trenddetective_gateway_v1_task, 3);
+
+/**
  * Why a task failed.
  *
  * @generated from message trenddetective.gateway.v1.TaskError
@@ -213,7 +257,7 @@ export type TaskError = Message<"trenddetective.gateway.v1.TaskError"> & {
  * Use `create(TaskErrorSchema)` to create a new message.
  */
 export const TaskErrorSchema: GenMessage<TaskError> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_task, 3);
+  messageDesc(file_trenddetective_gateway_v1_task, 4);
 
 /**
  * A pipeline stage.

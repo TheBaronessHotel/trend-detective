@@ -58,16 +58,27 @@ function elapsed(ms: number): string {
 
 // What a long-running stage is doing, so a wait doesn't look like a hang.
 const slowNotes: Partial<Record<Stage, string>> = {
-  [Stage.INGEST]: "NASA is preparing the files. Long date ranges and big rectangles can take several minutes.",
+  [Stage.INGEST]: "Fetching the data from NASA. Long date ranges and big rectangles can take several minutes.",
   [Stage.PREPROCESS]: "Reading and averaging the files. Many files take a while.",
 };
+
+/** What a running stage is doing: its worker's words, or a hint once it's slow. */
+function StageNote({ v, now }: { v: StageView; now: number }) {
+  const slow = v.since !== undefined && now - v.since > 30_000;
+  const text = v.activity ?? (slow ? slowNotes[v.stage] : undefined);
+  return text ? <p className="note stage-note">{text}</p> : null;
+}
 
 function status(v: StageView, now: number): string {
   switch (v.state) {
     case "waiting":
       return "not started";
-    case "running":
-      return v.since === undefined ? "working" : `working, ${elapsed(now - v.since)}`;
+    case "running": {
+      const parts = ["working"];
+      if (v.percent !== undefined) parts.push(`${v.percent}%`);
+      if (v.since !== undefined) parts.push(elapsed(now - v.since));
+      return parts.join(", ");
+    }
     case "failed":
       return "failed";
     case "done": {
@@ -190,9 +201,7 @@ export function JobPanel({ run, stopAfter, seriesTitle, onSaveCsv }: Props) {
                 </span>
                 <span>{v.label}</span>
                 <span className="stage-status">{status(v, now)}</span>
-                {v.state === "running" && v.since !== undefined && now - v.since > 30_000 && slowNotes[v.stage] && (
-                  <p className="note stage-note">{slowNotes[v.stage]}</p>
-                )}
+                {v.state === "running" && <StageNote v={v} now={now} />}
                 {v.error && (
                   <p className="stage-error">
                     {v.error}

@@ -15,8 +15,12 @@ export interface StageView {
   cached: boolean;
   /** How long the stage took, once it's done. */
   seconds?: number;
-  /** When a running stage could start, in ms since 1970. */
+  /** When a running stage started, or could have, in ms since 1970. */
   since?: number;
+  /** How much of a running stage is done, 0 to 100, when its worker says. */
+  percent?: number;
+  /** What a running stage is doing, for people, when its worker says. */
+  activity?: string;
   /** The first failed task's message, for people. */
   error?: string;
   /** Whether running the job again later might work. */
@@ -35,14 +39,26 @@ export function isFinished(job: Job | undefined): boolean {
   return job?.state === JobState.SUCCEEDED || job?.state === JobState.FAILED;
 }
 
-// The gateway hears about a task only when it finishes, so a task it has
-// queued may well be running already: a Harmony fetch sits "queued" for
-// minutes while NASA works on it. Anything handed out counts as running.
+// Only ingest reports when a task starts, so a task the gateway lists as
+// queued may well be running already, in preprocess for example. Anything
+// handed out counts as running.
 function stateOf(tasks: TaskStatus[]): StepState {
   if (tasks.length === 0) return "waiting";
   if (tasks.some((t) => t.state === TaskState.FAILED)) return "failed";
   if (tasks.every((t) => t.state === TaskState.SUCCEEDED)) return "done";
   return "running";
+}
+
+function firstStart(tasks: TaskStatus[]): number | undefined {
+  const starts = tasks.map((t) => (t.startedAt ? timestampMs(t.startedAt) : NaN)).filter(Number.isFinite);
+  return starts.length > 0 ? Math.min(...starts) : undefined;
+}
+
+/** The stage's share done: finished tasks count as 100, unreported ones as 0. */
+function percentDone(tasks: TaskStatus[]): number | undefined {
+  if (!tasks.some((t) => t.percent !== undefined)) return undefined;
+  const sum = tasks.reduce((n, t) => n + (t.state === TaskState.SUCCEEDED ? 100 : (t.percent ?? 0)), 0);
+  return Math.round(sum / tasks.length);
 }
 
 function lastFinish(tasks: TaskStatus[]): number | undefined {
@@ -69,14 +85,18 @@ export function stageViews(job: Job | undefined, stopAfter: Stage): StageView[] 
     // A stage can start once the one before it has finished; the first, once
     // the job exists.
     const previous = stages[i - 1];
-    const since = previous === undefined ? (job?.createdAt ? timestampMs(job.createdAt) : undefined) : lastFinish(tasksOf(previous));
+    const couldStart =
+      previous === undefined ? (job?.createdAt ? timestampMs(job.createdAt) : undefined) : lastFinish(tasksOf(previous));
+    const running = state === "running";
     return {
       stage,
       label: stageLabels[stage] ?? "Unknown stage",
       state,
       cached: tasks.length > 0 && tasks.every((t) => t.cacheHit),
       seconds: state === "done" ? duration(tasks) : undefined,
-      since: state === "running" ? since : undefined,
+      since: running ? (firstStart(tasks) ?? couldStart) : undefined,
+      percent: running ? percentDone(tasks) : undefined,
+      activity: running ? tasks.find((t) => t.state !== TaskState.SUCCEEDED && t.activity)?.activity : undefined,
       error: failed?.error?.userMessage || (failed ? "This step failed." : undefined),
       retryable: failed?.error?.retryable,
     };

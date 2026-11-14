@@ -123,6 +123,7 @@ Fetches NASA POWER monthly means for one point, with no login. The gateway sets 
 - Any other error publishes a `StageDone` with a `TaskError` and acks.
 - Failed attempts are counted in Redis, not by JetStream. Every Harmony poll is a JetStream delivery too, so the consumer's delivery limit is only a ceiling, at 2000.
 - While a task runs, the worker sends a heartbeat every third of `INGEST_ACK_WAIT`, so a long download isn't redelivered.
+- It also publishes `TaskProgress` on `events.task.progress`: once on a task's first delivery, then whatever the adapter reports through `core.ReportProgress`, at most every 2 seconds, plus the newest update before a task goes back to wait. The Harmony adapter reports Harmony's own percent while NASA works, then a count of files as it downloads them. Other adapters report nothing yet, and the app shows elapsed time for them instead.
 
 ## Settings
 

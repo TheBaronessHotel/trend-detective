@@ -88,6 +88,18 @@ class StageDone(_message.Message):
     error: TaskError
     def __init__(self, meta: _Optional[_Union[TaskMeta, _Mapping]] = ..., attempt: _Optional[int] = ..., cache_hit: _Optional[bool] = ..., finished_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ingest: _Optional[_Union[_ingest_pb2.RawDataset, _Mapping]] = ..., preprocess: _Optional[_Union[_preprocess_pb2.PreprocessResult, _Mapping]] = ..., analysis: _Optional[_Union[_analysis_pb2.AnalysisResult, _Mapping]] = ..., error: _Optional[_Union[TaskError, _Mapping]] = ...) -> None: ...
 
+class TaskProgress(_message.Message):
+    __slots__ = ("meta", "started_at", "percent", "activity")
+    META_FIELD_NUMBER: _ClassVar[int]
+    STARTED_AT_FIELD_NUMBER: _ClassVar[int]
+    PERCENT_FIELD_NUMBER: _ClassVar[int]
+    ACTIVITY_FIELD_NUMBER: _ClassVar[int]
+    meta: TaskMeta
+    started_at: _timestamp_pb2.Timestamp
+    percent: int
+    activity: str
+    def __init__(self, meta: _Optional[_Union[TaskMeta, _Mapping]] = ..., started_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., percent: _Optional[int] = ..., activity: _Optional[str] = ...) -> None: ...
+
 class TaskError(_message.Message):
     __slots__ = ("code", "retryable", "user_message", "detail")
     CODE_FIELD_NUMBER: _ClassVar[int]

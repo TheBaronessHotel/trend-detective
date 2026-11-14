@@ -62,6 +62,21 @@ message StageDone {
   }
 }
 
+// What a stage publishes on events.task.progress while a task runs: once when
+// it starts, then whenever it knows more, such as a Harmony job's percent.
+// Progress is best effort. The gateway may drop an update, and it never lets
+// one overwrite a task that has already finished.
+message TaskProgress {
+  TaskMeta meta = 1;
+  // When the stage started on the task. Set on the first update.
+  google.protobuf.Timestamp started_at = 2;
+  // Share of the task done, 0 to 100. Unset when the stage can't tell.
+  optional int32 percent = 3;
+  // What the task is doing, for people, such as "NASA is preparing the
+  // files". Shown as written, like TaskError.user_message.
+  string activity = 4;
+}
+
 // Why a task failed.
 message TaskError {
   ErrorCode code = 1;

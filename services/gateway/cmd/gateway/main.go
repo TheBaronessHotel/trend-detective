@@ -162,9 +162,10 @@ func run() error {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	errc := make(chan error, 3)
+	errc := make(chan error, 4)
 	go func() { errc <- events.Run(ctx, js, orch, log, 16) }()
 	go func() { errc <- events.RunAdvisories(ctx, js, orch, log) }()
+	go func() { errc <- events.RunProgress(ctx, js, orch, log) }()
 	go func() {
 		log.Info(ctx, "listening", "addr", srv.Addr, "variables", len(cat.Variables()))
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
