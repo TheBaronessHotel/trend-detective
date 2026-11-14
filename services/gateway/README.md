@@ -15,7 +15,9 @@ Go. The public Connect API on port 8080, and the orchestrator of every job. It p
 
 ## API
 
-So far: `ListVariables`, `CreateJob` and `GetJob`. The rest return `unimplemented` until their own tasks: `WatchJob` (GW-4), `GetResultURL` and `CreateUploadURL` (GW-5), `Narrate` (GW-6), and `GetQuota`.
+So far: `ListVariables`, `CreateJob`, `GetJob` and `WatchJob`. The rest return `unimplemented` until their own tasks: `GetResultURL` and `CreateUploadURL` (GW-5), `Narrate` (GW-6), and `GetQuota`.
+
+`WatchJob` sends the job right away and again after every change, then ends the stream once the job succeeds or fails. Every write to a job wakes its watchers at once, and they also re-read the job every 5 seconds in case a wake-up was missed. In the browser, connect-es handles the stream. `deploy/smoke/watch.py` is a small client that uses only the Python standard library.
 
 Connect speaks plain JSON over HTTP, so curl works:
 
@@ -45,6 +47,17 @@ Only `variableId`, `bbox` and `dates` are required. The gateway fills in the res
    - otherwise the gateway builds the next stage's tasks from the results and publishes them.
 
 Task IDs are predictable, like `<job>-preprocess-0`. If the gateway crashes halfway through starting a stage, the redelivered event starts it again with the same IDs, and JetStream drops the repeated publishes by `Nats-Msg-Id`.
+
+## When a stage never reports
+
+If a stage crashes on every attempt, it never sends a `StageDone`. Once its message runs out of deliveries, NATS publishes a max-deliveries advisory, and the ADVISORIES stream keeps it. The gateway then:
+1. reads the task from TASKS;
+2. records it as failed with `RETRIES_EXHAUSTED`, which fails the job;
+3. deletes the dead message.
+
+## Debugging a job
+
+`GET http://localhost:8080/debug/jobs/<id>` returns the job, with every task's stage, attempts and errors, plus the raw `StageDone` events behind it, as indented JSON. Compose publishes the gateway on 127.0.0.1 only.
 
 ## Redis layout
 
@@ -76,5 +89,5 @@ Add an entry to `catalog.yaml` and run `make test`. The catalog test fails on un
 
 ## Testing
 
-- `make test` covers the catalog, and the orchestrator against an in-memory Redis: every stage, duplicates, late duplicates, failures, `stop_after` and the token handling.
-- `make smoke`, with the stack up, creates a real job that stops after ingest and waits for it to succeed.
+- `make test` covers the catalog, and the orchestrator against an in-memory Redis: every stage, duplicates, late duplicates, failures, `stop_after`, the token handling, `WatchJob`, the advisory mapping and the debug page.
+- `make smoke`, with the stack up, creates a real job that stops after ingest, follows it with `WatchJob` until it succeeds, and checks `/debug/jobs`.

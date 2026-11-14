@@ -42,7 +42,10 @@ if [ -z "$id" ]; then
   exit 1
 fi
 
-echo "Waiting for job $id"
+echo "Watching job $id"
+python3 -I deploy/smoke/watch.py "$id" "$api" || { echo "FAIL: WatchJob didn't end with the job succeeded"; exit 1; }
+
+echo "Checking job $id"
 state=""
 for _ in $(seq 1 30); do
   job=$(call GetJob "{\"jobId\": \"$id\"}")
@@ -58,6 +61,12 @@ fi
 raw=$(printf '%s' "$job" | field job.results.raw.0.variables.0)
 if [ "$raw" != T2M ]; then
   echo "FAIL: job $id has no raw dataset for T2M: $job"
+  exit 1
+fi
+
+status=$(curl -s -o /tmp/smoke-debug.json -w '%{http_code}' "http://127.0.0.1:8080/debug/jobs/$id")
+if [ "$status" != 200 ] || ! grep -q stage_done_events /tmp/smoke-debug.json; then
+  echo "FAIL: /debug/jobs/$id answered $status"
   exit 1
 fi
 

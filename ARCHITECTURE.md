@@ -86,7 +86,7 @@ A one-shot Go program in `deploy/bootstrap`. It runs on every `make up`, creates
 - Every log record carries `job_id` and `task_id`, added through `WithContextAttrs`.
 - Python services use the same log field names and metric names.
 - Jaeger, Prometheus, Grafana and Pyroscope run in an opt-in compose profile started with `make up-obs`.
-- The gateway exposes `/debug/jobs/{id}` with each task's stage, attempts and errors.
+- The gateway exposes `/debug/jobs/{id}` with each task's stage, attempts and errors, plus the raw `StageDone` events.
 
 ## Job lifecycle
 
