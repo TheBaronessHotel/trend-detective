@@ -6,11 +6,10 @@ See the Analysis section of [ARCHITECTURE.md](../../ARCHITECTURE.md), and the [s
 
 ## Status
 
-ANA-1 is in: regression, Mann-Kendall with Sen's slope, and the agreement check. Still to come:
+ANA-1 is in: regression, Mann-Kendall with Sen's slope, and the agreement check. So is ANA-4: the shuffle test, the trend triangle, the monthly trends and the years to significance. Still to come:
 
 - **ANA-2, the grid tests.** `TestPlan.grid` is logged and skipped, and `AnalysisResult.grid` stays unset.
 - **ANA-3, diagnostics.** Pettitt, residual checks and outliers are logged and skipped.
-- **ANA-4, extras.** Shuffle, trend triangle, monthly trends and years to significance are logged and skipped.
 
 Skipped tests leave their fields unset, so the web app and the narrator should check a field is there before using it.
 
@@ -25,6 +24,7 @@ Skipped tests leave their fields unset, so the web app and the narrator should c
 | `src/analysis/suite.py` | Runs the plan's series tests and builds `SeriesAnalysis`, with the caveats |
 | `src/analysis/regression.py` | Least squares with the effective sample size correction |
 | `src/analysis/kendall.py` | Mann-Kendall (original, Hamed and Rao, seasonal), Sen's slope and its interval |
+| `src/analysis/extras.py` | The shuffle test, the trend triangle, the monthly trends and the years to significance |
 | `src/analysis/storage.py` | S3 through boto3, plus an in-memory store for tests |
 
 ## What the tests run on
@@ -54,6 +54,23 @@ The unit tests check all three variants against pymannkendall and the interval a
 
 **Agreement.** `same_direction` compares the signs of the regression slope and Sen's slope, and `same_significance` their verdicts. It's set when both tests ran.
 
+### Extras
+
+They test the same field as the regression. Where they need a p-value, they use the least-squares t-test with the same autocorrelation correction as the plan's regression, or with the correction on when the plan has no regression.
+
+**Shuffle test** (`ShuffleResult`). The series is cut into blocks of `block_length` months, 12 by default, counted from its first month. The whole blocks change places while the times stay put, and the least-squares slope is refitted each time, `permutations` times, 1000 by default. Blocks keep the autocorrelation inside them, and with 12-month blocks every value stays in its calendar month. A tail shorter than a block stays at the end.
+
+- `p_value` is `(k + 1) / (N + 1)`, where k of the N shuffles are at least as steep as the real slope. Counting the real series as one of the shuffles keeps it above 0.
+- `shuffled_slopes_per_decade` holds every shuffled slope, for the histogram, and `observed_slope_per_decade` is the regression's slope.
+- The shuffles come from a fixed seed, so a repeat task gives the same histogram.
+- It needs 5 whole blocks, since fewer can't be put in enough orders. A shorter record skips it with a caveat. `permutations` can be 1 to 10,000.
+
+**Trend triangle** (`TrendTriangleResult`). The trend of every window of whole calendar years at least `min_years` long, 10 by default. It shows whether a trend depends on where the record starts and ends. Rows are `start_years` and columns `end_years`, and both matrices are row-major `[start][end]`. A cell is NaN when its window is shorter than `min_years` or has fewer than 12 values. The cell for the first and the last year is the whole record, the same as `regression`. A record spanning fewer calendar years than `min_years` skips it with a caveat.
+
+**Monthly trends** (`monthly_trends`). A least-squares trend for each calendar month from its values across the years, January first. A month seen in fewer than 5 years gets NaN. When one or two months come out significant, a caveat says that twelve separate tests can produce that by chance: 46% of trendless series show at least one significant month at alpha 0.05, but only 2% show three.
+
+**Years to significance** (`YearsToSignificanceResult`). Weatherhead et al. (1998): the years of monthly data needed to detect the fitted trend with 90% probability, `n* = [3.3 * noise_sd / |trend_per_year| * sqrt((1 + phi) / (1 - phi))] ^ (2/3)`. `noise_sd` is the spread of the regression's residuals and `phi` their lag-1 autocorrelation, which the formula clips to ±0.99. A flat line gives `Infinity`. `years_so_far` runs from the first valid month to the last, and `already_significant` is the regression's verdict.
+
 ## Drawing the trend line and its band
 
 `RegressionResult.model` is enough to draw both, with no extra fields:
@@ -76,6 +93,9 @@ Plain sentences for the user and the narrator. In order:
 | `n_eff` under 10, with the correction on | Neighboring months are so alike that the N values count as only about M independent ones... |
 | Only one of regression and Mann-Kendall is significant | Only one of the two tests finds the trend significant... |
 | Both are significant, in opposite directions | The two tests find significant trends in opposite directions... |
+| Fewer than 5 whole shuffle blocks | The record is too short for the shuffle test, which needs at least N months |
+| Fewer calendar years than the triangle's `min_years` | The record is shorter than the N years the trend triangle's shortest window needs |
+| One or two months significant on their own | Each month of the year was tested on its own, and with twelve tests one or two can look significant just by chance |
 
 Two tests that both find nothing get no caveat, even when their small slopes point different ways.
 
@@ -94,7 +114,7 @@ If `result.json` exists, the task reuses it and reports `cache_hit: true`. Bump 
 
 | Error | Code |
 |---|---|
-| A daily or weekly series, more than one value in a month, a bad `alpha` or an unknown variant | `INVALID_REQUEST` |
+| A daily or weekly series, more than one value in a month, a bad `alpha`, an unknown variant, or shuffle or triangle settings out of range | `INVALID_REQUEST` |
 | Fewer than 12 values, or less than 2 years between the first and the last | `NO_DATA` |
 | A `Series` that isn't valid protojson | `INTERNAL` |
 | SeaweedFS errors, including a missing `Series` | Retried after 10 s, then 1 min, and reported as `INTERNAL` after 3 attempts |
@@ -115,4 +135,5 @@ Logs are `key=value` lines with `time`, `level` and `msg`, plus `job_id`, `task_
 
 - `make test-analysis` runs what CI's `analysis` workflow runs, in a few seconds: the lockfile check, ruff with bug rules only, and the unit tests. It needs uv.
 - pymannkendall is a dev dependency only. The service doesn't import it.
-- `make smoke`, with the stack up, runs the Delhi bundle through every stage and checks the trend analysis has the regression and Mann-Kendall results.
+- A calibration test runs the shuffle test on 100 trendless autocorrelated series and expects about 5% false alarms. The same series give a plain t-test about 21%.
+- `make smoke`, with the stack up, runs the Delhi bundle through every stage and checks the trend analysis has the regression, Mann-Kendall and extras results.
