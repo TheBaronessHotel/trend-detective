@@ -76,17 +76,64 @@ echo "Checking that a job that stopped after ingest has no time series"
 notready=$(call GetResultURL "{\"jobId\": \"$id\", \"artifact\": \"ARTIFACT_SERIES\"}")
 case "$notready" in *failed_precondition*) ;; *) echo "FAIL: GetResultURL should say there's no series: $notready"; exit 1 ;; esac
 
-echo "Uploading a CSV through a signed URL"
-printf 'date,value\n2001-01,3.5\n' > /tmp/smoke-upload.csv
-upload=$(call CreateUploadURL "{\"filename\": \"smoke.csv\", \"sizeBytes\": $(wc -c < /tmp/smoke-upload.csv | tr -d ' ')}")
-put_url=$(printf '%s' "$upload" | field url)
-key=$(printf '%s' "$upload" | field upload.key)
-status=$(curl -s -o /dev/null -w '%{http_code}' -X PUT --data-binary @/tmp/smoke-upload.csv "$put_url")
-if [ "$status" != 200 ] || ! curl -s "http://127.0.0.1:8888/buckets/uploads/$key" | grep -q 2001-01; then
-  echo "FAIL: upload through the signed URL answered $status"
+# upload FILE: uploads FILE through a signed URL and prints its BlobRef.
+upload() {
+  up=$(call CreateUploadURL "{\"filename\": \"smoke.csv\", \"sizeBytes\": $(wc -c < "$1" | tr -d ' ')}")
+  status=$(curl -s -o /dev/null -w '%{http_code}' -X PUT --data-binary @"$1" "$(printf '%s' "$up" | field url)")
+  if [ "$status" != 200 ]; then
+    echo "FAIL: upload through the signed URL answered $status" >&2
+    exit 1
+  fi
+  printf '%s' "$up" | field upload
+}
+
+# csv_job REF: creates a job on an uploaded file that stops after ingest,
+# waits for it to end and prints its ID.
+csv_job() {
+  created=$(call CreateJob "{\"spec\": {\"variableId\": \"user-csv\", \"upload\": $1,
+    \"bbox\": {\"west\": -9.5, \"south\": 38.5, \"east\": -9.0, \"north\": 39.0},
+    \"dates\": {\"start\": {\"year\": 1800, \"month\": 1, \"day\": 1}, \"end\": {\"year\": 2100, \"month\": 12, \"day\": 31}},
+    \"stopAfter\": \"STAGE_INGEST\"}}")
+  job=$(printf '%s' "$created" | field job.id)
+  [ -n "$job" ] || { echo "FAIL: CreateJob refused the CSV job: $created" >&2; exit 1; }
+  python3 -I deploy/smoke/watch.py "$job" "$api" >/dev/null 2>&1 || true
+  printf '%s' "$job"
+}
+
+echo "Uploading a CSV through a signed URL and running a job on it"
+{
+  echo 'date,rain (mm)'
+  for y in 2001 2002 2003; do
+    for m in 01 02 03 04 05 06 07 08 09 10 11 12; do echo "$y-$m,$m.5"; done
+  done
+} > /tmp/smoke-upload.csv
+ref=$(upload /tmp/smoke-upload.csv)
+csvid=$(csv_job "$ref")
+raw=$(call GetJob "{\"jobId\": \"$csvid\"}" | python3 -I -c '
+import json, sys
+job = json.load(sys.stdin)["job"]
+raws = job.get("results", {}).get("raw", [])
+if job["state"] != "JOB_STATE_SUCCEEDED" or not raws:
+    sys.exit("job ended as %s: %s" % (job["state"], json.dumps(job.get("tasks"))))
+raw = raws[0]
+if raw["format"] != "FORMAT_USER_CSV" or raw.get("step") != "TIME_STEP_MONTHLY" or raw["variables"] != ["rain (mm)"]:
+    sys.exit("unexpected raw dataset: " + json.dumps(raw))
+print(raw["files"][0]["blob"]["key"])
+') || { echo "FAIL: CSV job $csvid: $raw"; exit 1; }
+clean=$(curl -s "http://127.0.0.1:8888/buckets/raw/$raw" | head -2 | tr '\n' ' ')
+if [ "$clean" != "date,value 2001-01-01,1.5 " ]; then
+  echo "FAIL: the cleaned-up CSV starts with '$clean'"
   exit 1
 fi
-curl -s -o /dev/null -X DELETE "http://127.0.0.1:8888/buckets/uploads/$key"
+curl -s -o /dev/null -X DELETE "http://127.0.0.1:8888/buckets/uploads/$(printf '%s' "$ref" | field key)"
+
+echo "Checking that a broken CSV fails with the row to fix"
+printf 'date,value\n2001-01,1\n2001-02,abc\n' > /tmp/smoke-bad.csv
+ref=$(upload /tmp/smoke-bad.csv)
+badid=$(csv_job "$ref")
+message=$(call GetJob "{\"jobId\": \"$badid\"}" | field job.tasks.0.error.userMessage)
+case "$message" in *'Row 3: "abc"'*) ;; *) echo "FAIL: broken CSV job $badid said '$message'"; exit 1 ;; esac
+curl -s -o /dev/null -X DELETE "http://127.0.0.1:8888/buckets/uploads/$(printf '%s' "$ref" | field key)"
 
 echo "Checking that dates outside the variable's range are refused"
 outside=$(call CreateJob '{"spec": {"variableId": "air-temperature-power", "source": "SOURCE_BUNDLE",

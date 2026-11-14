@@ -92,6 +92,8 @@ services:
       <<: *infra-env
       EARTHDATA_TOKEN: ${EARTHDATA_TOKEN:-}
       HARMONY_CONCURRENCY: ${HARMONY_CONCURRENCY:-4}
+      # The same limit as the gateway's, checked again when reading.
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-20}
       BUNDLE_DIR: /bundle
       LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:

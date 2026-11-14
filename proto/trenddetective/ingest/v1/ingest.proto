@@ -37,7 +37,9 @@ enum Format {
   FORMAT_GIOVANNI_CSV = 2;
   // NASA POWER JSON.
   FORMAT_POWER_JSON = 3;
-  // A user CSV with a date column and a value column.
+  // A user's CSV, cleaned up by csv-upload: a "date,value" header, then one
+  // row per time step, sorted, with no repeated dates. Dates are YYYY-MM-DD,
+  // and monthly data uses the first of the month. An empty value is missing.
   FORMAT_USER_CSV = 4;
   // GeoTIFF, from AppEEARS area requests.
   FORMAT_GEOTIFF = 5;
@@ -119,7 +121,8 @@ message Power {
   trenddetective.common.v1.LatLon point = 3;
 }
 
-// Settings for SOURCE_CSV_UPLOAD.
+// Settings for SOURCE_CSV_UPLOAD. Ingest reads the file, checks it, and
+// stores a cleaned-up copy as FORMAT_USER_CSV.
 message CsvUpload {
   // The file in the uploads bucket, from CreateUploadURL.
   trenddetective.common.v1.BlobRef upload = 1;
@@ -157,6 +160,10 @@ message RawDataset {
   trenddetective.common.v1.DateRange dates = 7;
   repeated RawFile files = 8;
   google.protobuf.Timestamp fetched_at = 9;
+  // The data's time step, when the adapter knows it and the catalog can't.
+  // Set by csv-upload, which reads it from the file's dates, so preprocess
+  // can tell whether daily values still need monthly means.
+  trenddetective.common.v1.TimeStep step = 10;
 }
 
 // One file in the raw bucket.

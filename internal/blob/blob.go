@@ -79,6 +79,26 @@ func (b *Bucket) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 	return obj, nil
 }
 
+// Info is an object's metadata.
+type Info struct {
+	Size int64
+	// Changes whenever the object's content does.
+	ETag string
+}
+
+// Stat returns an object's metadata. It returns ErrNotFound when the object
+// doesn't exist.
+func (b *Bucket) Stat(ctx context.Context, key string) (Info, error) {
+	info, err := b.mc.StatObject(ctx, b.name, key, minio.StatObjectOptions{})
+	if err != nil {
+		if isNotFound(err) {
+			return Info{}, ErrNotFound
+		}
+		return Info{}, fmt.Errorf("stat %s/%s: %w", b.name, key, err)
+	}
+	return Info{Size: info.Size, ETag: info.ETag}, nil
+}
+
 // PutProto writes msg as protojson.
 func (b *Bucket) PutProto(ctx context.Context, key string, msg proto.Message) (*commonv1.BlobRef, error) {
 	data, err := protojson.Marshal(msg)

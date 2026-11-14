@@ -69,7 +69,7 @@ Files go straight between the browser and SeaweedFS through presigned URLs, so t
   - For a cube, `data_url` is the cube's binary data. The gateway reads the cube header to find it.
   - An output the job doesn't have yet gets `failed_precondition`, with a message like "The trend analysis isn't ready yet."
   - Only the prep and analysis buckets are ever signed.
-- **`CreateUploadURL(filename, size_bytes)`** signs a PUT for a CSV of up to `MAX_UPLOAD_MB`, at `uploads/<uuid>/<cleaned-up name>`. Pass the returned `upload` as `JobSpec.upload`. A presigned PUT can't enforce the size, so the csv-upload adapter checks it again when reading.
+- **`CreateUploadURL(filename, size_bytes)`** signs a PUT for a CSV of up to `MAX_UPLOAD_MB`, at `uploads/<uuid>/<cleaned-up name>`. Pass the returned `upload` as `JobSpec.upload`. A presigned PUT can't enforce the size, so the csv-upload adapter checks it again when reading. `CreateJob` refuses an upload ref outside the `uploads` bucket. The `user-csv` catalog entry runs CSV jobs.
 
 URLs are signed for `S3_PUBLIC_ENDPOINT`, the address the browser uses, and work for `PRESIGN_TTL`. The signature covers the host, so a URL signed for the internal `seaweedfs:8333` would fail in the browser. SeaweedFS answers the browser's CORS preflight itself, using `S3_ALLOWED_ORIGINS`.
 

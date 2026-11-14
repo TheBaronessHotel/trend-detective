@@ -388,8 +388,11 @@ func (o *Orchestrator) resolve(spec *gatewayv1.JobSpec) (*gatewayv1.JobSpec, *ca
 	if _, ok := entry.IngestTemplate(r.GetSource()); !ok {
 		return nil, nil, invalid("%s isn't available from %s.", entry.Variable.GetName(), sources.Name(r.GetSource()))
 	}
-	if r.GetSource() == ingestv1.Source_SOURCE_CSV_UPLOAD && r.GetUpload().GetKey() == "" {
-		return nil, nil, invalid("A CSV upload job needs the uploaded file.")
+	// Only files from CreateUploadURL, so a job can't read other buckets.
+	if r.GetSource() == ingestv1.Source_SOURCE_CSV_UPLOAD {
+		if up := r.GetUpload(); up.GetKey() == "" || up.GetBucket() != "uploads" {
+			return nil, nil, invalid("A CSV upload job needs the file uploaded through CreateUploadURL.")
+		}
 	}
 	if r.Filters == nil {
 		r.Filters = entry.Filters()

@@ -75,7 +75,8 @@ func (f *fakeAdapter) Fetch(ctx context.Context, _ *ingestv1.IngestTask, sink Si
 			return nil, err
 		}
 	}
-	return &Fetched{Source: ingestv1.Source_SOURCE_POWER, Format: ingestv1.Format_FORMAT_POWER_JSON, Variables: []string{"T2M"}}, nil
+	return &Fetched{Source: ingestv1.Source_SOURCE_POWER, Format: ingestv1.Format_FORMAT_POWER_JSON, Variables: []string{"T2M"},
+		Step: commonv1.TimeStep_TIME_STEP_MONTHLY}, nil
 }
 
 func bundleTask() *ingestv1.IngestTask {
@@ -98,7 +99,7 @@ func TestIngestWritesFilesAndThenHitsTheCache(t *testing.T) {
 	if err != nil || hit {
 		t.Fatalf("first run: hit=%v err=%v", hit, err)
 	}
-	if ds.GetSource() != ingestv1.Source_SOURCE_POWER || ds.GetVariableId() != "power-t2m" {
+	if ds.GetSource() != ingestv1.Source_SOURCE_POWER || ds.GetVariableId() != "power-t2m" || ds.GetStep() != commonv1.TimeStep_TIME_STEP_MONTHLY {
 		t.Errorf("dataset metadata: %v", ds)
 	}
 	if len(ds.GetFiles()) != 2 || !strings.HasSuffix(ds.GetFiles()[0].GetBlob().GetKey(), "/files/a.json") {

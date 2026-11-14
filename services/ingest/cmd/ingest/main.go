@@ -15,6 +15,7 @@ import (
 	"github.com/TheBaronessHotel/trend-detective/internal/obs"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/bundle"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/core"
+	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/csvupload"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/earthdata"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/giovanni"
 	"github.com/TheBaronessHotel/trend-detective/services/ingest/internal/harmony"
@@ -50,6 +51,11 @@ func run() error {
 		return err
 	}
 	harmonyConcurrency, err := envx.Int("HARMONY_CONCURRENCY", 4)
+	if err != nil {
+		return err
+	}
+	// The same limit the gateway signs uploads for.
+	maxUploadMB, err := envx.Int("MAX_UPLOAD_MB", 20)
 	if err != nil {
 		return err
 	}
@@ -96,7 +102,8 @@ func run() error {
 		util.Logger.Warn(ctx, "EARTHDATA_TOKEN is empty, so Harmony and Giovanni tasks fail unless the user gives a token")
 	}
 	powerAdapter := power.New(envx.String("POWER_URL", "https://power.larc.nasa.gov"))
-	svc := core.New(store.Bucket("raw"), bundles, harmonyAdapter, giovanniArea, giovanniPoint, powerAdapter)
+	csvUpload := csvupload.New(store.Bucket("uploads"), int64(maxUploadMB)<<20)
+	svc := core.New(store.Bucket("raw"), bundles, harmonyAdapter, giovanniArea, giovanniPoint, powerAdapter, csvUpload)
 
 	nc, err := nats.Connect(env["NATS_URL"], nats.Name("ingest"), nats.MaxReconnects(-1))
 	if err != nil {
