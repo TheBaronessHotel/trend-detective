@@ -429,11 +429,19 @@ func (x *HarmonySubset) GetMaxGranules() int32 {
 	return 0
 }
 
-// Settings for SOURCE_GIOVANNI_AREA.
+// Settings for SOURCE_GIOVANNI_AREA. Ingest asks Harmony's Giovanni
+// averaging service for the area average of the rectangle, one value per
+// time step, as CSV.
 type GiovanniArea struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Giovanni variable ID, for example "GPM_3IMERGM_07_precipitation".
-	DataFieldId   string `protobuf:"bytes,1,opt,name=data_field_id,json=dataFieldId,proto3" json:"data_field_id,omitempty"`
+	// Giovanni variable ID, for example
+	// "OMNO2d_003_ColumnAmountNO2TropCloudScreened". The list is at
+	// api.giovanni.earthdata.nasa.gov/configured-variables/. The averaging
+	// service refuses the variable's path inside the file.
+	DataFieldId string `protobuf:"bytes,1,opt,name=data_field_id,json=dataFieldId,proto3" json:"data_field_id,omitempty"`
+	// CMR collection concept ID, for example "C1266136111-GES_DISC". Harmony
+	// needs it in the request URL.
+	CollectionId  string `protobuf:"bytes,2,opt,name=collection_id,json=collectionId,proto3" json:"collection_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -471,6 +479,13 @@ func (*GiovanniArea) Descriptor() ([]byte, []int) {
 func (x *GiovanniArea) GetDataFieldId() string {
 	if x != nil {
 		return x.DataFieldId
+	}
+	return ""
+}
+
+func (x *GiovanniArea) GetCollectionId() string {
+	if x != nil {
+		return x.CollectionId
 	}
 	return ""
 }
@@ -944,9 +959,10 @@ const file_trenddetective_ingest_v1_ingest_proto_rawDesc = "" +
 	"\rHarmonySubset\x12#\n" +
 	"\rcollection_id\x18\x01 \x01(\tR\fcollectionId\x12\x1c\n" +
 	"\tvariables\x18\x02 \x03(\tR\tvariables\x12!\n" +
-	"\fmax_granules\x18\x03 \x01(\x05R\vmaxGranules\"2\n" +
+	"\fmax_granules\x18\x03 \x01(\x05R\vmaxGranules\"W\n" +
 	"\fGiovanniArea\x12\"\n" +
-	"\rdata_field_id\x18\x01 \x01(\tR\vdataFieldId\"k\n" +
+	"\rdata_field_id\x18\x01 \x01(\tR\vdataFieldId\x12#\n" +
+	"\rcollection_id\x18\x02 \x01(\tR\fcollectionId\"k\n" +
 	"\rGiovanniPoint\x12\"\n" +
 	"\rdata_field_id\x18\x01 \x01(\tR\vdataFieldId\x126\n" +
 	"\x05point\x18\x02 \x01(\v2 .trenddetective.common.v1.LatLonR\x05point\"}\n" +

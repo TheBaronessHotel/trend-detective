@@ -37,9 +37,23 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// version changes when the adapter starts writing different files for the
-// same task, which invalidates cached datasets.
-const version = "harmony-subset/1"
+// mode holds what differs between the two Harmony services the adapter
+// speaks to.
+type mode struct {
+	source ingestv1.Source
+	// Changes when the adapter starts writing different files for the same
+	// task, which invalidates cached datasets.
+	version string
+	format  ingestv1.Format
+	// Ask Giovanni's averaging service for one area-average value per time
+	// step, instead of HOSS for a subset of every granule.
+	areaAverage bool
+}
+
+var (
+	subsetMode = mode{source: ingestv1.Source_SOURCE_HARMONY_SUBSET, version: "harmony-subset/1", format: ingestv1.Format_FORMAT_NETCDF4}
+	areaMode   = mode{source: ingestv1.Source_SOURCE_GIOVANNI_AREA, version: "giovanni-area/1", format: ingestv1.Format_FORMAT_GIOVANNI_CSV, areaAverage: true}
+)
 
 const (
 	submitCheck = 10 * time.Second
@@ -65,22 +79,37 @@ type Config struct {
 	Downloads int
 }
 
-// Adapter implements core.Adapter for SOURCE_HARMONY_SUBSET.
+// Adapter implements core.Adapter for SOURCE_HARMONY_SUBSET, or for
+// SOURCE_GIOVANNI_AREA when made with NewAreaAverage.
 type Adapter struct {
 	cfg  Config
 	rdb  *redis.Client
 	http *http.Client
+	mode mode
 }
 
 // errLogin means Earthdata sent us to its login page, which happens when the
 // token is missing or rejected.
 var errLogin = errors.New("redirected to the Earthdata login page")
 
-// New returns an Adapter. rdb holds job state, slots and user tokens.
+// New returns the harmony-subset adapter. rdb holds job state, slots and
+// user tokens.
 func New(cfg Config, rdb *redis.Client) *Adapter {
+	return newAdapter(cfg, rdb, subsetMode)
+}
+
+// NewAreaAverage returns the giovanni-area adapter. It goes through Harmony
+// too, to Giovanni's averaging service, and shares the same slots per token.
+// It writes one CSV with one area-average value per time step.
+func NewAreaAverage(cfg Config, rdb *redis.Client) *Adapter {
+	return newAdapter(cfg, rdb, areaMode)
+}
+
+func newAdapter(cfg Config, rdb *redis.Client, m mode) *Adapter {
 	return &Adapter{
-		cfg: cfg,
-		rdb: rdb,
+		cfg:  cfg,
+		rdb:  rdb,
+		mode: m,
 		http: &http.Client{
 			Timeout: 10 * time.Minute,
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -97,17 +126,17 @@ func New(cfg Config, rdb *redis.Client) *Adapter {
 }
 
 // Source implements core.Adapter.
-func (a *Adapter) Source() ingestv1.Source { return ingestv1.Source_SOURCE_HARMONY_SUBSET }
+func (a *Adapter) Source() ingestv1.Source { return a.mode.source }
 
 // Fingerprint implements core.Adapter.
 func (a *Adapter) Fingerprint(context.Context, *ingestv1.IngestTask) (string, error) {
-	return version, nil
+	return a.mode.version, nil
 }
 
 // Fetch implements core.Adapter. It returns core.Pending until the Harmony
 // job is done.
 func (a *Adapter) Fetch(ctx context.Context, task *ingestv1.IngestTask, sink core.Sink) (*core.Fetched, error) {
-	req, err := newRequest(task)
+	req, err := newRequest(task, a.mode)
 	if err != nil {
 		return nil, err
 	}
@@ -142,8 +171,8 @@ func (a *Adapter) Fetch(ctx context.Context, task *ingestv1.IngestTask, sink cor
 		}
 		_ = a.rdb.Del(ctx, stateKey).Err()
 		return &core.Fetched{
-			Source:    ingestv1.Source_SOURCE_HARMONY_SUBSET,
-			Format:    ingestv1.Format_FORMAT_NETCDF4,
+			Source:    a.mode.source,
+			Format:    a.mode.format,
 			Variables: req.variables,
 		}, nil
 	case "failed", "canceled":
@@ -181,15 +210,19 @@ func failure(j *job, collection string) error {
 		"NASA's Harmony service couldn't process this request.", "Harmony job %s %s: %s", j.JobID, j.Status, detail)
 }
 
-// start counts granules, takes a slot and submits the job.
+// start counts granules, takes a slot and submits the job. Area averages
+// skip the count: Giovanni reads the granules itself and returns one file.
 func (a *Adapter) start(ctx context.Context, req *request, token, stateKey string) error {
-	hits, err := a.granules(ctx, token, req)
-	if err != nil {
-		return err
-	}
-	if hits == 0 {
-		return core.Errorf(gatewayv1.ErrorCode_ERROR_CODE_NO_DATA, false,
-			"There's no data for this place and time range.", "CMR found no granules")
+	hits := 0
+	if !a.mode.areaAverage {
+		var err error
+		if hits, err = a.granules(ctx, token, req); err != nil {
+			return err
+		}
+		if hits == 0 {
+			return core.Errorf(gatewayv1.ErrorCode_ERROR_CODE_NO_DATA, false,
+				"There's no data for this place and time range.", "CMR found no granules")
+		}
 	}
 	if req.maxGranules > 0 && hits > req.maxGranules {
 		return core.Errorf(gatewayv1.ErrorCode_ERROR_CODE_TOO_LARGE, false,
@@ -212,7 +245,7 @@ func (a *Adapter) start(ctx context.Context, req *request, token, stateKey strin
 		return core.Transient(err)
 	}
 	_ = a.rdb.Expire(ctx, stateKey, stateTTL).Err()
-	return core.Pending(submitCheck, fmt.Sprintf("submitted Harmony job %s for %d granules", jobID, hits))
+	return core.Pending(submitCheck, fmt.Sprintf("submitted Harmony job %s (%s, %d granules counted)", jobID, a.mode.version, hits))
 }
 
 // token returns the user's own token when the task has one, else the team's.
@@ -244,27 +277,30 @@ type request struct {
 	maxGranules int
 }
 
-func newRequest(task *ingestv1.IngestTask) (*request, error) {
-	h := task.GetHarmonySubset()
-	start, ok1 := isoDate(task.GetDates().GetStart(), false)
-	end, ok2 := isoDate(task.GetDates().GetEnd(), true)
-	if h.GetCollectionId() == "" || len(h.GetVariables()) == 0 || task.GetBbox() == nil || !ok1 || !ok2 {
-		return nil, core.Errorf(gatewayv1.ErrorCode_ERROR_CODE_INVALID_REQUEST, false,
-			"The job couldn't start.", "harmony-subset task needs a collection, variables, a rectangle and dates")
+func newRequest(task *ingestv1.IngestTask, m mode) (*request, error) {
+	r := &request{bbox: task.GetBbox()}
+	if m.areaAverage {
+		g := task.GetGiovanniArea()
+		r.collection = g.GetCollectionId()
+		if g.GetDataFieldId() != "" {
+			r.variables = []string{g.GetDataFieldId()}
+		}
+	} else {
+		h := task.GetHarmonySubset()
+		r.collection, r.variables, r.maxGranules = h.GetCollectionId(), h.GetVariables(), int(h.GetMaxGranules())
 	}
-	key, err := core.CacheKey(task, version)
-	if err != nil {
+	var ok1, ok2 bool
+	r.start, ok1 = isoDate(task.GetDates().GetStart(), false)
+	r.end, ok2 = isoDate(task.GetDates().GetEnd(), true)
+	if r.collection == "" || len(r.variables) == 0 || r.bbox == nil || !ok1 || !ok2 {
+		return nil, core.Errorf(gatewayv1.ErrorCode_ERROR_CODE_INVALID_REQUEST, false,
+			"The job couldn't start.", "%s task needs a collection, variables, a rectangle and dates", m.version)
+	}
+	var err error
+	if r.key, err = core.CacheKey(task, m.version); err != nil {
 		return nil, err
 	}
-	return &request{
-		key:         key,
-		collection:  h.GetCollectionId(),
-		variables:   h.GetVariables(),
-		bbox:        task.GetBbox(),
-		start:       start,
-		end:         end,
-		maxGranules: int(h.GetMaxGranules()),
-	}, nil
+	return r, nil
 }
 
 // isoDate formats a date as the first or last second of that day, in UTC.
@@ -312,6 +348,9 @@ func (a *Adapter) submit(ctx context.Context, token string, r *request) (string,
 		"subset":      {"lat(" + num(r.bbox.GetSouth()) + ":" + num(r.bbox.GetNorth()) + ")", "lon(" + num(r.bbox.GetWest()) + ":" + num(r.bbox.GetEast()) + ")", `time("` + r.start + `":"` + r.end + `")`},
 		"forceAsync":  {"true"},
 		"skipPreview": {"true"},
+	}
+	if a.mode.areaAverage {
+		q.Set("average", "area")
 	}
 	u := fmt.Sprintf("%s/%s/ogc-api-coverages/1.0.0/collections/parameter_vars/coverage/rangeset?%s",
 		a.cfg.HarmonyURL, url.PathEscape(r.collection), q.Encode())
@@ -455,8 +494,12 @@ func (a *Adapter) downloadOne(ctx context.Context, token string, l link, sink co
 	if err := statusError(resp, "Harmony download"); err != nil {
 		return err
 	}
+	// Giovanni labels its CSV "GEOTIFF/CSV", which isn't a MIME type.
 	contentType := l.Type
-	if contentType == "" {
+	switch {
+	case a.mode.areaAverage:
+		contentType = "text/csv"
+	case contentType == "":
 		contentType = "application/x-netcdf4"
 	}
 	return sink.Put(ctx, core.File{

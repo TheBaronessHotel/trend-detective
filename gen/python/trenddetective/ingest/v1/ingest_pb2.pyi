@@ -82,10 +82,12 @@ class HarmonySubset(_message.Message):
     def __init__(self, collection_id: _Optional[str] = ..., variables: _Optional[_Iterable[str]] = ..., max_granules: _Optional[int] = ...) -> None: ...
 
 class GiovanniArea(_message.Message):
-    __slots__ = ("data_field_id",)
+    __slots__ = ("data_field_id", "collection_id")
     DATA_FIELD_ID_FIELD_NUMBER: _ClassVar[int]
+    COLLECTION_ID_FIELD_NUMBER: _ClassVar[int]
     data_field_id: str
-    def __init__(self, data_field_id: _Optional[str] = ...) -> None: ...
+    collection_id: str
+    def __init__(self, data_field_id: _Optional[str] = ..., collection_id: _Optional[str] = ...) -> None: ...
 
 class GiovanniPoint(_message.Message):
     __slots__ = ("data_field_id", "point")
