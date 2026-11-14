@@ -1036,3 +1036,72 @@ p {
 .heat-popup .maplibregl-popup-tip {
   display: none;
 }
+
+/* ---- explanations: the narrator's overview and questions ---- */
+.narrate {
+  margin: 1.4rem 0 0;
+  padding: 1rem 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.narrate-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 0.8rem;
+}
+
+.narrate-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+.narrate-turns {
+  display: grid;
+  gap: 0.8rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.turn-text {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.turn-user .turn-text {
+  color: var(--muted);
+}
+
+.turn-user .turn-text::before {
+  content: "> ";
+}
+
+.turn-warn {
+  color: var(--bad);
+}
+
+.narrate-ask {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.8rem;
+}
+
+.narrate-key {
+  margin: 0.9rem 0 0;
+  font-size: 0.8rem;
+}
+
+.narrate-key summary {
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.narrate-key .fields {
+  margin-top: 0.6rem;
+}
