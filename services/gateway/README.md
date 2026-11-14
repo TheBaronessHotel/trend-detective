@@ -11,11 +11,12 @@ Go. The public Connect API on port 8080, and the orchestrator of every job. It p
 | `internal/catalog` | Loads and checks the catalog. A broken catalog stops the gateway at startup |
 | `internal/jobs` | The orchestrator, and the Redis store it uses |
 | `internal/api` | The Connect handlers. They turn errors into codes the web app can show |
+| `internal/narrate` | The `Narrate` proxy to the narrator service |
 | `internal/events` | The consumer of `events.stage.done` |
 
 ## API
 
-So far: `ListVariables`, `CreateJob`, `GetJob`, `WatchJob`, `GetResultURL` and `CreateUploadURL`. `Narrate` (GW-6) and `GetQuota` still return `unimplemented`.
+So far: `ListVariables`, `CreateJob`, `GetJob`, `WatchJob`, `GetResultURL`, `CreateUploadURL` and `Narrate`. `GetQuota` still returns `unimplemented`.
 
 `WatchJob` sends the job right away and again after every change, then ends the stream once the job succeeds or fails. Every write to a job wakes its watchers at once, and they also re-read the job every 5 seconds in case a wake-up was missed. In the browser, connect-es handles the stream. `deploy/smoke/watch.py` is a small client that uses only the Python standard library.
 
@@ -36,6 +37,25 @@ curl -s -H 'Content-Type: application/json' -d '{"jobId": "<id from CreateJob>"}
 ```
 
 Only `variableId`, `bbox` and `dates` are required. The gateway fills in the rest from the catalog, and `GetJob` shows the spec it actually used. An `X-Earthdata-Token` header on `CreateJob` makes ingest use that user's own NASA quota. The token goes into Redis, and only its key goes over NATS.
+
+## Narrate
+
+`Narrate(job_id, question, history, llm)` streams the narrator's explanation of a finished job. The user's LLM key goes in the `X-Llm-Api-Key` header. Without a key, an empty question gets the narrator's template overview.
+
+1. The gateway loads the job. Until `results.analysis.series` is set, it answers `failed_precondition` (HTTP 409) with a reason: still running, failed, or stopped before analysis.
+2. It builds the narrator's `NarrateRequest`: the analysis refs from the job, the `VariableContext` from the catalog (id, name, definition, units, `llm_hints`), bbox and dates from the job's resolved spec, and the browser's question, history and `llm` as sent.
+3. It calls the narrator at `NARRATOR_URL` over h2c, forwarding the key header only when one was sent, and relays every event unchanged.
+
+The narrator's own errors keep their code and message, like `unauthenticated` for a rejected key or `resource_exhausted` for a rate limit. If the narrator can't be reached, the answer is `unavailable` and the rest of the app works as usual. Compose has no `depends_on` on the narrator for that reason. The key is held for the call only. It is never logged, and it is removed from any narrator error before that error is logged or passed on.
+
+Connect streams need a 5-byte envelope before the JSON body:
+
+```sh
+body='{"jobId":"<id>","llm":{"provider":"PROVIDER_OPENAI_CHAT","model":"gpt-5.5"}}'
+{ printf '00%08x' ${#body} | xxd -r -p; printf %s "$body"; } | \
+  curl -sN -H 'Content-Type: application/connect+json' -H "X-Llm-Api-Key: $OPENAI_API_KEY" \
+    --data-binary @- $api/Narrate
+```
 
 ## How a job runs
 
@@ -117,9 +137,11 @@ Add an entry to `catalog.yaml` and run `make test`. The catalog test fails on un
 | `QUOTA_CUTOFF` | 0.9 | Share of the Giovanni quota after which Giovanni jobs are refused |
 | `EARTHDATA_TOKEN` | empty | The team's token, for the Giovanni quota check |
 | `CMR_URL`, `HARMONY_URL`, `GIOVANNI_URL` | NASA's public addresses | |
+| `NARRATOR_URL` | `http://narrator:8081` | The narrator's Connect address, called over h2c |
+| `NARRATOR_TIMEOUT` | `4m` | Upper bound for one `Narrate` call, stream included. Keep it above the narrator's `NARRATE_TIMEOUT` (3m) so its own timeout reaches the user |
 | `LOG_LEVEL`, `ADMIN_ADDR` | `info`, `:9090` | As for every Go service |
 
 ## Testing
 
-- `make test` covers the catalog, and the orchestrator against an in-memory Redis: every stage, duplicates, late duplicates, failures, `stop_after`, the token handling, `WatchJob`, the advisory mapping, the debug page, signed downloads and uploads, the preflight checks against a fake NASA, date clamping and the task cap.
+- `make test` covers the catalog, and the orchestrator against an in-memory Redis: every stage, duplicates, late duplicates, failures, `stop_after`, the token handling, `WatchJob`, the advisory mapping, the debug page, signed downloads and uploads, the preflight checks against a fake NASA, date clamping and the task cap. `Narrate` runs against a fake narrator served over h2c: the relayed stream, the request it builds, key forwarding, unfinished jobs, narrator errors, an unreachable narrator, the timeout, and that the key never reaches a log.
 - `make smoke`, with the stack up, creates a real job that stops after ingest, follows it with `WatchJob` until it succeeds, and checks `/debug/jobs`. It also checks that the job has no series, and uploads a CSV through a signed URL.

@@ -6,12 +6,15 @@ package api
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"connectrpc.com/connect/v2"
 	gatewayv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/gateway/v1"
 	"github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/gateway/v1/gatewayv1connect"
+	narratorv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/narrator/v1"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/catalog"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/jobs"
+	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/narrate"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/preflight"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/results"
 	"github.com/lein3000zzz/the-watchers/pkg/observability/logging"
@@ -21,6 +24,12 @@ import (
 // EarthdataTokenHeader carries a user's own Earthdata token on CreateJob.
 const EarthdataTokenHeader = "X-Earthdata-Token"
 
+// LLMKeyHeader carries a user's own LLM key on Narrate.
+const LLMKeyHeader = narrate.APIKeyHeader
+
+// msgNarratorDown is shown when the narrator can't be reached.
+const msgNarratorDown = "The explanation service isn't reachable right now. The charts and numbers still work. Try again in a moment."
+
 // Server implements GatewayService. Methods that belong to later tasks
 // return Unimplemented.
 type Server struct {
@@ -28,12 +37,13 @@ type Server struct {
 	cat     *catalog.Catalog
 	jobs    *jobs.Orchestrator
 	results *results.Service
+	narrate *narrate.Service
 	log     logging.Logger
 }
 
 // New returns a Server.
-func New(cat *catalog.Catalog, orch *jobs.Orchestrator, res *results.Service, log logging.Logger) *Server {
-	return &Server{cat: cat, jobs: orch, results: res, log: log.With("component", "api")}
+func New(cat *catalog.Catalog, orch *jobs.Orchestrator, res *results.Service, narr *narrate.Service, log logging.Logger) *Server {
+	return &Server{cat: cat, jobs: orch, results: res, narrate: narr, log: log.With("component", "api")}
 }
 
 // ListVariables implements GatewayService.
@@ -102,6 +112,29 @@ func (s *Server) CreateUploadURL(ctx context.Context, req *gatewayv1.CreateUploa
 	return &gatewayv1.CreateUploadURLResponse{Url: up.URL, Upload: up.Ref, ExpiresAt: timestamppb.New(up.ExpiresAt)}, nil
 }
 
+// Narrate implements GatewayService. It relays the narrator's stream for a
+// job whose analysis has finished, and fails with FailedPrecondition before
+// that. The X-Llm-Api-Key header goes to the narrator and nowhere else.
+func (s *Server) Narrate(ctx context.Context, req *gatewayv1.NarrateRequest, stream gatewayv1connect.GatewayServiceNarrateServerStream) error {
+	if req.GetJobId() == "" {
+		return connect.NewError(connect.CodeInvalidArgument, "job_id is required")
+	}
+	if s.narrate == nil {
+		return connect.NewError(connect.CodeUnavailable, msgNarratorDown)
+	}
+	key := ""
+	if info, ok := connect.CallInfoForServerContext(ctx); ok {
+		key = strings.TrimSpace(info.RequestHeader().Get(LLMKeyHeader))
+	}
+	err := s.narrate.Narrate(ctx, req, key, func(ev *narratorv1.NarrateEvent) error {
+		return stream.Send(&gatewayv1.NarrateResponse{Event: ev})
+	})
+	if err != nil {
+		return s.toConnect(ctx, err)
+	}
+	return nil
+}
+
 // toConnect maps an error to a Connect error. Unexpected errors get a generic
 // message, and the detail goes to the log only.
 func (s *Server) toConnect(ctx context.Context, err error) error {
@@ -109,6 +142,8 @@ func (s *Server) toConnect(ctx context.Context, err error) error {
 	var badResult *results.InvalidError
 	var notReady *results.NotReadyError
 	var refusal *preflight.Refusal
+	var narrNotReady *narrate.NotReadyError
+	var narrErr *narrate.NarratorError
 	switch {
 	case errors.As(err, &refusal) && refusal.Quota:
 		return connect.NewError(connect.CodeResourceExhausted, refusal.Error())
@@ -124,6 +159,16 @@ func (s *Server) toConnect(ctx context.Context, err error) error {
 		return connect.NewError(connect.CodeNotFound, "No job with that ID. Jobs are kept for 7 days.")
 	case errors.Is(err, jobs.ErrUnavailable):
 		return connect.NewError(connect.CodeUnavailable, err.Error())
+	case errors.As(err, &narrNotReady):
+		return connect.NewError(connect.CodeFailedPrecondition, narrNotReady.Error())
+	case errors.As(err, &narrErr):
+		return connect.NewError(narrErr.Code, narrErr.Message)
+	case errors.Is(err, narrate.ErrUnavailable):
+		return connect.NewError(connect.CodeUnavailable, msgNarratorDown)
+	case errors.Is(err, context.Canceled):
+		return connect.NewError(connect.CodeCanceled, "The request was canceled.")
+	case errors.Is(err, context.DeadlineExceeded):
+		return connect.NewError(connect.CodeDeadlineExceeded, "That took too long. Try again.")
 	}
 	s.log.Error(ctx, "request failed", logging.Err(err))
 	return connect.NewError(connect.CodeInternal, "Something went wrong on our side.")

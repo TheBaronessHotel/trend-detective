@@ -30,6 +30,7 @@ import (
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/catalog"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/events"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/jobs"
+	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/narrate"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/preflight"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/results"
 	"github.com/lein3000zzz/the-watchers/pkg/observability/logging"
@@ -132,8 +133,20 @@ func run() error {
 	}
 	res := results.New(orch, store.Bucket("prep"), signer, presignTTL, int64(maxUploadMB)<<20)
 
+	// The stack starts without the narrator. Narrate then fails with
+	// Unavailable and everything else works.
+	narratorClient, err := narrate.NewClient(envx.String("NARRATOR_URL", "http://narrator:8081"))
+	if err != nil {
+		return err
+	}
+	narratorTimeout, err := envx.Duration("NARRATOR_TIMEOUT", 4*time.Minute)
+	if err != nil {
+		return err
+	}
+	narr := narrate.New(orch, cat, narratorClient, narratorTimeout, log)
+
 	connectServer := connect.NewServer()
-	gatewayv1connect.RegisterGatewayServiceHandler(connectServer, api.New(cat, orch, res, log))
+	gatewayv1connect.RegisterGatewayServiceHandler(connectServer, api.New(cat, orch, res, narr, log))
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, connectServer)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok\n")) })
@@ -202,7 +215,7 @@ func withCORS(h http.Handler, origins string) http.Handler {
 			"Content-Type", "Connect-Protocol-Version", "Connect-Timeout-Ms",
 			"Connect-Accept-Encoding", "Connect-Content-Encoding",
 			"Grpc-Timeout", "X-Grpc-Web", "X-User-Agent", "Traceparent",
-			api.EarthdataTokenHeader, "X-Llm-Api-Key",
+			api.EarthdataTokenHeader, api.LLMKeyHeader,
 		},
 		ExposedHeaders: []string{"Grpc-Status", "Grpc-Message", "Grpc-Status-Details-Bin", "Connect-Content-Encoding"},
 		MaxAge:         7200,
