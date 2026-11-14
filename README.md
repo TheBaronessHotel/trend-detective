@@ -37,7 +37,7 @@ make up
 
 The first run copies `.env.example` to `.env`. Put your Earthdata token in it as `EARTHDATA_TOKEN`. You get one at [urs.earthdata.nasa.gov](https://urs.earthdata.nasa.gov) under "Generate Token". The same account also has to approve the [NASA GESDISC DATA ARCHIVE](https://urs.earthdata.nasa.gov/approve_app?client_id=e2WVk8Pw6weeLUKZYOxvTQ) app once, or GPM and MERRA-2 requests fail with 403.
 
-So far `make up` starts NATS, Redis and SeaweedFS, runs bootstrap to create the JetStream streams and the S3 buckets, and starts ingest and the gateway. The other services join compose as they get built. To try the API with curl, see [services/gateway/README.md](services/gateway/README.md). Other targets:
+So far `make up` starts NATS, Redis and SeaweedFS, runs bootstrap to create the JetStream streams and the S3 buckets, and starts ingest, preprocess, analysis and the gateway. The other services join compose as they get built. To try the API with curl, see [services/gateway/README.md](services/gateway/README.md). Other targets:
 
 | Target | What it does |
 |---|---|
@@ -46,7 +46,8 @@ So far `make up` starts NATS, Redis and SeaweedFS, runs bootstrap to create the 
 | `make ps` | Lists the containers |
 | `make clean` | Stops everything and deletes all data |
 | `make test` | Runs the Go unit tests |
-| `make smoke` | With the stack up, publishes a real ingest task and checks the result |
+| `make test-preprocess`, `make test-analysis` | Runs a Python service's lockfile check, lint and unit tests. Needs uv |
+| `make smoke` | With the stack up, runs the Delhi bundle through each stage and checks the results |
 | `make smoke-harmony` | Runs a real GPM job through NASA Harmony. Needs `EARTHDATA_TOKEN` in `.env` |
 | `make smoke-power` | Runs a real job through NASA POWER. Needs no token |
 | `make smoke-giovanni` | Runs a real point job through NASA Giovanni. Needs `EARTHDATA_TOKEN` in `.env` |

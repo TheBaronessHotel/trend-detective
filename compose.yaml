@@ -119,6 +119,20 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  analysis:
+    build:
+      context: .
+      dockerfile: services/analysis/Dockerfile
+    environment:
+      <<: *infra-env
+      ANALYSIS_CONCURRENCY: ${ANALYSIS_CONCURRENCY:-2}
+      ANALYSIS_ACK_WAIT: ${ANALYSIS_ACK_WAIT:-2m}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
   # The public Connect API, on http://localhost:8080.
   gateway:
     build:
