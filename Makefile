@@ -1,4 +1,4 @@
-.PHONY: up down logs ps clean smoke smoke-harmony smoke-power smoke-giovanni test gen lint fmt breaking
+.PHONY: up down logs ps clean smoke smoke-harmony smoke-power smoke-giovanni test gen lint fmt breaking web-dev web-check
 
 # Start the stack in the background and wait until bootstrap has finished.
 # The first run creates .env from .env.example. `up --wait` would treat
@@ -8,7 +8,7 @@ up: .env
 	@docker compose wait bootstrap >/dev/null; \
 	code=$$(docker compose ps -a bootstrap --format '{{.ExitCode}}'); \
 	if [ "$$code" = 0 ]; then \
-		echo "Stack is up. Streams and buckets are ready."; \
+		echo "Stack is up. Streams and buckets are ready. The web app is on http://localhost:3000"; \
 	else \
 		echo "Bootstrap failed with exit code $$code:"; \
 		docker compose logs --no-log-prefix bootstrap; \
@@ -49,6 +49,17 @@ smoke-power:
 # Live check against Giovanni's time-series API. Needs EARTHDATA_TOKEN in .env.
 smoke-giovanni:
 	sh deploy/smoke/giovanni.sh
+
+# The web app with hot reload on http://localhost:5173, against the running
+# stack's gateway. Needs Bun (https://bun.sh).
+web-dev:
+	bun install
+	cd services/web && bun run dev
+
+# The web app's type check, unit tests and production build.
+web-check:
+	bun install --frozen-lockfile
+	cd services/web && bun run typecheck && bun test && bun run build
 
 # Go unit tests.
 test:

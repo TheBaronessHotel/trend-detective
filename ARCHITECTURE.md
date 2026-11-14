@@ -26,7 +26,7 @@ Still open:
 | preprocess | Decodes formats into canonical `Series` and `Grid`, runs filter chains, aggregates regions, computes anomalies, builds slider cubes | NATS, SeaweedFS | team's choice, Python expected |
 | analysis | Runs the full test suite on series and fast per-cell tests on grids | NATS, SeaweedFS | team's choice, Python expected |
 | narrator | Streams the LLM overview and Q&A from finished analysis results | Connect, SeaweedFS | team's choice |
-| web | Map, time slider, charts, heatmap, chat | Connect to gateway, presigned URLs to SeaweedFS | team's choice |
+| web | Map, time slider, charts, heatmap, chat | Connect to gateway, presigned URLs to SeaweedFS | TypeScript, React, Vite and Bun |
 
 Rules:
 - Stages never call each other. Each one reads its own queue and reports to the gateway. A job can stop after any stage, so preprocessing works on its own.
@@ -266,7 +266,7 @@ One public monorepo, [TheBaronessHotel/trend-detective](https://github.com/TheBa
     ├── preprocess/
     ├── analysis/
     ├── narrator/
-    └── web/
+    └── web/          TypeScript, React, Vite, Bun
 ```
 
 | Target | What it does |
@@ -283,6 +283,8 @@ One public monorepo, [TheBaronessHotel/trend-detective](https://github.com/TheBa
 | `make smoke-harmony` | Runs a real GPM job through Harmony. Needs `EARTHDATA_TOKEN`, so CI skips it |
 | `make smoke-power` | Runs a real job through NASA POWER. No token, but CI skips it |
 | `make smoke-giovanni` | Runs a real point job through Giovanni's time-series API. Needs `EARTHDATA_TOKEN`, so CI skips it |
+| `make web-dev` | The web app with hot reload on port 5173, against the running stack's gateway |
+| `make web-check` | The web app's type check, unit tests and production build. CI runs it |
 | `make gen` | Regenerates `gen/` from `proto/` |
 | `make lint` | Lints and format-checks the protos |
 

@@ -14,6 +14,7 @@ The design is in [ARCHITECTURE.md](ARCHITECTURE.md). Tasks and decisions live in
 ├── compose.yaml, .env.example               the local stack and its settings
 ├── Makefile                                up, down, logs, gen, lint and more
 ├── buf.yaml, buf.gen.yaml                  buf module and codegen settings
+├── package.json, bun.lock, bunfig.toml     Bun workspace for the web app
 ├── go.mod                                  one Go module for gen/go, gateway and ingest
 ├── proto/trenddetective/<service>/v1/      contracts, one package per owning service
 ├── gen/                                    generated Go, Python and TS code, committed
@@ -24,7 +25,7 @@ The design is in [ARCHITECTURE.md](ARCHITECTURE.md). Tasks and decisions live in
     ├── preprocess/   Decodes, cleans and aggregates data into series and grids
     ├── analysis/     Trend tests on series and grid cells
     ├── narrator/     Optional LLM explanations, bring your own key
-    └── web/          Map, time slider, charts, heatmap
+    └── web/          TypeScript, React and Vite, built with Bun. Map, charts, the job runner
 ```
 
 ## Running it
@@ -37,7 +38,7 @@ make up
 
 The first run copies `.env.example` to `.env`. Put your Earthdata token in it as `EARTHDATA_TOKEN`. You get one at [urs.earthdata.nasa.gov](https://urs.earthdata.nasa.gov) under "Generate Token". The same account also has to approve the [NASA GESDISC DATA ARCHIVE](https://urs.earthdata.nasa.gov/approve_app?client_id=e2WVk8Pw6weeLUKZYOxvTQ) app once, or GPM and MERRA-2 requests fail with 403.
 
-So far `make up` starts NATS, Redis and SeaweedFS, runs bootstrap to create the JetStream streams and the S3 buckets, and starts ingest, preprocess, analysis and the gateway. The other services join compose as they get built. To try the API with curl, see [services/gateway/README.md](services/gateway/README.md). Other targets:
+So far `make up` starts NATS, Redis and SeaweedFS, runs bootstrap to create the JetStream streams and the S3 buckets, and starts ingest, the gateway and the web app. Open [http://localhost:3000](http://localhost:3000), pick a variable, draw a rectangle and press Fetch the data. The other services join compose as they get built. To try the API with curl, see [services/gateway/README.md](services/gateway/README.md). Other targets:
 
 | Target | What it does |
 |---|---|
@@ -51,12 +52,15 @@ So far `make up` starts NATS, Redis and SeaweedFS, runs bootstrap to create the 
 | `make smoke-harmony` | Runs a real GPM job through NASA Harmony. Needs `EARTHDATA_TOKEN` in `.env` |
 | `make smoke-power` | Runs a real job through NASA POWER. Needs no token |
 | `make smoke-giovanni` | Runs a real point job through NASA Giovanni. Needs `EARTHDATA_TOKEN` in `.env` |
+| `make web-dev` | Runs the web app with hot reload on http://localhost:5173, against the running stack. Needs [Bun](https://bun.sh) |
+| `make web-check` | The web app's type check, unit tests and production build |
 
 The ports listen on 127.0.0.1 only:
 - NATS: 4222, and 8222 for monitoring.
 - Redis: 6379.
 - SeaweedFS: 8333 for S3, 9333 for the master UI, and 8888 for the filer UI.
 - Gateway: 8080, the Connect API.
+- Web app: 3000, and 5173 for `make web-dev`.
 
 ## Working here
 
