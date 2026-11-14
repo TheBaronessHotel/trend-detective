@@ -1,8 +1,9 @@
 """Runs the series part of a TestPlan and builds the SeriesAnalysis document.
 
-ANA-1 covers regression, Mann-Kendall and the agreement check. The other
-series tests (ANA-3 and ANA-4) and the grid tests (ANA-2) are logged and
-skipped, so their fields stay unset.
+Regression, Mann-Kendall and the agreement check came with ANA-1. The shuffle
+test, the trend triangle, the monthly trends and the years to significance
+come with ANA-4. The diagnostics (ANA-3) and the grid tests (ANA-2) are logged
+and skipped, so their fields stay unset.
 """
 
 from __future__ import annotations
@@ -14,12 +15,16 @@ import numpy as np
 from trenddetective.analysis.v1 import analysis_pb2, results_pb2
 from trenddetective.preprocess.v1 import data_pb2
 
-from . import errors, kendall, regression
-from .series import Monthly, month_timestamp, prepare
+from . import errors, extras, kendall, regression
+from .series import MIN_YEARS, Monthly, month_timestamp, prepare
 
 DEFAULT_ALPHA = 0.05
 # Fewer effective values than this get a caveat.
 FEW_EFFECTIVE = 10
+DEFAULT_PERMUTATIONS = 1000
+MAX_PERMUTATIONS = 10_000
+DEFAULT_BLOCK_LENGTH = 12
+DEFAULT_MIN_YEARS = 10
 
 ONE_TEST_SIGNIFICANT = (
     "Only one of the two tests finds the trend significant, so a few extreme months may be driving it. "
@@ -28,6 +33,10 @@ ONE_TEST_SIGNIFICANT = (
 OPPOSITE_DIRECTIONS = (
     "The two tests find significant trends in opposite directions, so a few extreme months are probably "
     "driving the regression."
+)
+MONTHS_BY_CHANCE = (
+    "Each month of the year was tested on its own, and with twelve tests one or two can look significant "
+    "just by chance."
 )
 
 log = logging.getLogger("analysis.suite")
@@ -53,6 +62,13 @@ def run(
     )
     out.warnings.extend(monthly.warnings)
 
+    # One fit serves the regression result and the years to significance. Its
+    # correction, also used by the trend triangle and the monthly trends,
+    # follows the plan's regression, and is on when the plan has none.
+    regressions = [s.regression for s in plan.series if s.WhichOneof("test") == "regression"]
+    correct = regressions[0].correct_autocorrelation if regressions else True
+    fit = regression.fit(monthly.t, monthly.tested, alpha=alpha, correct_autocorrelation=correct)
+
     ran: set[str] = set()
     skipped: list[str] = []
     for spec in plan.series:
@@ -60,11 +76,22 @@ def run(
         if kind is None or kind in ran:
             continue
         if kind == "regression":
-            result, notes = _regression(monthly, spec.regression, alpha)
-            out.regression.CopyFrom(result)
-            out.warnings.extend(notes)
+            out.regression.CopyFrom(_regression(monthly, fit, alpha))
+            if correct and fit.n_effective < FEW_EFFECTIVE:
+                out.warnings.append(
+                    f"Neighboring months are so alike that the {fit.n} values count as only about "
+                    f"{max(1, round(fit.n_effective))} independent ones, so the test is cautious."
+                )
         elif kind == "mann_kendall":
             out.mann_kendall.CopyFrom(_mann_kendall(monthly, spec.mann_kendall, alpha))
+        elif kind == "shuffle":
+            _shuffle(out, monthly, spec.shuffle)
+        elif kind == "trend_triangle":
+            _trend_triangle(out, monthly, spec.trend_triangle, alpha, correct)
+        elif kind == "monthly_trends":
+            _monthly_trends(out, monthly, alpha, correct)
+        elif kind == "years_to_significance":
+            _years_to_significance(out, monthly, fit, alpha)
         else:
             skipped.append(kind)
             continue
@@ -81,10 +108,7 @@ def run(
     return out
 
 
-def _regression(
-    m: Monthly, spec: analysis_pb2.Regression, alpha: float
-) -> tuple[results_pb2.RegressionResult, list[str]]:
-    fit = regression.fit(m.t, m.tested, alpha=alpha, correct_autocorrelation=spec.correct_autocorrelation)
+def _regression(m: Monthly, fit: regression.LinearTrend, alpha: float) -> results_pb2.RegressionResult:
     result = results_pb2.RegressionResult(
         slope_per_decade=fit.slope * 10,
         slope_ci_low=fit.ci_low * 10,
@@ -103,14 +127,7 @@ def _regression(
     model.slope_stderr = fit.slope_stderr
     model.residual_sd = fit.residual_sd
     model.lag1_autocorrelation = fit.lag1_autocorrelation
-
-    notes = []
-    if spec.correct_autocorrelation and fit.n_effective < FEW_EFFECTIVE:
-        notes.append(
-            f"Neighboring months are so alike that the {fit.n} values count as only about "
-            f"{max(1, round(fit.n_effective))} independent ones, so the test is cautious."
-        )
-    return result, notes
+    return result
 
 
 def _mann_kendall(m: Monthly, spec: analysis_pb2.MannKendall, alpha: float) -> results_pb2.MannKendallResult:
@@ -141,6 +158,91 @@ def _mann_kendall(m: Monthly, spec: analysis_pb2.MannKendall, alpha: float) -> r
         sens_ci_low=test.slope_ci_low * 10,
         sens_ci_high=test.slope_ci_high * 10,
         n=test.n,
+    )
+
+
+def _shuffle(out: results_pb2.SeriesAnalysis, m: Monthly, spec: analysis_pb2.Shuffle) -> None:
+    permutations = spec.permutations or DEFAULT_PERMUTATIONS
+    block_length = spec.block_length or DEFAULT_BLOCK_LENGTH
+    if not 1 <= permutations <= MAX_PERMUTATIONS:
+        raise errors.invalid(
+            f"The shuffle test can run from 1 to {MAX_PERMUTATIONS:,} shuffles.",
+            f"Shuffle.permutations is {permutations}",
+        )
+    if block_length < 1:
+        raise errors.invalid("The shuffle test's blocks need at least one month.", f"Shuffle.block_length is {block_length}")
+    result = extras.shuffle_test(m.t, m.tested, permutations=permutations, block_length=block_length)
+    if result is None:
+        out.warnings.append(
+            f"The record is too short for the shuffle test, which needs at least "
+            f"{extras.MIN_BLOCKS * block_length} months."
+        )
+        return
+    out.shuffle.CopyFrom(
+        results_pb2.ShuffleResult(
+            permutations=permutations,
+            block_length=block_length,
+            observed_slope_per_decade=result.observed * 10,
+            p_value=result.p_value,
+            shuffled_slopes_per_decade=(result.slopes * 10).tolist(),
+        )
+    )
+
+
+def _trend_triangle(
+    out: results_pb2.SeriesAnalysis, m: Monthly, spec: analysis_pb2.TrendTriangle, alpha: float, correct: bool
+) -> None:
+    min_years = spec.min_years or DEFAULT_MIN_YEARS
+    if min_years < MIN_YEARS:
+        raise errors.invalid(
+            f"The trend triangle's shortest window has to be at least {MIN_YEARS} years.",
+            f"TrendTriangle.min_years is {min_years}",
+        )
+    triangle = extras.trend_triangle(m, min_years=min_years, alpha=alpha, correct=correct)
+    if triangle is None:
+        out.warnings.append(
+            f"The record is shorter than the {min_years} years the trend triangle's shortest window needs."
+        )
+        return
+    out.trend_triangle.CopyFrom(
+        results_pb2.TrendTriangleResult(
+            min_years=min_years,
+            start_years=triangle.start_years,
+            end_years=triangle.end_years,
+            slopes_per_decade=(triangle.slopes * 10).ravel().tolist(),
+            p_values=triangle.p_values.ravel().tolist(),
+        )
+    )
+
+
+def _monthly_trends(out: results_pb2.SeriesAnalysis, m: Monthly, alpha: float, correct: bool) -> None:
+    trends = extras.monthly_trends(m, alpha=alpha, correct=correct)
+    for trend in trends:
+        out.monthly_trends.add(
+            month=trend.month,
+            slope_per_decade=trend.slope * 10,
+            p_value=trend.p_value,
+            significant=trend.p_value < alpha,
+        )
+    # At alpha 0.05, 46% of series with no trend at all show at least one
+    # significant month among 12 (1 - 0.95^12), but three or more only 2%.
+    if 1 <= sum(t.p_value < alpha for t in trends) <= 2:
+        out.warnings.append(MONTHS_BY_CHANCE)
+
+
+def _years_to_significance(
+    out: results_pb2.SeriesAnalysis, m: Monthly, fit: regression.LinearTrend, alpha: float
+) -> None:
+    detection = extras.years_to_significance(fit, m.span_years)
+    out.years_to_significance.CopyFrom(
+        results_pb2.YearsToSignificanceResult(
+            years_needed=detection.years_needed,
+            years_so_far=detection.years_so_far,
+            noise_sd=detection.noise_sd,
+            trend_per_year=detection.trend_per_year,
+            phi=detection.phi,
+            already_significant=fit.p_value < alpha,
+        )
     )
 
 

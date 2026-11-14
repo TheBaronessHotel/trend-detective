@@ -75,6 +75,12 @@ class Monthly:
         return int(np.isfinite(self.tested).sum())
 
     @property
+    def span_years(self) -> float:
+        """Years from the first valid month to the last, both counted."""
+        valid = np.flatnonzero(np.isfinite(self.tested))
+        return float(valid[-1] - valid[0] + 1) / 12
+
+    @property
     def t(self) -> np.ndarray:
         """Years since the origin, for every slot."""
         return (self.first_month + np.arange(self.size) - self.origin) / 12.0

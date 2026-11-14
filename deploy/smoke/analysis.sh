@@ -2,8 +2,8 @@
 # Smoke test for analysis, run by `make smoke` against a running stack. It
 # runs a whole job for the power-delhi-monthly bundle, through ingest,
 # preprocess and analysis, waits for it to succeed, then downloads the trend
-# analysis through a signed URL and checks the regression and Mann-Kendall
-# results are in it.
+# analysis through a signed URL and checks the regression, Mann-Kendall and
+# extras results are in it.
 set -eu
 
 api=http://127.0.0.1:8080/trenddetective.gateway.v1.GatewayService
@@ -57,8 +57,15 @@ for name, value in [("regression slope", reg.get("slopePerDecade", 0)), ("regres
                     ("Sen slope", mk.get("sensSlopePerDecade", 0)), ("Mann-Kendall p", mk.get("pValue", 0))]:
     assert math.isfinite(float(value)), (name, value)
 assert "timeOrigin" in reg["model"], "the fitted model has no time origin"
-print("%+.3f %s per decade, regression p %.2g, Mann-Kendall p %.2g" % (
-    float(reg.get("slopePerDecade", 0)), a.get("units", ""), float(reg.get("pValue", 0)), float(mk.get("pValue", 0))))
+# The extras, which the catalog plan asks for.
+sh, tri, ys = a["shuffle"], a["trendTriangle"], a["yearsToSignificance"]
+assert sh["permutations"] == len(sh["shuffledSlopesPerDecade"]) == 1000, "shuffle"
+assert len(tri["slopesPerDecade"]) == len(tri["startYears"]) * len(tri["endYears"]), "trend triangle"
+assert [m["month"] for m in a["monthlyTrends"]] == list(range(1, 13)), "monthly trends"
+assert float(ys["yearsSoFar"]) == 44, ys
+print("%+.3f %s per decade, regression p %.2g, Mann-Kendall p %.2g, shuffle p %.2g, %.0f years to significance" % (
+    float(reg.get("slopePerDecade", 0)), a.get("units", ""), float(reg.get("pValue", 0)), float(mk.get("pValue", 0)),
+    float(sh.get("pValue", 0)), float(ys.get("yearsNeeded", 0))))
 ')
 
 echo "OK: job $id went through every stage: $summary"
