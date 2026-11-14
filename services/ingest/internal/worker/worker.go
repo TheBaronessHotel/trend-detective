@@ -35,7 +35,10 @@ const (
 type Config struct {
 	// Tasks in flight at once.
 	Concurrency int
-	// Attempts per task before the worker reports it failed.
+	// Failed attempts per task before the worker reports it failed.
+	MaxAttempts int
+	// JetStream's delivery limit. Every poll of a running Harmony job is a
+	// delivery, so this is a high ceiling, not the retry limit.
 	MaxDeliver int
 	// How long JetStream waits for an ack before it redelivers. The worker
 	// sends a heartbeat well inside this while it works.
@@ -46,27 +49,40 @@ type Config struct {
 	DrainTimeout time.Duration
 }
 
+// Attempts counts failed attempts per task. JetStream's delivery count can't
+// do this, because polls of a running Harmony job are deliveries too.
+type Attempts interface {
+	// Count returns the failed attempts so far.
+	Count(ctx context.Context, taskID string) (int, error)
+	// Failed records one more failed attempt and returns the new count.
+	Failed(ctx context.Context, taskID string) (int, error)
+	// Clear forgets a finished task.
+	Clear(ctx context.Context, taskID string) error
+}
+
 // Worker consumes tasks.ingest.
 type Worker struct {
-	js    jetstream.JetStream
-	svc   *core.Service
-	log   logging.Logger
-	kit   *redkit.Kit
-	scope tracing.Scope
-	cfg   Config
-	now   func() time.Time
+	js       jetstream.JetStream
+	svc      *core.Service
+	attempts Attempts
+	log      logging.Logger
+	kit      *redkit.Kit
+	scope    tracing.Scope
+	cfg      Config
+	now      func() time.Time
 }
 
 // New returns a Worker.
-func New(js jetstream.JetStream, svc *core.Service, util *observability.Utility, kit *redkit.Kit, cfg Config) *Worker {
+func New(js jetstream.JetStream, svc *core.Service, attempts Attempts, util *observability.Utility, kit *redkit.Kit, cfg Config) *Worker {
 	return &Worker{
-		js:    js,
-		svc:   svc,
-		log:   util.Logger.With("component", "worker"),
-		kit:   kit,
-		scope: tracing.Scope{Manager: util.TracerManager, TracerName: tracerName},
-		cfg:   cfg,
-		now:   time.Now,
+		js:       js,
+		svc:      svc,
+		attempts: attempts,
+		log:      util.Logger.With("component", "worker"),
+		kit:      kit,
+		scope:    tracing.Scope{Manager: util.TracerManager, TracerName: tracerName},
+		cfg:      cfg,
+		now:      time.Now,
 	}
 }
 
@@ -118,10 +134,6 @@ func (w *Worker) Run(ctx context.Context) error {
 
 func (w *Worker) handle(ctx context.Context, msg jetstream.Msg) {
 	ctx = natsx.ExtractTrace(ctx, msg.Headers())
-	attempt := 1
-	if md, err := msg.Metadata(); err == nil {
-		attempt = int(md.NumDelivered)
-	}
 
 	task := &gatewayv1.Task{}
 	if err := natsx.Decode(msg.Data(), task); err != nil {
@@ -133,6 +145,11 @@ func (w *Worker) handle(ctx context.Context, msg jetstream.Msg) {
 	meta := task.GetMeta()
 	ctx = obs.WithTask(ctx, meta.GetJobId(), meta.GetTaskId())
 	operation := sources.Name(core.SourceOf(task.GetIngest()))
+	failures, err := w.attempts.Count(ctx, meta.GetTaskId())
+	if err != nil {
+		w.log.Warn(ctx, "couldn't read the attempt count", logging.Err(err))
+	}
+	attempt := failures + 1
 
 	_ = w.scope.Manager.WithSpan(ctx, w.scope.TracerName, "ingest "+operation, func(ctx context.Context, span trace.Span) (err error) {
 		span.SetAttributes(
@@ -146,6 +163,13 @@ func (w *Worker) handle(ctx context.Context, msg jetstream.Msg) {
 		stopHeartbeat := heartbeat(msg, w.cfg.AckWait/3)
 		ds, cacheHit, err := w.ingest(ctx, task)
 		stopHeartbeat()
+
+		if p, ok := core.AsPending(err); ok {
+			// Not done yet, and not a failure. Check again later.
+			w.log.Debug(ctx, "waiting", "reason", p.Reason, "after", p.After)
+			_ = msg.NakWithDelay(p.After)
+			return nil
+		}
 
 		report := &gatewayv1.StageDone{
 			Meta:       meta,
@@ -161,12 +185,18 @@ func (w *Worker) handle(ctx context.Context, msg jetstream.Msg) {
 		}
 
 		e := core.AsError(err)
-		if e.Transient && attempt < w.cfg.MaxDeliver {
-			delay := w.backoff(attempt)
-			w.log.Warn(ctx, "retrying", logging.Err(err), "attempt", attempt, "delay", delay)
-			_ = msg.NakWithDelay(delay)
-			return err
+		if e.Transient {
+			if n, ferr := w.attempts.Failed(ctx, meta.GetTaskId()); ferr == nil {
+				attempt = n
+			}
+			if attempt < w.cfg.MaxAttempts {
+				delay := w.backoff(attempt)
+				w.log.Warn(ctx, "retrying", logging.Err(err), "attempt", attempt, "delay", delay)
+				_ = msg.NakWithDelay(delay)
+				return err
+			}
 		}
+		report.Attempt = int32(attempt)
 		w.log.Error(ctx, "task failed", logging.Err(err), "attempt", attempt, "code", e.Code.String())
 		report.Result = &gatewayv1.StageDone_Error{Error: e.TaskError()}
 		w.finish(ctx, msg, report)
@@ -194,6 +224,7 @@ func (w *Worker) finish(ctx context.Context, msg jetstream.Msg, report *gatewayv
 		_ = msg.NakWithDelay(w.backoff(1))
 		return
 	}
+	_ = w.attempts.Clear(ctx, report.GetMeta().GetTaskId())
 	if err := msg.DoubleAck(ctx); err != nil && !errors.Is(err, jetstream.ErrMsgAlreadyAckd) {
 		// The report is out, so a redelivery only repeats it. StageDone uses
 		// the same Nats-Msg-Id, and the gateway counts each task once.

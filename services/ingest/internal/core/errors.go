@@ -3,6 +3,7 @@ package core
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	gatewayv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/gateway/v1"
 )
@@ -70,4 +71,27 @@ func (e *Error) TaskError() *gatewayv1.TaskError {
 		UserMessage: e.UserMessage,
 		Detail:      detail,
 	}
+}
+
+// PendingError means the data isn't ready yet, for example while a Harmony
+// job runs. The worker checks again after After, without counting a failure
+// and without holding a worker in the meantime.
+type PendingError struct {
+	After time.Duration
+	// Why it's waiting, for the log.
+	Reason string
+}
+
+func (e *PendingError) Error() string { return "pending: " + e.Reason }
+
+// Pending returns a PendingError.
+func Pending(after time.Duration, reason string) *PendingError {
+	return &PendingError{After: after, Reason: reason}
+}
+
+// AsPending reports whether err means "check again later".
+func AsPending(err error) (*PendingError, bool) {
+	var p *PendingError
+	ok := errors.As(err, &p)
+	return p, ok
 }

@@ -35,7 +35,7 @@ You need Docker. Then:
 make up
 ```
 
-The first run copies `.env.example` to `.env`. Put your Earthdata token in it as `EARTHDATA_TOKEN`. You get one at [urs.earthdata.nasa.gov](https://urs.earthdata.nasa.gov) under "Generate Token".
+The first run copies `.env.example` to `.env`. Put your Earthdata token in it as `EARTHDATA_TOKEN`. You get one at [urs.earthdata.nasa.gov](https://urs.earthdata.nasa.gov) under "Generate Token". The same account also has to approve the [NASA GESDISC DATA ARCHIVE](https://urs.earthdata.nasa.gov/approve_app?client_id=e2WVk8Pw6weeLUKZYOxvTQ) app once, or GPM and MERRA-2 requests fail with 403.
 
 So far `make up` starts NATS, Redis and SeaweedFS, runs bootstrap to create the JetStream streams and the S3 buckets, and starts ingest and the gateway. The other services join compose as they get built. To try the API with curl, see [services/gateway/README.md](services/gateway/README.md). Other targets:
 
@@ -47,6 +47,7 @@ So far `make up` starts NATS, Redis and SeaweedFS, runs bootstrap to create the 
 | `make clean` | Stops everything and deletes all data |
 | `make test` | Runs the Go unit tests |
 | `make smoke` | With the stack up, publishes a real ingest task and checks the result |
+| `make smoke-harmony` | Runs a real GPM job through NASA Harmony. Needs `EARTHDATA_TOKEN` in `.env` |
 
 The ports listen on 127.0.0.1 only:
 - NATS: 4222, and 8222 for monitoring.
