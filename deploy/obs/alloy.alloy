@@ -1,0 +1,30 @@
+// Grafana Alloy for the obs compose profile (`make up-obs`). Pyroscope itself
+// doesn't scrape, so Alloy pulls pprof from each Go service's admin listener
+// (/debug/pprof/ on :9090, served by the-watchers in pull mode) and pushes the
+// profiles to Pyroscope. Block and mutex profiling are off in internal/obs, so
+// only CPU, memory and goroutines are collected.
+
+pyroscope.write "local" {
+  endpoint {
+    url = "http://pyroscope:4040"
+  }
+}
+
+pyroscope.scrape "go" {
+  targets = [
+    {"__address__" = "gateway:9090", "service_name" = "gateway"},
+    {"__address__" = "ingest:9090", "service_name" = "ingest"},
+    {"__address__" = "narrator:9090", "service_name" = "narrator"},
+  ]
+  forward_to      = [pyroscope.write.local.receiver]
+  scrape_interval = "15s"
+
+  profiling_config {
+    profile.block {
+      enabled = false
+    }
+    profile.mutex {
+      enabled = false
+    }
+  }
+}

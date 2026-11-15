@@ -160,12 +160,17 @@ func run() error {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok\n")) })
 	mux.Handle("GET /debug/jobs/{id}", api.DebugJobs(orch))
 
+	handler, err := obs.HTTP(util, mux, "/healthz")
+	if err != nil {
+		return err
+	}
+
 	protocols := new(http.Protocols)
 	protocols.SetHTTP1(true)
 	protocols.SetUnencryptedHTTP2(true)
 	srv := &http.Server{
 		Addr:              envx.String("HTTP_ADDR", ":8080"),
-		Handler:           withCORS(mux, envx.String("CORS_ORIGINS", "*")),
+		Handler:           withCORS(handler, envx.String("CORS_ORIGINS", "*")),
 		Protocols:         protocols,
 		ReadHeaderTimeout: 10 * time.Second,
 	}

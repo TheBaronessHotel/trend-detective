@@ -1,4 +1,4 @@
-.PHONY: up down logs ps clean smoke smoke-harmony smoke-power smoke-giovanni smoke-appeears smoke-airs warm-examples test test-preprocess test-analysis gen lint fmt breaking web-dev web-check
+.PHONY: up up-obs down logs ps clean smoke smoke-harmony smoke-power smoke-giovanni smoke-appeears smoke-airs warm-examples test test-preprocess test-analysis gen lint fmt breaking web-dev web-check
 
 # Runs on Linux, macOS and Windows.
 #
@@ -30,9 +30,20 @@ endif
 up: .env
 	$(SH) deploy/up.sh
 
-# Stop the stack. Data stays in the Docker volumes.
+# The stack plus the obs profile: Jaeger, Prometheus, Grafana, and Pyroscope
+# with Alloy pulling the profiles. The Go services send spans to Jaeger. Set
+# OTEL_EXPORTER_OTLP_ENDPOINT in your environment to send them somewhere else.
+# make itself exports the two variables to deploy/up.sh, so this works in cmd
+# as well as sh.
+up-obs: export COMPOSE_PROFILES := obs
+up-obs: export OTEL_EXPORTER_OTLP_ENDPOINT ?= http://jaeger:4318
+up-obs: up
+	@echo Grafana http://localhost:3001  Jaeger http://localhost:16686  Prometheus http://localhost:9091  Pyroscope http://localhost:4040
+
+# Stop the stack, the obs profile too if it runs. Data stays in the Docker
+# volumes. A plain `docker compose down` leaves profile containers running.
 down:
-	docker compose down
+	docker compose --profile obs down
 
 # Follow the logs of every container.
 logs:
@@ -44,7 +55,7 @@ ps:
 
 # Stop the stack and delete its data: streams, job state and every bucket.
 clean:
-	docker compose down -v
+	docker compose --profile obs down -v
 
 # End-to-end checks against the running stack. Run `make up` first.
 smoke:
