@@ -34,7 +34,7 @@ In compose, set `NARRATOR_HTTPS_PROXY` (and `NARRATOR_HTTP_PROXY` for `http://` 
 
 ### Without a key
 
-The app works without an LLM key. For an overview request (empty question) with no key and a non-local `llm.base_url`, `internal/overview` writes 3 to 5 plain sentences from the results alone: direction and rate per decade with the confidence interval, significance (p-value against alpha, and whether Mann-Kendall agrees), record length, the main warnings and a significant Pettitt change point, and a reminder that a trend is not proof of a cause. It streams one sentence per `text_delta`, then `done` with `model: "template"` and no `unverified_numbers`. The `llm` config may be missing and isn't checked, since nothing is called.
+The app works without an LLM key. For an overview request (empty question) with no key and a non-local `llm.base_url`, `internal/overview` writes 3 to 5 plain sentences from the results alone: direction and rate per decade with the confidence interval, significance (p-value against alpha, and whether Mann-Kendall agrees), record length, the main warnings and a significant Pettitt change point, and a reminder that a trend is not proof of a cause. A significant result on a record under 10 years gets a sentence saying it's too short to call a trend, the same rule as the web app's verdict; with a key, the model gets the same rule and a `guide.short_record_years` fact. It streams one sentence per `text_delta`, then `done` with `model: "template"` and no `unverified_numbers`. The `llm` config may be missing and isn't checked, since nothing is called.
 
 ### Errors
 

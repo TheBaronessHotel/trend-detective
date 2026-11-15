@@ -16,6 +16,10 @@ import (
 	"github.com/TheBaronessHotel/trend-detective/services/narrator/internal/llm"
 )
 
+// ShortRecordYears is the record length below which a significant result
+// isn't called a trend, the same rule as the web app's verdict.
+const ShortRecordYears = 10
+
 // systemRules is the instruction block. It must not contain an em dash.
 // The digits 2, 3 and 10 are counts the verifier allows. 200 is only the
 // answer-length cap, not a sample result.
@@ -30,7 +34,8 @@ Rules:
 - Do not claim that the trend causes anything, or that anything causes the trend.
 - Answer in the language of the user's question. When there is no question, give an overview in English, unless the variable context or llm_hints name another language.
 - Answer in at most about 200 words, in 2–3 short paragraphs, unless the user asks for more detail.
-- If a test was not run, say that it is not available. Do not guess its result.`
+- If a test was not run, say that it is not available. Do not guess its result.
+- If the facts include guide.short_record_years, the record is shorter than that many years. Then do not call a significant result a trend: say the record is too short to tell a trend from a few unusual months, and that at least that many years is safer.`
 
 const overviewQuestion = "Give an overview of this trend for students and the public."
 
@@ -184,6 +189,11 @@ func (d *doc) dates(r *commonv1.DateRange) (years float64, ok bool) {
 	years, ok = recordYears(r)
 	if ok {
 		d.lineMeasured("dates.record_years", "years", years)
+		// The app won't call a trend in a record this short; the model
+		// shouldn't either, and may quote the threshold.
+		if years < ShortRecordYears {
+			d.lineNum("guide.short_record_years", "years", ShortRecordYears)
+		}
 	}
 	return years, ok
 }

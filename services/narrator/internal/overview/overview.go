@@ -47,6 +47,9 @@ func BuildSentences(series *analysisv1.SeriesAnalysis, grid *analysisv1.GridAnal
 	required := []string{}
 	if t, ok := o.trend(); ok {
 		required = append(required, o.rateSentence(t), o.significanceSentence(t))
+		if s := o.shortRecordSentence(t); s != "" {
+			required = append(required, s)
+		}
 	} else {
 		required = append(required, o.noTrendSentence(), o.recordSentence())
 	}
@@ -181,6 +184,33 @@ func (o *overview) significanceSentence(t trendFacts) string {
 	}
 	b.WriteString(".")
 	return b.String()
+}
+
+// shortRecordYears is the record length below which a significant result
+// isn't called a trend, the same rule as the web app's verdict.
+const shortRecordYears = 10
+
+// shortRecordSentence warns, for a significant result on fewer than
+// shortRecordYears of monthly record, that it's too short to call a trend.
+func (o *overview) shortRecordSentence(t trendFacts) string {
+	if !t.significant || o.s.GetNTotal() <= 0 {
+		return ""
+	}
+	years := float64(o.s.GetNTotal()) / 12
+	if years >= shortRecordYears {
+		return ""
+	}
+	return fmt.Sprintf("But %s of record is too short to call this a trend: a few unusual months can make one look real, and at least %d years is safer.",
+		yearsText(years), shortRecordYears)
+}
+
+// yearsText says a record length: "2 years", "1 year", "2.5 years".
+func yearsText(y float64) string {
+	r := math.Round(y*10) / 10
+	if r == 1 {
+		return "1 year"
+	}
+	return trimNum(r) + " years"
 }
 
 // agreementClause compares the regression with Mann-Kendall. It trusts the
