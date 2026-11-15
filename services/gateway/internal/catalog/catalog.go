@@ -83,6 +83,28 @@ func (c *Catalog) Variables() []*gatewayv1.Variable {
 	return out
 }
 
+// TopicsInUse returns the browser's topics in order, each with only the
+// measurements some variable uses, and no topic left empty.
+func (c *Catalog) TopicsInUse() []*gatewayv1.Topic {
+	used := map[[2]string]bool{}
+	for _, e := range c.byID {
+		used[[2]string{e.Variable.GetTopic(), e.Variable.GetMeasurement()}] = true
+	}
+	var out []*gatewayv1.Topic
+	for _, t := range Topics {
+		topic := &gatewayv1.Topic{Name: t.Name}
+		for _, m := range t.Measurements {
+			if used[[2]string{t.Name, m}] {
+				topic.Measurements = append(topic.Measurements, m)
+			}
+		}
+		if len(topic.Measurements) > 0 {
+			out = append(out, topic)
+		}
+	}
+	return out
+}
+
 type file struct {
 	Variables []rawEntry `json:"variables"`
 }
@@ -105,6 +127,37 @@ type rawEntry struct {
 	LLMHints      string                      `json:"llm_hints"`
 	DatasetURL    string                      `json:"dataset_url"`
 	PixelSize     struct{ Lat, Lon float64 }  `json:"pixel_size"`
+	Topic         string                      `json:"topic"`
+	Measurement   string                      `json:"measurement"`
+	Product       string                      `json:"product"`
+}
+
+// Topics lists the browser's topics in order, each with its measurements in
+// order. A catalog entry must use one of these pairs, so a typo can't make a
+// topic of its own.
+var Topics = []struct {
+	Name         string
+	Measurements []string
+}{
+	{"Air", []string{"Temperature", "Humidity", "Rain and snow", "Clouds", "Sunlight", "Wind and pressure"}},
+	{"Air quality", []string{"Gases", "Particles"}},
+	{"Water", []string{"Soil moisture", "Groundwater", "Runoff", "Evaporation"}},
+	{"Land and plants", []string{"Plants", "Land temperature"}},
+	{"Ocean", []string{"Sea temperature", "Ocean colour"}},
+	{"Snow and ice", []string{"Snow", "Sea ice"}},
+	{"Your data", []string{"Upload"}},
+}
+
+func checkTopic(topic, measurement string) error {
+	for _, t := range Topics {
+		if t.Name == topic {
+			if slices.Contains(t.Measurements, measurement) {
+				return nil
+			}
+			return fmt.Errorf("measurement %q isn't one of topic %q's: %s", measurement, topic, strings.Join(t.Measurements, ", "))
+		}
+	}
+	return fmt.Errorf("topic %q isn't one of the browser's topics", topic)
 }
 
 // Parse reads catalog YAML. It rejects unknown fields and reports every
@@ -140,11 +193,12 @@ func Parse(data []byte) (*Catalog, error) {
 
 func (r rawEntry) entry() (*Entry, error) {
 	var errs []error
-	for name, v := range map[string]string{"id": r.ID, "name": r.Name, "definition": r.Definition, "units": r.Units} {
+	for name, v := range map[string]string{"id": r.ID, "name": r.Name, "definition": r.Definition, "units": r.Units, "product": r.Product} {
 		if v == "" {
 			errs = append(errs, fmt.Errorf("%s is required", name))
 		}
 	}
+	errs = appendErr(errs, checkTopic(r.Topic, r.Measurement))
 	step, err := parseStep(r.Step)
 	errs = appendErr(errs, err)
 	domain, err := parseDomain(r.Domain)
@@ -205,6 +259,9 @@ func (r rawEntry) entry() (*Entry, error) {
 			PixelLonDeg:   r.PixelSize.Lon,
 			// GetBlockPixels is 0 for a nil aggregation.
 			DefaultBlockPixels: aggregation.GetBlockPixels(),
+			Topic:              r.Topic,
+			Measurement:        r.Measurement,
+			Product:            r.Product,
 		},
 		SourceUnits: r.SourceUnits,
 		LLMHints:    strings.TrimSpace(r.LLMHints),

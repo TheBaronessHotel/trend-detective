@@ -646,3 +646,30 @@ func TestAggregationRefusesOutOfRange(t *testing.T) {
 		}
 	}
 }
+
+func TestSkippingTestsTrimsThePlan(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	s := spec()
+	s.VariableId, s.Source = "precipitation-gpm", ingestv1.Source_SOURCE_HARMONY_SUBSET
+
+	// The map's tests only: the region's tests go, the job still analyzes.
+	s.SkipSeriesTests = true
+	job, err := h.o.CreateJob(ctx, s, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := job.GetSpec(); len(got.GetTests().GetSeries()) != 0 || len(got.GetTests().GetGrid()) == 0 || got.GetStopAfter() != gatewayv1.Stage_STAGE_UNSPECIFIED {
+		t.Errorf("region tests skipped: %v", got)
+	}
+
+	// No tests at all: the job ends at preprocess, with its chart and map.
+	s.SkipGridTests = true
+	job, err = h.o.CreateJob(ctx, s, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := job.GetSpec().GetStopAfter(); got != gatewayv1.Stage_STAGE_PREPROCESS {
+		t.Errorf("both skipped: stop after %v", got)
+	}
+}

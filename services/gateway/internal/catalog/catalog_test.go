@@ -57,6 +57,9 @@ func TestParseRejectsBadEntries(t *testing.T) {
 variables:
   - id: x
     name: X
+    topic: Air
+    measurement: Temperature
+    product: P
     definition: d
     units: u
     step: monthly
@@ -79,6 +82,9 @@ variables:
 		"missing definition":      {"    definition: d\n", "", "definition"},
 		"bad filter op":           {"    units: u\n", "    units: u\n    filters: { ops: [ { blur: {} } ] }\n", "filters"},
 		"grid without pixel size": {"    domain: land\n", "    domain: land\n    grid: true\n", "pixel_size"},
+		"unknown topic":           {"topic: Air", "topic: Weather", "topic"},
+		"measurement of another":  {"measurement: Temperature", "measurement: Gases", "measurement"},
+		"missing product":         {"    product: P\n", "", "product"},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -107,5 +113,34 @@ func TestGridVariablesCarryPixelSizeAndBlock(t *testing.T) {
 	}
 	if v := gpm.Variable; v.GetPixelLatDeg() != 0.1 || v.GetDefaultBlockPixels() != 4 {
 		t.Errorf("precipitation-gpm: %v", v)
+	}
+}
+
+// The browser groups variables by these, so every shipped entry has them.
+func TestShippedVariablesHaveATopic(t *testing.T) {
+	c, err := Parse(gateway.CatalogYAML)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range c.Variables() {
+		if v.GetTopic() == "" || v.GetMeasurement() == "" || v.GetProduct() == "" {
+			t.Errorf("%s: topic %q, measurement %q, product %q", v.GetId(), v.GetTopic(), v.GetMeasurement(), v.GetProduct())
+		}
+	}
+}
+
+func TestTopicsInUseSkipEmptyOnes(t *testing.T) {
+	c, err := Parse(gateway.CatalogYAML)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topics := c.TopicsInUse()
+	if len(topics) == 0 || topics[0].GetName() != "Air" || topics[0].GetMeasurements()[0] != "Temperature" {
+		t.Fatalf("topics: %v", topics)
+	}
+	for _, tp := range topics {
+		if len(tp.GetMeasurements()) == 0 {
+			t.Errorf("topic %q has no measurements", tp.GetName())
+		}
 	}
 }

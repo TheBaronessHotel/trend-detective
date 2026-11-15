@@ -81,13 +81,23 @@ class ListVariablesRequest(_message.Message):
     def __init__(self) -> None: ...
 
 class ListVariablesResponse(_message.Message):
-    __slots__ = ("variables",)
+    __slots__ = ("variables", "topics")
     VARIABLES_FIELD_NUMBER: _ClassVar[int]
+    TOPICS_FIELD_NUMBER: _ClassVar[int]
     variables: _containers.RepeatedCompositeFieldContainer[Variable]
-    def __init__(self, variables: _Optional[_Iterable[_Union[Variable, _Mapping]]] = ...) -> None: ...
+    topics: _containers.RepeatedCompositeFieldContainer[Topic]
+    def __init__(self, variables: _Optional[_Iterable[_Union[Variable, _Mapping]]] = ..., topics: _Optional[_Iterable[_Union[Topic, _Mapping]]] = ...) -> None: ...
+
+class Topic(_message.Message):
+    __slots__ = ("name", "measurements")
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    MEASUREMENTS_FIELD_NUMBER: _ClassVar[int]
+    name: str
+    measurements: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, name: _Optional[str] = ..., measurements: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class Variable(_message.Message):
-    __slots__ = ("id", "name", "definition", "units", "step", "available", "grid", "domain", "default_source", "sources", "dataset_url", "pixel_lat_deg", "pixel_lon_deg", "default_block_pixels")
+    __slots__ = ("id", "name", "definition", "units", "step", "available", "grid", "domain", "default_source", "sources", "dataset_url", "pixel_lat_deg", "pixel_lon_deg", "default_block_pixels", "topic", "measurement", "product")
     ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     DEFINITION_FIELD_NUMBER: _ClassVar[int]
@@ -102,6 +112,9 @@ class Variable(_message.Message):
     PIXEL_LAT_DEG_FIELD_NUMBER: _ClassVar[int]
     PIXEL_LON_DEG_FIELD_NUMBER: _ClassVar[int]
     DEFAULT_BLOCK_PIXELS_FIELD_NUMBER: _ClassVar[int]
+    TOPIC_FIELD_NUMBER: _ClassVar[int]
+    MEASUREMENT_FIELD_NUMBER: _ClassVar[int]
+    PRODUCT_FIELD_NUMBER: _ClassVar[int]
     id: str
     name: str
     definition: str
@@ -116,7 +129,10 @@ class Variable(_message.Message):
     pixel_lat_deg: float
     pixel_lon_deg: float
     default_block_pixels: int
-    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., definition: _Optional[str] = ..., units: _Optional[str] = ..., step: _Optional[_Union[_common_pb2.TimeStep, str]] = ..., available: _Optional[_Union[_common_pb2.DateRange, _Mapping]] = ..., grid: _Optional[bool] = ..., domain: _Optional[_Union[Domain, str]] = ..., default_source: _Optional[_Union[_ingest_pb2.Source, str]] = ..., sources: _Optional[_Iterable[_Union[_ingest_pb2.Source, str]]] = ..., dataset_url: _Optional[str] = ..., pixel_lat_deg: _Optional[float] = ..., pixel_lon_deg: _Optional[float] = ..., default_block_pixels: _Optional[int] = ...) -> None: ...
+    topic: str
+    measurement: str
+    product: str
+    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., definition: _Optional[str] = ..., units: _Optional[str] = ..., step: _Optional[_Union[_common_pb2.TimeStep, str]] = ..., available: _Optional[_Union[_common_pb2.DateRange, _Mapping]] = ..., grid: _Optional[bool] = ..., domain: _Optional[_Union[Domain, str]] = ..., default_source: _Optional[_Union[_ingest_pb2.Source, str]] = ..., sources: _Optional[_Iterable[_Union[_ingest_pb2.Source, str]]] = ..., dataset_url: _Optional[str] = ..., pixel_lat_deg: _Optional[float] = ..., pixel_lon_deg: _Optional[float] = ..., default_block_pixels: _Optional[int] = ..., topic: _Optional[str] = ..., measurement: _Optional[str] = ..., product: _Optional[str] = ...) -> None: ...
 
 class CreateJobRequest(_message.Message):
     __slots__ = ("spec",)
@@ -131,7 +147,7 @@ class CreateJobResponse(_message.Message):
     def __init__(self, job: _Optional[_Union[Job, _Mapping]] = ...) -> None: ...
 
 class JobSpec(_message.Message):
-    __slots__ = ("variable_id", "bbox", "dates", "source", "stop_after", "upload", "filters", "aggregation", "tests")
+    __slots__ = ("variable_id", "bbox", "dates", "source", "stop_after", "upload", "filters", "aggregation", "tests", "skip_series_tests", "skip_grid_tests")
     VARIABLE_ID_FIELD_NUMBER: _ClassVar[int]
     BBOX_FIELD_NUMBER: _ClassVar[int]
     DATES_FIELD_NUMBER: _ClassVar[int]
@@ -141,6 +157,8 @@ class JobSpec(_message.Message):
     FILTERS_FIELD_NUMBER: _ClassVar[int]
     AGGREGATION_FIELD_NUMBER: _ClassVar[int]
     TESTS_FIELD_NUMBER: _ClassVar[int]
+    SKIP_SERIES_TESTS_FIELD_NUMBER: _ClassVar[int]
+    SKIP_GRID_TESTS_FIELD_NUMBER: _ClassVar[int]
     variable_id: str
     bbox: _common_pb2.BBox
     dates: _common_pb2.DateRange
@@ -150,7 +168,9 @@ class JobSpec(_message.Message):
     filters: _preprocess_pb2.FilterChain
     aggregation: _preprocess_pb2.Aggregation
     tests: _analysis_pb2.TestPlan
-    def __init__(self, variable_id: _Optional[str] = ..., bbox: _Optional[_Union[_common_pb2.BBox, _Mapping]] = ..., dates: _Optional[_Union[_common_pb2.DateRange, _Mapping]] = ..., source: _Optional[_Union[_ingest_pb2.Source, str]] = ..., stop_after: _Optional[_Union[_task_pb2.Stage, str]] = ..., upload: _Optional[_Union[_common_pb2.BlobRef, _Mapping]] = ..., filters: _Optional[_Union[_preprocess_pb2.FilterChain, _Mapping]] = ..., aggregation: _Optional[_Union[_preprocess_pb2.Aggregation, _Mapping]] = ..., tests: _Optional[_Union[_analysis_pb2.TestPlan, _Mapping]] = ...) -> None: ...
+    skip_series_tests: bool
+    skip_grid_tests: bool
+    def __init__(self, variable_id: _Optional[str] = ..., bbox: _Optional[_Union[_common_pb2.BBox, _Mapping]] = ..., dates: _Optional[_Union[_common_pb2.DateRange, _Mapping]] = ..., source: _Optional[_Union[_ingest_pb2.Source, str]] = ..., stop_after: _Optional[_Union[_task_pb2.Stage, str]] = ..., upload: _Optional[_Union[_common_pb2.BlobRef, _Mapping]] = ..., filters: _Optional[_Union[_preprocess_pb2.FilterChain, _Mapping]] = ..., aggregation: _Optional[_Union[_preprocess_pb2.Aggregation, _Mapping]] = ..., tests: _Optional[_Union[_analysis_pb2.TestPlan, _Mapping]] = ..., skip_series_tests: _Optional[bool] = ..., skip_grid_tests: _Optional[bool] = ...) -> None: ...
 
 class Job(_message.Message):
     __slots__ = ("id", "state", "spec", "tasks", "tasks_total", "tasks_succeeded", "tasks_failed", "results", "created_at", "updated_at")

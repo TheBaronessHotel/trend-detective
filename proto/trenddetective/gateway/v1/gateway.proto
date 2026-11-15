@@ -41,6 +41,17 @@ message ListVariablesRequest {}
 
 message ListVariablesResponse {
   repeated Variable variables = 1;
+  // The browser's topics in order, each with its measurements in order.
+  // Every variable's topic and measurement is one of these.
+  repeated Topic topics = 2;
+}
+
+// A topic in the variable browser, like one of Giovanni's disciplines.
+message Topic {
+  // For example "Air".
+  string name = 1;
+  // For example "Temperature" and "Humidity".
+  repeated string measurements = 2;
 }
 
 // A catalog entry, as the browser sees it.
@@ -71,6 +82,14 @@ message Variable {
   // The catalog's default Grid block size (Aggregation.block_pixels), or 0
   // when it leaves the size to SUBREGION_N.
   int32 default_block_pixels = 14;
+  // Where the variable sits in the browser, like Giovanni's disciplines and
+  // measurements: a topic, for example "Air", and within it a measurement,
+  // for example "Temperature". The catalog checks both against a fixed list.
+  string topic = 15;
+  string measurement = 16;
+  // The data product, for example "MERRA-2" or "MODIS", for searching and
+  // for saying where the numbers come from.
+  string product = 17;
 }
 
 // Where a variable has data.
@@ -108,6 +127,13 @@ message JobSpec {
   trenddetective.preprocess.v1.Aggregation aggregation = 8;
   // Replaces the catalog's default tests.
   trenddetective.analysis.v1.TestPlan tests = 9;
+  // Leave the region's trend tests (TestPlan.series) out of the plan. The
+  // region's chart is still made.
+  bool skip_series_tests = 10;
+  // Leave the per-cell tests behind the trend map (TestPlan.grid) out. The
+  // month-by-month map still works from preprocess's Grid. With both
+  // skipped, the job stops after preprocess.
+  bool skip_grid_tests = 11;
 }
 
 // A job and everything known about it. The gateway is the only writer.

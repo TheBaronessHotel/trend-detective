@@ -445,6 +445,17 @@ func (o *Orchestrator) resolve(spec *gatewayv1.JobSpec) (*gatewayv1.JobSpec, *ca
 	if r.Tests == nil {
 		r.Tests = entry.Tests()
 	}
+	// The app's toggles: drop tests from the plan, and with none left, end
+	// the job at preprocess, which already has the chart and the map.
+	if r.GetSkipSeriesTests() {
+		r.Tests.Series = nil
+	}
+	if r.GetSkipGridTests() {
+		r.Tests.Grid = nil
+	}
+	if len(r.Tests.GetSeries()) == 0 && len(r.Tests.GetGrid()) == 0 && lastStage(r) > gatewayv1.Stage_STAGE_PREPROCESS {
+		r.StopAfter = gatewayv1.Stage_STAGE_PREPROCESS
+	}
 	agg, err := o.aggregation(entry, r.GetAggregation())
 	if err != nil {
 		return nil, nil, err

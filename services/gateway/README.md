@@ -67,7 +67,7 @@ body='{"jobId":"<id>","llm":{"provider":"PROVIDER_OPENAI_CHAT","model":"gpt-5.5"
 
 ## How a job runs
 
-1. `CreateJob` checks the request, fills in defaults, runs the preflight checks below, stores the job and publishes the ingest task.
+1. `CreateJob` checks the request, fills in defaults, runs the preflight checks below, stores the job and publishes the ingest task. `skip_series_tests` and `skip_grid_tests` drop the region's tests or the map's from the catalog's plan; with neither left, `stop_after` becomes preprocess, which has the chart and the map already.
 2. Every `StageDone` is recorded, and its task is counted once. JetStream delivers each event at least once, so a Lua script makes the count safe to repeat.
 3. When the last task of a stage reports:
    - if any task failed, the job fails;
@@ -128,6 +128,8 @@ Every key of a job shares the `{id}` hash tag, and everything expires after 7 da
 ## Adding a variable
 
 Add an entry to `catalog.yaml` and run `make test`. The catalog test fails on unknown fields, missing definitions, a default source that isn't offered, and filter or test settings that don't match the protos.
+
+Each entry also has a `topic`, a `measurement` and a `product`, which the web app's browser groups and searches by, like Giovanni's disciplines and measurements. The pairs come from `Topics` in `internal/catalog`, so a new measurement goes there first. `ListVariables` returns the topics in that order, with only the measurements some variable uses.
 
 ## Settings
 
