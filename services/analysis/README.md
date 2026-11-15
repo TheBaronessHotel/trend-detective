@@ -82,7 +82,7 @@ They test the same field as the regression. Where they need a p-value, they use 
 
 They look at the same field as the regression, and use the regression's fit where they need one. Outliers are flagged, never dropped: every test uses every value.
 
-**Pettitt** (`PettittResult`). Pettitt's (1979) test for one change in level. `U_t` sums `sign(x_i - x_j)` over every value `i` up to `t` and `j` after it, `K` is the largest `|U_t|`, and `p` is about `2 exp(-6 K^2 / (n^3 + n^2))`. Gaps are squeezed out. `change_time` is the first month after the change, and `mean_before` and `mean_after` are the levels on either side. A steady trend makes Pettitt significant too, at its middle. So the caveat about a jump comes only when Pettitt is significant and a step at the change point fits the values better than the regression's straight line, both with two parameters.
+**Pettitt** (`PettittResult`). Pettitt's (1979) test for one change in level. `U_t` sums `sign(x_i - x_j)` over every value `i` up to `t` and `j` after it, `K` is the largest `|U_t|`, and `p` is about `2 exp(-6 K^2 / (n^3 + n^2))`. That `p` assumes independent values, and months that resemble their neighbors make `K` larger than chance alone would: on trendless series with a lag-1 autocorrelation of 0.5, 40 to 50% came out significant. So when the plan's regression has its autocorrelation correction on, the variance in the exponent grows by `(1 + r1) / (1 - r1)`, with `r1` the lag-1 autocorrelation of the regression's residuals, positive values only and clipped at 0.99: the same inflation as the regression's effective sample size. Gaps are squeezed out. `change_time` is the first month after the change, and `mean_before` and `mean_after` are the levels on either side. A steady trend makes Pettitt significant too, at its middle. So the caveat about a jump comes only when Pettitt is significant and a step at the change point fits the values better than the regression's straight line, both with two parameters.
 
 **Residual checks** (`ResidualChecksResult`). On the regression's residuals:
 
@@ -133,7 +133,7 @@ Plain sentences for the user and the narrator. The caveats about the data come f
 | Fewer than 5 whole shuffle blocks | The record is too short for the shuffle test, which needs at least N months |
 | Fewer calendar years than the triangle's `min_years` | The record is shorter than the N years the trend triangle's shortest window needs |
 | One or two months significant on their own | Each month of the year was tested on its own, and with twelve tests one or two can look significant just by chance |
-| Pettitt significant, and a step fits better than the line | The values jump around July 2010 instead of changing steadily. A sudden step, like a new sensor or a new dam, can look like a trend |
+| Pettitt significant, and a step fits better than the line | The values jump around MONTH YEAR instead of changing steadily. A sudden step, like a new sensor or a new dam, can look like a trend |
 | Dropping the outliers would make the trend not significant | The trend rests on N unusual months: without them, the trend isn't significant |
 | Dropping the outliers would make the trend significant | N unusual months hide the trend: without them, the trend would be significant |
 | Residuals autocorrelated, and the regression runs without the correction | Neighboring months are alike, and the regression doesn't allow for that, so its p-value comes out too small |
@@ -201,6 +201,7 @@ Logs are `key=value` lines with `time`, `level` and `msg`, plus `job_id`, `task_
 - `make test-analysis` runs what CI's `analysis` workflow runs, in a few seconds: the lockfile check, ruff with bug rules only, and the unit tests. It needs uv.
 - pymannkendall is a dev dependency only. The service doesn't import it.
 - A calibration test runs the shuffle test on 100 trendless autocorrelated series and expects about 5% false alarms. The same series give a plain t-test about 21%.
+- Another runs Pettitt on 100 trendless series with a lag-1 autocorrelation of 0.5 and expects at most 10 significant changes. Without the allowance for autocorrelation, 41 of them did; with it, 2.
 - The grid tests check every cell against the series code, with gaps and ties, and the false discovery rate correction against scipy.
 - The validation tests check the trends against NOAA's published CO2 growth, offline. `uv run python scripts/validate_noaa_co2.py` repeats it on NOAA's current files, or with `--from` on files downloaded already.
 - `make smoke`, with the stack up, runs the Delhi bundle through every stage and checks the trend analysis has the regression, Mann-Kendall, extras and diagnostics results.

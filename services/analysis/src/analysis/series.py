@@ -139,7 +139,7 @@ def prepare(series: data_pb2.Series, field_choice: int) -> Monthly:
 
     years = span_months / 12
     if years < SHORT_RECORD_YEARS:
-        warnings.append(f"Only {years:.0f} years of data. A trend in a record this short is uncertain.")
+        warnings.append(f"Only {_years_text(years)} years of data. A trend in a record this short is uncertain.")
     missing = 1 - valid.size / size
     if missing > MANY_MISSING:
         warnings.append(f"{missing:.0%} of the months have no value.")
@@ -237,6 +237,13 @@ def month_timestamp(month_index: float) -> timestamp_pb2.Timestamp:
     ts = timestamp_pb2.Timestamp()
     ts.FromDatetime(start + (end - start) * (month_index - k))
     return ts
+
+
+def _years_text(years: float) -> str:
+    """A length in years the way the web app's verdict writes one under 10: to
+    a tenth, halves rounded up, so 117 months read 9.8 rather than 10, and a
+    whole number without its decimal."""
+    return f"{math.floor(years * 10 + 0.5) / 10:g}"
 
 
 def _month_index(ts: timestamp_pb2.Timestamp) -> int:

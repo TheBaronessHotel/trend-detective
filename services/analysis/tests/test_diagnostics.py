@@ -82,6 +82,38 @@ def test_pettitt_points_at_a_real_month_across_gaps():
     assert out.pettitt.change_time == month_timestamp(month_of(2000, 1) + 62)
 
 
+def test_pettitt_allows_for_autocorrelation():
+    x = np.round(np.random.default_rng(4).normal(0, 1, 40), 1)
+    plain = diagnostics.pettitt(x, line_sse=math.inf)
+    corrected = diagnostics.pettitt(x, line_sse=math.inf, r1=0.5)
+    # The same split, with the variance in the exponent (1 + 0.5) / (1 - 0.5) = 3 times as large.
+    assert (corrected.k, corrected.index) == (plain.k, plain.index)
+    assert corrected.p_value == pytest.approx(min(1, 2 * math.exp(-6 * plain.k**2 / ((40**3 + 40**2) * 3))))
+    # As in the regression, only a positive r1 is allowed for.
+    assert diagnostics.pettitt(x, line_sse=math.inf, r1=-0.3).p_value == plain.p_value
+
+
+def test_pettitt_rarely_finds_a_step_in_autocorrelated_noise():
+    # Trendless months that resemble their neighbors, like real anomalies.
+    # Before the allowance for autocorrelation, 41 of these 100 came out with
+    # a significant change and the caveat about a jump; with it, 2 do.
+    flagged = jumps = 0
+    for seed in range(100):
+        out = suite.run(make_series(ar1_noise(240, 0.5, 1.0, seed)), plan("pettitt"))
+        flagged += out.pettitt.significant
+        jumps += any(w.startswith("The values jump") for w in out.warnings)
+    assert flagged <= 10
+    assert jumps <= 10
+
+
+def test_the_allowance_follows_the_plans_correction():
+    values = ar1_noise(240, 0.5, 1.0, 3)
+    values[120:] += 0.5
+    on = suite.run(make_series(values), plan("pettitt")).pettitt.p_value
+    off = suite.run(make_series(values), plan("pettitt", correct=False)).pettitt.p_value
+    assert off < on < 1
+
+
 # Residual checks.
 
 
