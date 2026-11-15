@@ -6,6 +6,7 @@
 # near Delhi, stopping after ingest, and waits for the 24 NetCDF files.
 # Harmony usually takes one to five minutes.
 set -eu
+. "$(dirname "$0")/python.sh"
 
 if ! grep -qE '^EARTHDATA_TOKEN=.+' .env 2>/dev/null; then
   echo "SKIP: set EARTHDATA_TOKEN in .env first, then run make up"
@@ -14,7 +15,7 @@ fi
 
 api=http://127.0.0.1:8080/trenddetective.gateway.v1.GatewayService
 call() { curl -s -H 'Content-Type: application/json' -d "$2" "$api/$1"; }
-field() { python3 -I -c '
+field() { "$PY" -I -c '
 import json, sys
 value = json.load(sys.stdin)
 for key in sys.argv[1].split("."):
@@ -44,5 +45,5 @@ if [ "$state" != JOB_STATE_SUCCEEDED ]; then
   docker compose logs --no-log-prefix --tail=20 ingest
   exit 1
 fi
-files=$(printf '%s' "$job" | python3 -I -c 'import json,sys; print(len(json.load(sys.stdin)["job"]["results"]["raw"][0]["files"]))')
+files=$(printf '%s' "$job" | "$PY" -I -c 'import json,sys; print(len(json.load(sys.stdin)["job"]["results"]["raw"][0]["files"]))')
 echo "OK: Harmony delivered $files NetCDF files into the raw bucket"

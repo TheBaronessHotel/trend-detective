@@ -1,0 +1,17 @@
+# Check text files out with LF on every system, including Windows with
+# core.autocrlf=true. Shell scripts mounted into containers, like
+# deploy/seaweedfs/start.sh, fail on CRLF ("set: illegal option -"), and so do
+# the smoke scripts and Makefile recipes run through sh.
+* text=auto eol=lf
+
+*.sh text eol=lf
+Makefile text eol=lf
+
+# Files Git should never touch.
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.nc binary
+*.nc4 binary

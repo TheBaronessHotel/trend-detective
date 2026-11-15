@@ -4,6 +4,7 @@
 # it to succeed. That covers the whole loop: Connect API, Redis, the ingest
 # task on NATS, ingest itself, and the StageDone coming back.
 set -eu
+. "$(dirname "$0")/python.sh"
 
 api=http://127.0.0.1:8080/trenddetective.gateway.v1.GatewayService
 
@@ -12,7 +13,7 @@ call() {
 }
 
 field() {
-  python3 -I -c '
+  "$PY" -I -c '
 import json, sys
 value = json.load(sys.stdin)
 for key in sys.argv[1].split("."):
@@ -45,7 +46,7 @@ if [ -z "$id" ]; then
 fi
 
 echo "Watching job $id"
-python3 -I deploy/smoke/watch.py "$id" "$api" || { echo "FAIL: WatchJob didn't end with the job succeeded"; exit 1; }
+"$PY" -I deploy/smoke/watch.py "$id" "$api" || { echo "FAIL: WatchJob didn't end with the job succeeded"; exit 1; }
 
 echo "Checking job $id"
 state=""
@@ -96,7 +97,7 @@ csv_job() {
     \"stopAfter\": \"STAGE_INGEST\"}}")
   job=$(printf '%s' "$created" | field job.id)
   [ -n "$job" ] || { echo "FAIL: CreateJob refused the CSV job: $created" >&2; exit 1; }
-  python3 -I deploy/smoke/watch.py "$job" "$api" >/dev/null 2>&1 || true
+  "$PY" -I deploy/smoke/watch.py "$job" "$api" >/dev/null 2>&1 || true
   printf '%s' "$job"
 }
 
@@ -109,7 +110,7 @@ echo "Uploading a CSV through a signed URL and running a job on it"
 } > /tmp/smoke-upload.csv
 ref=$(upload /tmp/smoke-upload.csv)
 csvid=$(csv_job "$ref")
-raw=$(call GetJob "{\"jobId\": \"$csvid\"}" | python3 -I -c '
+raw=$(call GetJob "{\"jobId\": \"$csvid\"}" | "$PY" -I -c '
 import json, sys
 job = json.load(sys.stdin)["job"]
 raws = job.get("results", {}).get("raw", [])

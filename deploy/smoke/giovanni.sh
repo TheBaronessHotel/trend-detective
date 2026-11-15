@@ -8,6 +8,7 @@
 # reports the grid cell it used, whose center should be within 0.125 degrees
 # of the box's.
 set -eu
+. "$(dirname "$0")/python.sh"
 
 api=http://127.0.0.1:8080/trenddetective.gateway.v1.GatewayService
 call() { curl -s -H 'Content-Type: application/json' -d "$2" "$api/$1"; }
@@ -16,12 +17,12 @@ spec='{"spec": {"variableId": "groundwater-gldas", "source": "SOURCE_GIOVANNI_PO
   "bbox": {"west": 75.0, "south": 30.0, "east": 76.0, "north": 31.0},
   "dates": {"start": {"year": 2004, "month": 1, "day": 1}, "end": {"year": 2023, "month": 12, "day": 31}},
   "stopAfter": "STAGE_INGEST"}}'
-id=$(call CreateJob "$spec" | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["job"]["id"])')
+id=$(call CreateJob "$spec" | "$PY" -I -c 'import json,sys; print(json.load(sys.stdin)["job"]["id"])')
 echo "Job $id: fetching from Giovanni"
-python3 -I deploy/smoke/watch.py "$id" "$api" || { echo "FAIL: job didn't succeed"; call GetJob "{\"jobId\": \"$id\"}"; exit 1; }
+"$PY" -I deploy/smoke/watch.py "$id" "$api" || { echo "FAIL: job didn't succeed"; call GetJob "{\"jobId\": \"$id\"}"; exit 1; }
 
 job=$(call GetJob "{\"jobId\": \"$id\"}")
-key=$(printf '%s' "$job" | python3 -I -c '
+key=$(printf '%s' "$job" | "$PY" -I -c '
 import json, sys
 raw = json.load(sys.stdin)["job"]["results"]["raw"][0]
 point, files = raw["point"], raw["files"]
@@ -33,7 +34,7 @@ if not ok:
 print(files[0]["blob"]["key"])
 ') || { echo "FAIL: the raw dataset isn't what the job asked for"; exit 1; }
 
-curl -s "http://127.0.0.1:8888/buckets/raw/$key" | python3 -I -c '
+curl -s "http://127.0.0.1:8888/buckets/raw/$key" | "$PY" -I -c '
 import sys
 lines = sys.stdin.read().splitlines()
 undef = next(l.split(",", 1)[1] for l in lines if l.startswith("undef,"))
