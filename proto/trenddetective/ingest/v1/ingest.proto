@@ -83,6 +83,11 @@ message HarmonySubset {
   // Fail instead of fetching when CMR reports more granules than this. The
   // gateway sets it from MAX_GRANULES.
   int32 max_granules = 3;
+  // Name the granules by CMR concept ID, picked by their dates, instead of
+  // asking for a time subset. For collections whose time axis Harmony's
+  // subsetter can't read, like NOBM's monthly files ("months since"). Each
+  // granule comes back whole in time, cut only to the rectangle.
+  bool by_granule_id = 4;
 }
 
 // Settings for SOURCE_GIOVANNI_AREA. Ingest asks Harmony's Giovanni

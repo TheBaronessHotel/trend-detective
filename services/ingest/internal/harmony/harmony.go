@@ -15,11 +15,13 @@
 package harmony
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"path"
@@ -341,7 +343,19 @@ const giovanniRefusal = "is not supported by the Cloud Giovanni Averaging Servic
 // skip the count: Giovanni reads the granules itself and returns one file.
 func (a *Adapter) start(ctx context.Context, req *request, token, stateKey string) error {
 	hits := 0
-	if !a.mode.areaAverage {
+	switch {
+	case req.byGranuleID:
+		// The IDs replace the time subset; their count is the hits.
+		ids, err := a.granuleIDs(ctx, token, req)
+		if err != nil {
+			return err
+		}
+		req.granuleIDs, hits = ids, len(ids)
+		if hits == 0 {
+			return core.Errorf(gatewayv1.ErrorCode_ERROR_CODE_NO_DATA, false,
+				"There's no data for this place and time range.", "CMR found no granules")
+		}
+	case !a.mode.areaAverage:
 		var err error
 		if hits, err = a.granules(ctx, token, req); err != nil {
 			return err
@@ -385,6 +399,10 @@ type request struct {
 	bbox        *commonv1.BBox
 	start, end  string
 	maxGranules int
+	// Name granules by ID instead of a time subset (HarmonySubset.by_granule_id).
+	byGranuleID bool
+	// Filled in by start when byGranuleID is set.
+	granuleIDs []string
 }
 
 func newRequest(task *ingestv1.IngestTask, m mode) (*request, error) {
@@ -398,6 +416,7 @@ func newRequest(task *ingestv1.IngestTask, m mode) (*request, error) {
 	} else {
 		h := task.GetHarmonySubset()
 		r.collection, r.variables, r.maxGranules = h.GetCollectionId(), h.GetVariables(), int(h.GetMaxGranules())
+		r.byGranuleID = h.GetByGranuleId()
 	}
 	var ok1, ok2 bool
 	r.start, ok1 = isoDate(task.GetDates().GetStart(), false)
@@ -451,8 +470,57 @@ func (a *Adapter) granules(ctx context.Context, token string, r *request) (int, 
 	return hits, nil
 }
 
+// granuleIDs lists, in date order, the CMR concept IDs of the granules the
+// request covers. It asks for one more than max_granules, so a request over
+// the cap fails like the count would.
+func (a *Adapter) granuleIDs(ctx context.Context, token string, r *request) ([]string, error) {
+	size := cmrPageSize
+	if r.maxGranules > 0 && r.maxGranules < size {
+		size = r.maxGranules + 1
+	}
+	q := url.Values{
+		"collection_concept_id": {r.collection},
+		"bounding_box":          {strings.Join([]string{num(r.bbox.GetWest()), num(r.bbox.GetSouth()), num(r.bbox.GetEast()), num(r.bbox.GetNorth())}, ",")},
+		"temporal":              {r.start + "," + r.end},
+		"sort_key":              {"start_date"},
+		"page_size":             {strconv.Itoa(size)},
+	}
+	resp, err := a.get(ctx, token, a.cfg.CMRURL+"/search/granules.json?"+q.Encode())
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if err := statusError(resp, "CMR"); err != nil {
+		return nil, err
+	}
+	var body struct {
+		Feed struct {
+			Entry []struct {
+				ID string `json:"id"`
+			} `json:"entry"`
+		} `json:"feed"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return nil, core.Errorf(gatewayv1.ErrorCode_ERROR_CODE_UPSTREAM, true,
+			"NASA's search service returned something unexpected.", "decode CMR granules: %v", err)
+	}
+	ids := make([]string, 0, len(body.Feed.Entry))
+	for _, e := range body.Feed.Entry {
+		if e.ID != "" {
+			ids = append(ids, e.ID)
+		}
+	}
+	return ids, nil
+}
+
+// CMR's largest page. MAX_GRANULES keeps requests well under it.
+const cmrPageSize = 2000
+
 // submit starts an async HOSS job and returns its ID.
 func (a *Adapter) submit(ctx context.Context, token string, r *request) (string, error) {
+	if len(r.granuleIDs) > 0 {
+		return a.submitByID(ctx, token, r)
+	}
 	q := url.Values{
 		"variable":    {strings.Join(r.variables, ",")},
 		"subset":      {"lat(" + num(r.bbox.GetSouth()) + ":" + num(r.bbox.GetNorth()) + ")", "lon(" + num(r.bbox.GetWest()) + ":" + num(r.bbox.GetEast()) + ")", `time("` + r.start + `":"` + r.end + `")`},
@@ -468,6 +536,49 @@ func (a *Adapter) submit(ctx context.Context, token string, r *request) (string,
 	if err != nil {
 		return "", err
 	}
+	return a.submitted(resp)
+}
+
+// submitByID starts a job that names its granules by ID and cuts only the
+// rectangle. It POSTs a form, since a long list of IDs doesn't fit a URL:
+// Harmony answered a GET with 24 of them with a server error.
+func (a *Adapter) submitByID(ctx context.Context, token string, r *request) (string, error) {
+	var body bytes.Buffer
+	form := multipart.NewWriter(&body)
+	for _, f := range [][2]string{
+		{"variable", strings.Join(r.variables, ",")},
+		{"subset", "lat(" + num(r.bbox.GetSouth()) + ":" + num(r.bbox.GetNorth()) + ")"},
+		{"subset", "lon(" + num(r.bbox.GetWest()) + ":" + num(r.bbox.GetEast()) + ")"},
+		{"granuleId", strings.Join(r.granuleIDs, ",")},
+		{"forceAsync", "true"},
+		{"skipPreview", "true"},
+	} {
+		if err := form.WriteField(f[0], f[1]); err != nil {
+			return "", core.Errorf(gatewayv1.ErrorCode_ERROR_CODE_INTERNAL, false, "Something went wrong while fetching the data.", "build form: %w", err)
+		}
+	}
+	if err := form.Close(); err != nil {
+		return "", core.Errorf(gatewayv1.ErrorCode_ERROR_CODE_INTERNAL, false, "Something went wrong while fetching the data.", "build form: %w", err)
+	}
+	u := fmt.Sprintf("%s/%s/ogc-api-coverages/1.0.0/collections/parameter_vars/coverage/rangeset", a.cfg.HarmonyURL, url.PathEscape(r.collection))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, &body)
+	if err != nil {
+		return "", core.Errorf(gatewayv1.ErrorCode_ERROR_CODE_INTERNAL, false, "Something went wrong while fetching the data.", "build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", form.FormDataContentType())
+	resp, err := a.http.Do(req)
+	if errors.Is(err, errLogin) {
+		return "", unauthenticated(err)
+	}
+	if err != nil {
+		return "", core.Errorf(gatewayv1.ErrorCode_ERROR_CODE_UPSTREAM, true, "Couldn't reach NASA's servers.", "POST %s: %w", redact(u), err)
+	}
+	return a.submitted(resp)
+}
+
+// submitted reads the job Harmony started, from a submit's response.
+func (a *Adapter) submitted(resp *http.Response) (string, error) {
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusBadRequest {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))

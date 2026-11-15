@@ -40,6 +40,10 @@ type fakeNASA struct {
 	// When set, a failed job reports this error message.
 	failWith string
 	cancels  int
+	// Granules CMR lists, and the form of the last POSTed submit.
+	granuleIDs []string
+	lastMethod string
+	lastForm   url.Values
 }
 
 func newFakeNASA(t *testing.T) *fakeNASA {
@@ -69,10 +73,22 @@ func (f *fakeNASA) serve(w http.ResponseWriter, r *http.Request) {
 	case r.URL.Path == "/search/granules.json":
 		f.cmrCalls++
 		w.Header().Set("CMR-Hits", fmt.Sprint(f.hits))
-		_, _ = w.Write([]byte(`{"feed":{"entry":[]}}`))
+		entries := []map[string]string{}
+		if r.URL.Query().Get("page_size") != "0" {
+			for _, id := range f.granuleIDs {
+				entries = append(entries, map[string]string{"id": id})
+			}
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"feed": map[string]any{"entry": entries}})
 	case strings.HasSuffix(r.URL.Path, "/coverage/rangeset"):
 		f.submits++
+		f.lastMethod = r.Method
 		f.lastQuery = r.URL.Query()
+		if r.Method == http.MethodPost {
+			if err := r.ParseMultipartForm(1 << 20); err == nil {
+				f.lastForm = r.MultipartForm.Value
+			}
+		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"jobID": "job-1", "status": "accepted"})
 	case r.URL.Path == "/jobs/job-1/cancel" && r.Method == http.MethodPost:
 		f.cancels++
@@ -536,4 +552,48 @@ func TestAreaAverageNeedsTheGiovanniID(t *testing.T) {
 	tk.GetGiovanniArea().DataFieldId = ""
 	_, err := h.a.Fetch(context.Background(), tk, newSink())
 	wantCode(t, err, gatewayv1.ErrorCode_ERROR_CODE_INVALID_REQUEST, false)
+}
+
+// NOBM's monthly files have a time axis Harmony's subsetter can't read, so
+// the job names its granules by ID and asks for no time subset.
+func TestByGranuleIDNamesGranulesWithoutATimeSubset(t *testing.T) {
+	h := newHarness(t, Config{})
+	h.nasa.granuleIDs = []string{"G1-GES_DISC", "G2-GES_DISC"}
+	tk := task(77)
+	tk.GetHarmonySubset().ByGranuleId = true
+
+	_, err := h.a.Fetch(context.Background(), tk, newSink())
+	wantPending(t, err)
+	if h.nasa.lastMethod != http.MethodPost {
+		t.Fatalf("submitted with %s, want a POSTed form", h.nasa.lastMethod)
+	}
+	form := h.nasa.lastForm
+	if got := strings.Join(form["granuleId"], ","); got != "G1-GES_DISC,G2-GES_DISC" {
+		t.Errorf("granuleId: %q", got)
+	}
+	if got := strings.Join(form["subset"], " "); got != "lat(28:29) lon(77:78)" {
+		t.Errorf("subset: %q, want only the rectangle", got)
+	}
+	if got := strings.Join(form["variable"], ","); got != "Grid/precipitation" {
+		t.Errorf("variable: %q", got)
+	}
+}
+
+func TestByGranuleIDKeepsTheCapAndNoData(t *testing.T) {
+	h := newHarness(t, Config{})
+	h.nasa.granuleIDs = []string{"G1", "G2", "G3"}
+	tk := task(77)
+	tk.GetHarmonySubset().ByGranuleId = true
+	tk.GetHarmonySubset().MaxGranules = 2
+	_, err := h.a.Fetch(context.Background(), tk, newSink())
+	wantCode(t, err, gatewayv1.ErrorCode_ERROR_CODE_TOO_LARGE, false)
+
+	h2 := newHarness(t, Config{})
+	tk2 := task(78)
+	tk2.GetHarmonySubset().ByGranuleId = true
+	_, err = h2.a.Fetch(context.Background(), tk2, newSink())
+	wantCode(t, err, gatewayv1.ErrorCode_ERROR_CODE_NO_DATA, false)
+	if h2.nasa.submits != 0 {
+		t.Errorf("submitted %d jobs with no granules", h2.nasa.submits)
+	}
 }

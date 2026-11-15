@@ -384,7 +384,12 @@ type HarmonySubset struct {
 	Variables []string `protobuf:"bytes,2,rep,name=variables,proto3" json:"variables,omitempty"`
 	// Fail instead of fetching when CMR reports more granules than this. The
 	// gateway sets it from MAX_GRANULES.
-	MaxGranules   int32 `protobuf:"varint,3,opt,name=max_granules,json=maxGranules,proto3" json:"max_granules,omitempty"`
+	MaxGranules int32 `protobuf:"varint,3,opt,name=max_granules,json=maxGranules,proto3" json:"max_granules,omitempty"`
+	// Name the granules by CMR concept ID, picked by their dates, instead of
+	// asking for a time subset. For collections whose time axis Harmony's
+	// subsetter can't read, like NOBM's monthly files ("months since"). Each
+	// granule comes back whole in time, cut only to the rectangle.
+	ByGranuleId   bool `protobuf:"varint,4,opt,name=by_granule_id,json=byGranuleId,proto3" json:"by_granule_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -438,6 +443,13 @@ func (x *HarmonySubset) GetMaxGranules() int32 {
 		return x.MaxGranules
 	}
 	return 0
+}
+
+func (x *HarmonySubset) GetByGranuleId() bool {
+	if x != nil {
+		return x.ByGranuleId
+	}
+	return false
 }
 
 // Settings for SOURCE_GIOVANNI_AREA. Ingest asks Harmony's Giovanni
@@ -982,11 +994,12 @@ const file_trenddetective_ingest_v1_ingest_proto_rawDesc = "" +
 	"csv_upload\x18\x0e \x01(\v2#.trenddetective.ingest.v1.CsvUploadH\x00R\tcsvUpload\x12:\n" +
 	"\x06bundle\x18\x0f \x01(\v2 .trenddetective.ingest.v1.BundleH\x00R\x06bundle\x12@\n" +
 	"\bappeears\x18\x10 \x01(\v2\".trenddetective.ingest.v1.AppeearsH\x00R\bappeearsB\t\n" +
-	"\aadapter\"u\n" +
+	"\aadapter\"\x99\x01\n" +
 	"\rHarmonySubset\x12#\n" +
 	"\rcollection_id\x18\x01 \x01(\tR\fcollectionId\x12\x1c\n" +
 	"\tvariables\x18\x02 \x03(\tR\tvariables\x12!\n" +
-	"\fmax_granules\x18\x03 \x01(\x05R\vmaxGranules\"W\n" +
+	"\fmax_granules\x18\x03 \x01(\x05R\vmaxGranules\x12\"\n" +
+	"\rby_granule_id\x18\x04 \x01(\bR\vbyGranuleId\"W\n" +
 	"\fGiovanniArea\x12\"\n" +
 	"\rdata_field_id\x18\x01 \x01(\tR\vdataFieldId\x12#\n" +
 	"\rcollection_id\x18\x02 \x01(\tR\fcollectionId\"k\n" +
