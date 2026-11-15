@@ -1540,3 +1540,15 @@ p {
 .cell-size + .step {
   margin-top: 1.8rem;
 }
+
+/* ---- one map cell's own chart, under the region's ---- */
+.cell-chart {
+  margin: 1.4rem 0 0;
+  padding: 1rem 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.cell-trend {
+  margin: 0 0 0.6rem;
+  font-size: 0.82rem;
+}

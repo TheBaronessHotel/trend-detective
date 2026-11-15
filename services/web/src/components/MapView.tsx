@@ -31,6 +31,8 @@ interface Props {
   months?: MonthsView;
   /** Drawn over the map, at the bottom. */
   children?: ReactNode;
+  /** A heatmap or month-by-month cell was clicked: its index in the Grid. */
+  onCell?: (cell: number) => void;
 }
 
 export interface MonthsView {
@@ -296,15 +298,15 @@ function showRectangle(map: MapLibreMap | undefined, b: Box | undefined) {
  * rectangle" and drag to draw one instead; spinning is off while drawing.
  * The rectangle can also be typed in beside the globe.
  */
-export function MapView({ box, onBox, heatmap, focus, months, children }: Props) {
+export function MapView({ box, onBox, heatmap, focus, months, children, onCell }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | undefined>(undefined);
   const [drawing, setDrawing] = useState(false);
   const dark = useDarkTheme();
 
   // The map's handlers outlive renders, so they read the latest values here.
-  const latest = useRef({ box, onBox, drawing, dark, heatmap, months });
-  latest.current = { box, onBox, drawing, dark, heatmap, months };
+  const latest = useRef({ box, onBox, drawing, dark, heatmap, months, onCell });
+  latest.current = { box, onBox, drawing, dark, heatmap, months, onCell };
   // The frames the months source holds, so new ones replace its data.
   const shownFrames = useRef<MonthFrames | undefined>(undefined);
 
@@ -374,6 +376,21 @@ export function MapView({ box, onBox, heatmap, focus, months, children }: Props)
         popup.setLngLat(e.lngLat).setText(monthText(m, Number(f.id))).addTo(created);
       });
       created.on("mouseleave", "months-fill", () => popup.remove());
+
+      // A click on a cell opens its own chart; the pointer says cells are clickable.
+      const clickCell = (cell: number | undefined) => {
+        if (cell !== undefined && Number.isInteger(cell) && !latest.current.drawing) latest.current.onCell?.(cell);
+      };
+      created.on("click", "heat-fill", (e: MapLayerMouseEvent) => clickCell(Number(e.features?.[0]?.properties?.cell)));
+      created.on("click", "months-fill", (e: MapLayerMouseEvent) => clickCell(Number(e.features?.[0]?.id)));
+      for (const layer of ["heat-fill", "months-fill"]) {
+        created.on("mouseenter", layer, () => {
+          if (!latest.current.drawing) created.getCanvas().style.cursor = "pointer";
+        });
+        created.on("mouseleave", layer, () => {
+          created.getCanvas().style.cursor = "";
+        });
+      }
 
       let start: Corner | undefined;
       const corner = (e: MapMouseEvent): Corner => ({ lat: e.lngLat.lat, lng: e.lngLat.lng });

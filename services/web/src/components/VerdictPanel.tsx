@@ -10,10 +10,10 @@ export function VerdictPanel({ analysis }: { analysis: SeriesAnalysis }) {
   const v = verdict(analysis);
   if (!v) return null;
   return (
-    <section className={v.significant ? "verdict verdict-sure" : "verdict"} aria-label="What the trend tests found">
+    <section className={v.significant && !v.short ? "verdict verdict-sure" : "verdict"} aria-label="What the trend tests found">
       <p className="verdict-head">
         <span className="verdict-glyph" aria-hidden="true">
-          {v.significant ? glyphs[v.direction] : "~"}
+          {v.significant && !v.short ? glyphs[v.direction] : "~"}
         </span>
         <span className="verdict-headline">{v.headline}</span>
         <span className="verdict-rate">{v.rate}</span>

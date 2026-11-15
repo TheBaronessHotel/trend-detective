@@ -40,7 +40,7 @@ export function HeatmapLegend({ heatmap: h }: { heatmap: Heatmap }) {
         after correcting for testing many cells at once
         {h.significant > 0 ? ` (p up to ${formatValue(short(h.pThreshold))})` : ""}. Each cell averages {h.k} × {h.k} pixels.
         {h.cut ? " Cells on the edge are drawn cut to your rectangle, but their numbers come from whole NASA pixels, which reach a little past it." : ""}{" "}
-        Point at a cell for its numbers.
+        Point at a cell for its numbers, or click it for its own chart.
       </p>
     </section>
   );

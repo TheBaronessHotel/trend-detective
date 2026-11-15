@@ -10,6 +10,7 @@ import { describePoint } from "../lib/bbox";
 import { compare, type Day, formatMonth } from "../lib/dates";
 import { type StageView, stageViews } from "../lib/job";
 import { formatLabel, sourceLabel, stepLabel } from "../lib/sources";
+import { CellChart } from "./CellChart";
 import { SeriesChart } from "./SeriesChart";
 import { HeatmapLegend } from "./HeatmapLegend";
 import { NarratePanel } from "./NarratePanel";
@@ -37,8 +38,18 @@ export interface Run {
   monthsMap?: boolean;
 }
 
+/** One map cell's own chart, opened by clicking the cell on the globe. */
+export interface CellView {
+  series: Series;
+  /** The cell's trend test from the trend map, in words, when there is one. */
+  trend: string;
+}
+
 interface Props {
   run: Run | undefined;
+  /** A clicked map cell, shown under the region's chart. */
+  cell?: CellView;
+  onCloseCell?: () => void;
   stopAfter: Stage;
   /** The variable's name, for the chart's title. */
   seriesTitle: (variableId: string) => string;
@@ -174,6 +185,8 @@ function Results({
   heatmap,
   title,
   onSaveCsv,
+  cell,
+  onCloseCell,
 }: {
   jobId: string;
   series: Series;
@@ -181,6 +194,8 @@ function Results({
   heatmap: Heatmap | undefined;
   title: string;
   onSaveCsv: () => Promise<void>;
+  cell?: CellView;
+  onCloseCell?: () => void;
 }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string>();
@@ -214,16 +229,21 @@ function Results({
         }
       />
       {saveError && <Alert>{saveError}</Alert>}
+      {cell && <CellChart cell={cell} title={title} onClose={onCloseCell} />}
       {analysis && <NarratePanel jobId={jobId} />}
     </div>
   );
 }
 
 /** The job: each stage as it runs, what went wrong, and what came back. */
-export function JobPanel({ run, stopAfter, seriesTitle, onSaveCsv, onStop }: Props) {
+export function JobPanel({ run, cell, onCloseCell, stopAfter, seriesTitle, onSaveCsv, onStop }: Props) {
   const [stopping, setStopping] = useState(false);
   // Folded down to one line, so the globe gets the room.
   const [folded, setFolded] = useState(false);
+  // A clicked cell opens the panel to show its chart.
+  useEffect(() => {
+    if (cell) setFolded(false);
+  }, [cell]);
   const views = stageViews(run?.job, stopAfter);
   const now = useNow(views.some((v) => v.state === "running"));
   if (!run) return null;
@@ -251,6 +271,8 @@ export function JobPanel({ run, stopAfter, seriesTitle, onSaveCsv, onStop }: Pro
               heatmap={run.heatmap}
               title={seriesTitle(run.series.variableId)}
               onSaveCsv={onSaveCsv}
+              cell={cell}
+              onCloseCell={onCloseCell}
             />
             <details className="job-details">
               <summary>
