@@ -29,16 +29,17 @@ def test_delhi_temperature_with_the_catalog_plan():
     assert out.variable_id == "T2M" and out.units == "C"
     assert out.n_valid == out.n_total == 528
     assert out.field == analysis_pb2.SERIES_FIELD_ANOMALIES
-    # Preprocess doesn't make anomalies yet, so analysis did. POWER's values
-    # step down in mid-2010. January and December cool on their own, which
-    # gets the caveat about twelve tests. The residuals aren't normal.
+    # Preprocess doesn't make anomalies yet, so analysis did. January and
+    # December cool on their own, which gets the caveat about twelve tests.
+    # The residuals aren't normal. The biggest shift, in mid-2010, came out at
+    # p 0.0007 before Pettitt allowed for neighboring months being alike
+    # (r1 about 0.46), and isn't significant now.
     assert list(out.warnings) == [
         series_mod.OWN_ANOMALIES,
-        "The values jump around July 2010 instead of changing steadily. "
-        "A sudden step, like a new sensor or a new dam, can look like a trend.",
         suite.MONTHS_BY_CHANCE,
         suite.NOT_BELL_SHAPED_MK,
     ]
+    assert not out.pettitt.significant
 
     reg, mk = out.regression, out.mann_kendall
     assert reg.slope_ci_low < reg.slope_per_decade < reg.slope_ci_high
@@ -55,6 +56,17 @@ def test_delhi_temperature_with_the_catalog_plan():
     for name in ("shuffle", "trend_triangle", "years_to_significance", "pettitt", "residual_checks", "outliers"):
         assert out.HasField(name)
     assert [t.month for t in out.monthly_trends] == list(range(1, 13))
+
+
+@pytest.mark.parametrize(("months", "shown"), [(84, "7"), (114, "9.5"), (117, "9.8"), (119, "9.9")])
+def test_a_short_record_says_how_short_to_a_tenth(months: int, shown: str):
+    out = suite.run(make_series(seasonal_series(10)[:months]), series_plan())
+    assert f"Only {shown} years of data. A trend in a record this short is uncertain." in out.warnings
+
+
+def test_ten_years_is_not_short():
+    out = suite.run(make_series(seasonal_series(10)), series_plan())
+    assert not any(w.startswith("Only ") for w in out.warnings)
 
 
 def test_autocorrelation_correction_changes_the_delhi_verdict():

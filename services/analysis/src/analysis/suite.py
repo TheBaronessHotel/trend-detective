@@ -2,8 +2,8 @@
 
 Regression, Mann-Kendall and the agreement check came with ANA-1, the extras
 with ANA-4, and the diagnostics (Pettitt, residual checks, outliers) with
-ANA-3. The grid tests (ANA-2) are logged and skipped, so their field stays
-unset.
+ANA-3. The grid tests (ANA-2) aren't run here: pipeline.py runs them with
+grid.py.
 """
 
 from __future__ import annotations
@@ -111,7 +111,7 @@ def run(
         elif kind == "years_to_significance":
             _years_to_significance(out, monthly, fit, alpha)
         elif kind == "pettitt":
-            _pettitt(out, monthly, fit, alpha)
+            _pettitt(out, monthly, fit, alpha, correct)
         elif kind == "residual_checks":
             _residual_checks(out, monthly, fit, alpha)
         elif kind == "outliers":
@@ -134,8 +134,6 @@ def run(
 
     if skipped:
         logger.info("skipped tests that aren't built yet", extra={"fields": {"tests": ",".join(skipped)}})
-    if plan.grid:
-        logger.info("skipped grid tests, which aren't built yet", extra={"fields": {"tests": len(plan.grid)}})
     return out
 
 
@@ -277,10 +275,15 @@ def _years_to_significance(
     )
 
 
-def _pettitt(out: results_pb2.SeriesAnalysis, m: Monthly, fit: regression.LinearTrend, alpha: float) -> None:
+def _pettitt(
+    out: results_pb2.SeriesAnalysis, m: Monthly, fit: regression.LinearTrend, alpha: float, correct: bool
+) -> None:
     # The line's residual sum of squares, to tell a step from a steady change.
     line_sse = fit.residual_sd**2 * (fit.n - 2)
-    change = diagnostics.pettitt(m.tested, line_sse)
+    # Months that resemble their neighbors get the same allowance as in the
+    # regression, when the plan has its correction on.
+    r1 = fit.lag1_autocorrelation if correct else 0.0
+    change = diagnostics.pettitt(m.tested, line_sse, r1)
     significant = change.p_value < alpha
     out.pettitt.CopyFrom(
         results_pb2.PettittResult(

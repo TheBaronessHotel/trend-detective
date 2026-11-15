@@ -27,7 +27,7 @@ ANALYSIS_BUCKET = "analysis"
 # Changes whenever the documents this code writes could change for the same
 # task, like a new test or a fixed formula. It is part of the cache key, so
 # bumping it makes every cached result stale at once.
-CODE_VERSION = "5"
+CODE_VERSION = "6"
 KEY_VERSION = "analysis/v1"
 
 RESULT_FILE = "result.json"

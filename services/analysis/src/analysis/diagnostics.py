@@ -24,6 +24,9 @@ MEAN_AD_SCALE = 1.253314
 # A calendar month needs values in this many years for a median and MAD of
 # its own, the same as for its trend.
 MIN_YEARS_PER_MONTH = 5
+# Pettitt's allowance for autocorrelation grows without bound as r1 nears 1,
+# so r1 is clipped here, as phi is for the years to significance.
+MAX_R1 = 0.99
 
 
 @dataclass(frozen=True)
@@ -48,7 +51,7 @@ class ResidualChecks:
     normality_ok: bool
 
 
-def pettitt(y: np.ndarray, line_sse: float) -> ChangePoint:
+def pettitt(y: np.ndarray, line_sse: float, r1: float = 0.0) -> ChangePoint:
     """Pettitt's (1979) test for one change in the level of a series, NaN where
     missing, compared with a straight line whose residual sum of squares is
     line_sse.
@@ -57,6 +60,13 @@ def pettitt(y: np.ndarray, line_sse: float) -> ChangePoint:
     largest |U_t|, the change comes after its t, and p is about
     2 exp(-6 K^2 / (n^3 + n^2)). Gaps are squeezed out, so the change point is
     the first valid value after the change.
+
+    That p assumes independent values. Months that resemble their neighbors
+    make K come out larger than chance alone would: on trendless series with
+    a lag-1 autocorrelation of 0.5, 40 to 50% came out significant. So with
+    a positive r1, the lag-1 autocorrelation of the regression's residuals,
+    the variance in the exponent grows by (1 + r1) / (1 - r1), the same
+    inflation as the regression's effective sample size.
     """
     valid = np.flatnonzero(np.isfinite(y))
     x = y[valid]
@@ -68,10 +78,12 @@ def pettitt(y: np.ndarray, line_sse: float) -> ChangePoint:
     k = float(abs(u[split]))
     before, after = x[: split + 1], x[split + 1 :]
     step_sse = float(((before - before.mean()) ** 2).sum() + ((after - after.mean()) ** 2).sum())
+    r = min(r1, MAX_R1)
+    inflation = (1 + r) / (1 - r) if r > 0 else 1.0
     return ChangePoint(
         index=int(valid[split + 1]),
         k=k,
-        p_value=min(1.0, 2 * math.exp(-6 * k * k / (n**3 + n**2))),
+        p_value=min(1.0, 2 * math.exp(-6 * k * k / ((n**3 + n**2) * inflation))),
         mean_before=float(before.mean()),
         mean_after=float(after.mean()),
         step_fits_better=step_sse < line_sse,
