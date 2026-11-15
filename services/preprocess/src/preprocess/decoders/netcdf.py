@@ -33,6 +33,7 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 
+import netCDF4 as nc
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -62,18 +63,18 @@ def decode(paths: list[Path], raw: ingest_pb2.RawDataset, source_units: str) -> 
         raise errors.invalid(
             "The data for this job couldn't be matched to a variable.", "RawDataset lists no variables"
         )
-    measurement, helpers = raw.variables[0], list(raw.variables[1:])
+    variables = list(raw.variables)
     notes: list[str] = []
     parts: list[xr.Dataset] = []
     declared = ""
 
     for i, path in enumerate(paths):
         coverage = raw.files[i].coverage if i < len(raw.files) else None
-        da = _read(path, measurement)
-        declared = declared or str(da.attrs.get("units", ""))
-        ds = canonical.make_dataset(_canonical_dims(da, path.name, coverage))
-        for h in helpers:
-            ds[canonical.helper_name(h)] = _canonical_dims(_read(path, h), path.name, coverage).astype("float64")
+        measurement, *helpers = _read(path, variables)
+        declared = declared or str(measurement.attrs.get("units", ""))
+        ds = canonical.make_dataset(_canonical_dims(measurement, path.name, coverage))
+        for var, da in zip(variables[1:], helpers, strict=True):
+            ds[canonical.helper_name(var)] = _to_hpa(_canonical_dims(da, path.name, coverage)).astype("float64")
         parts.append(ds)
 
     ds = canonical.combine(parts)
@@ -90,44 +91,76 @@ def decode(paths: list[Path], raw: ingest_pb2.RawDataset, source_units: str) -> 
     )
 
 
-def _read(path: Path, var: str) -> xr.DataArray:
-    group, _, name = var.rpartition("/")
+def _read(path: Path, variables: list[str]) -> list[xr.DataArray]:
+    """Reads every variable from one file, opening each group once and the
+    file's raw netCDF handle at most once, all under the file lock."""
+    groups: dict[str, xr.Dataset] = {}
+    handle: nc.Dataset | None = None
+    out: list[xr.DataArray] = []
     try:
-        # load() reads the data before the file closes, all under the lock.
-        with _FILES, xr.open_dataset(path, group=group or None, engine="netcdf4", mask_and_scale=True) as ds:
-            if name not in ds.variables:
-                raise errors.invalid(
-                    "The downloaded file doesn't have the variable this job asked for.",
-                    f"{path.name}: no {name!r} in group {group or '/'}; has {sorted(map(str, ds.data_vars))}",
-                )
-            da = ds[name].load()
-            missing = [d for d in da.dims if d not in da.coords]
-            if missing and group:
-                da = _coords_from_parents(path, group, da, missing)
-            return da
+        with _FILES:
+            try:
+                for var in variables:
+                    group, _, name = var.rpartition("/")
+                    if group not in groups:
+                        groups[group] = xr.open_dataset(path, group=group or None, engine="netcdf4", mask_and_scale=True)
+                    ds = groups[group]
+                    if name not in ds.variables:
+                        raise errors.invalid(
+                            "The downloaded file doesn't have the variable this job asked for.",
+                            f"{path.name}: no {name!r} in group {group or '/'}; has {sorted(map(str, ds.data_vars))}",
+                        )
+                    # load() reads the data before the file closes.
+                    da = ds[name].load()
+                    missing = [str(d) for d in da.dims if d not in da.coords]
+                    if missing and group:
+                        handle = handle or nc.Dataset(path)
+                        da = _coords_from_parents(handle, group, da, missing)
+                    out.append(da)
+            finally:
+                for ds in groups.values():
+                    ds.close()
+                if handle is not None:
+                    handle.close()
     except errors.TaskFailure:
         raise
-    except (OSError, ValueError, KeyError) as err:
+    except (OSError, ValueError, KeyError, RuntimeError) as err:
         raise errors.unreadable(
             "NASA sent a file we couldn't read.", f"{path.name}: {type(err).__name__}: {err}"
         ) from err
+    return out
 
 
-def _coords_from_parents(path: Path, group: str, da: xr.DataArray, dims: list[str]) -> xr.DataArray:
-    """Gives each axis in dims the values of the nearest variable of the same
-    name in a group above the variable's own, up to the root. Called with the
-    file lock held."""
-    parts = group.split("/")
-    for depth in range(len(parts) - 1, -1, -1):
-        parent = "/".join(parts[:depth]) or None
-        with xr.open_dataset(path, group=parent, engine="netcdf4", mask_and_scale=True) as ds:
-            found = {d: ds[d].load() for d in dims if d in ds.variables and ds[d].dims == (d,)}
-        for d, coord in found.items():
-            da = da.assign_coords({d: coord})
-        dims = [d for d in dims if d not in found]
+def _coords_from_parents(handle: nc.Dataset, group: str, da: xr.DataArray, dims: list[str]) -> xr.DataArray:
+    """Gives each axis in dims the values of the nearest 1-D variable of the
+    same name in the variable's group or a group above it, up to the root.
+
+    It reads those few values straight through netCDF4: opening each parent
+    group with xarray took most of a second per file on AIRS, inside the
+    lock every task's file reads share."""
+    chain = [handle]
+    for part in group.split("/"):
+        chain.append(chain[-1].groups[part])
+    for g in reversed(chain):
+        for d in list(dims):
+            v = g.variables.get(d)
+            if v is None or v.dimensions != (d,):
+                continue
+            values = np.ma.filled(np.ma.asarray(v[:], dtype="float64"), np.nan)
+            attrs = {k: v.getncattr(k) for k in ("units", "standard_name", "long_name") if k in v.ncattrs()}
+            da = da.assign_coords({d: xr.DataArray(values, dims=d, attrs=attrs)})
+            dims.remove(d)
         if not dims:
             break
     return da
+
+
+def _to_hpa(helper: xr.DataArray) -> xr.DataArray:
+    """A helper whose units say it's a pressure, in hPa. Others pass through."""
+    factor = _PRESSURE_UNITS.get(str(helper.attrs.get("units", "")).strip().lower())
+    if factor is None or factor == 1.0:
+        return helper
+    return helper * factor
 
 
 def _canonical_dims(
@@ -142,7 +175,20 @@ def _canonical_dims(
         raise errors.unreadable(
             "NASA sent a file we couldn't read.", f"{file_name}: two axes of the same kind in {da.dims}"
         )
+    # An axis found by its name alone, like YDim, has no positions unless some
+    # group holds its values. Without them xarray counts 0, 1, 2, and the map
+    # would land at the wrong place without any error.
+    for dim in da.dims:
+        kind = renames.get(str(dim), str(dim))
+        if kind in ("lat", "lon", "level") and dim not in da.coords:
+            raise errors.unreadable(
+                "NASA sent a file we couldn't read.",
+                f"{file_name}: axis {dim!r} has no coordinate values in its group or any group above",
+            )
     da = da.rename(renames)
+    # A single pressure level is a plain map, like any other axis of size 1.
+    if "level" in da.dims and da.sizes["level"] == 1:
+        da = da.squeeze("level", drop=True)
 
     if "time" not in da.dims:
         # A granule with no time axis covers one step, which ingest knows.

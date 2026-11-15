@@ -131,3 +131,86 @@ def test_many_threads_can_decode_at_once(tmp_path: Path):
     with ThreadPoolExecutor(max_workers=8) as pool:
         sizes = list(pool.map(decode_one, paths * 4))
     assert sizes == [2] * 32
+
+
+# Data on pressure levels, and axes found by name (PRE-6 review fixes).
+
+
+def _jan_2020(raw: ingest_pb2.RawDataset) -> ingest_pb2.RawDataset:
+    raw.files[0].coverage.CopyFrom(
+        common_pb2.DateRange(start=common_pb2.Date(year=2020, month=1, day=1), end=common_pb2.Date(year=2020, month=1, day=31))
+    )
+    return raw
+
+
+def test_a_single_pressure_level_is_a_plain_map(tmp_path: Path):
+    times = pd.to_datetime(["2020-01-01"]).values
+    lev = xr.DataArray([500.0], dims="lev", attrs={"units": "hPa"})
+    da = xr.DataArray(
+        np.ones((1, 1, 2, 2)), dims=("time", "lev", "lat", "lon"),
+        coords={"time": times, "lev": lev, "lat": [1.0, 0.0], "lon": [0.0, 1.0]}, name="T",
+    )
+    path = tmp_path / "lev1.nc"
+    da.to_dataset().to_netcdf(path)
+
+    dec = netcdf.decode([path], raw_dataset(ingest_pb2.FORMAT_NETCDF4, ["T"], ["lev1.nc"]), "K")
+
+    assert dec.values.dims == ("time", "lat", "lon")
+
+
+def test_an_axis_without_coordinate_values_is_refused(tmp_path: Path):
+    import netCDF4 as nc
+
+    path = tmp_path / "nocoords.nc"
+    with nc.Dataset(path, "w") as f:
+        f.createDimension("YDim", 3)
+        f.createDimension("XDim", 2)
+        f.createGroup("g").createVariable("V", "f4", ("YDim", "XDim"))[:] = np.arange(6).reshape(3, 2)
+    raw = _jan_2020(raw_dataset(ingest_pb2.FORMAT_NETCDF4, ["g/V"], ["nocoords.nc"]))
+
+    with pytest.raises(errors.TaskFailure) as info:
+        netcdf.decode([path], raw, "")
+    assert info.value.code == errors.task_pb2.ERROR_CODE_UPSTREAM
+    assert "no coordinate values" in info.value.detail
+
+
+def _profile_file(path: Path, ps_value: float, ps_units: str | None) -> None:
+    times = pd.to_datetime(["2020-01-01"]).values
+    lev = xr.DataArray([1000.0, 500.0, 100.0], dims="lev", attrs={"units": "hPa"})
+    vmr = xr.DataArray(
+        np.array([1.0, 2.0, 3.0])[None, :, None, None] * np.ones((1, 3, 1, 1)), dims=("time", "lev", "lat", "lon"),
+        coords={"time": times, "lev": lev, "lat": [0.0], "lon": [0.0]}, name="VMR",
+    )
+    ps = xr.DataArray(
+        np.full((1, 1, 1), ps_value), dims=("time", "lat", "lon"),
+        coords={"time": times, "lat": [0.0], "lon": [0.0]}, name="PS",
+        attrs={"units": ps_units} if ps_units else {},
+    )
+    xr.Dataset({"VMR": vmr, "PS": ps}).to_netcdf(path)
+
+
+def _column(path: Path):
+    from google.protobuf import json_format
+
+    from preprocess import filters
+    from trenddetective.preprocess.v1 import preprocess_pb2
+
+    dec = netcdf.decode([path], raw_dataset(ingest_pb2.FORMAT_NETCDF4, ["VMR", "PS"], [path.name]), "")
+    chain = json_format.ParseDict({"ops": [{"column_average": {"surface_pressure": "PS"}}]}, preprocess_pb2.FilterChain())
+    filters.apply(dec, chain)
+    return dec.values.values[0, 0, 0]
+
+
+def test_surface_pressure_in_pa_is_converted(tmp_path: Path):
+    path = tmp_path / "pa.nc"
+    _profile_file(path, 60000.0, "Pa")
+    # 600 hPa: the 1000 hPa layer is under the ground, weights 0, 300, 300.
+    assert _column(path) == pytest.approx(2.5)
+
+
+def test_surface_pressure_that_cant_be_hpa_is_refused(tmp_path: Path):
+    path = tmp_path / "unlabelled.nc"
+    _profile_file(path, 60000.0, None)
+    with pytest.raises(errors.TaskFailure) as info:
+        _column(path)
+    assert "looks like Pa" in info.value.detail

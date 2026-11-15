@@ -34,6 +34,8 @@ from .. import canonical, errors
 from ..canonical import REASON, VALUE, Decoded
 
 DEFAULT_MIN_COVERAGE = 0.9
+# Above any surface pressure on Earth (about 1085 hPa at the Dead Sea).
+MAX_SURFACE_HPA = 1200.0
 
 
 def layer_bounds(levels: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -66,6 +68,17 @@ def column_average(dec: Decoded, op: preprocess_pb2.ColumnAverage) -> None:
 
     v = dec.data[VALUE]
     ps = dec.data[helper]
+    # The decoder converts a surface pressure whose units say Pa, but a file
+    # without units can still hold Pa. The highest real surface pressure is
+    # about 1085 hPa, so anything far above it can't be hPa, and every
+    # column would silently weigh in the whole atmosphere.
+    highest = float(ps.max(skipna=True)) if bool(ps.notnull().any()) else float("nan")
+    if highest > MAX_SURFACE_HPA:
+        raise errors.invalid(
+            "This variable's preparation steps are set up wrong.",
+            f"filter chain: column_average needs surface pressure in hPa, but {op.surface_pressure!r} "
+            f"reaches {highest:.6g}, which looks like Pa",
+        )
     levels = dec.data["level"].values.astype("float64")
     bottom, top = layer_bounds(levels)
     bottom_da = xr.DataArray(bottom, dims="level", coords={"level": levels})
