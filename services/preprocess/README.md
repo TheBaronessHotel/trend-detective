@@ -37,7 +37,7 @@ Every decoder returns a `Decoded`: an xarray Dataset with a `value` variable (fl
 - Latitude runs north first and longitude west first, in -180 to 180.
 - Units are the task's `source_units` when set. A file that says otherwise is logged, because the catalog's unit filters are written against `source_units`.
 
-After decoding, the pipeline keeps the steps inside the requested dates and the pixels whose centers fall inside the rectangle. A rectangle smaller than one pixel keeps the pixel it touches.
+After decoding, the pipeline keeps the steps inside the requested dates and the pixels whose centers fall inside the rectangle or on its edges, within 1e-6° so rounding in the files' coordinates doesn't drop an edge (MERRA-2's 0° east arrives as -5.9e-13). Edge pixels can reach half a pixel past the rectangle. A rectangle smaller than one pixel keeps the pixel it touches.
 
 The time step comes from `RawDataset.step` when ingest set it, as csv-upload does, and otherwise from the spacing of the dates. Monthly series get every month from first to last, with months a source skipped marked missing, so a step's position always says how far apart two steps are.
 

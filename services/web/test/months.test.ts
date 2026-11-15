@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { create } from "@bufbuild/protobuf";
 import { timestampFromMs } from "@bufbuild/protobuf/wkt";
+import { BBoxSchema } from "@gen/common/v1/common_pb";
 import { GridSchema } from "@gen/preprocess/v1/data_pb";
 import { cellAt, monthFrames, quantile, readCube } from "../src/lib/months";
 
@@ -54,6 +55,14 @@ describe("monthFrames", () => {
     expect(f.valueRange[0]).toBe(1);
     expect(f.valueRange[1]).toBe(6);
     expect(f.anomalyMax).toBe(2);
+  });
+
+  test("cells are cut to the job's rectangle", () => {
+    const cut = create(GridSchema, grid);
+    cut.bbox = create(BBoxSchema, { west: 71, south: 21, east: 80, north: 30 });
+    const frames = monthFrames(cut, values)!;
+    expect(frames.cells.features[0]?.geometry.coordinates[0]).toEqual([[71, 25], [75, 25], [75, 30], [71, 30], [71, 25]]);
+    expect(frames.cells.features[2]?.geometry.coordinates[0]).toEqual([[71, 21], [75, 21], [75, 25], [71, 25], [71, 21]]);
   });
 
   test("anomalies of the wrong size are left out", () => {

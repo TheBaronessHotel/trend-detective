@@ -2,6 +2,7 @@
 // job's Grid and GridAnalysis into polygons for the heatmap.
 
 import type { GridAnalysis, GridLayer } from "@gen/analysis/v1/results_pb";
+import type { BBox } from "@gen/common/v1/common_pb";
 import type { Variable } from "@gen/gateway/v1/gateway_pb";
 import type { Grid } from "@gen/preprocess/v1/data_pb";
 import type { Feature, FeatureCollection, Polygon } from "geojson";
@@ -72,8 +73,41 @@ export interface CellProps {
   p: number;
 }
 
+/**
+ * A cell's ring from its edges, cut to the rectangle the job asked for.
+ * Pixels whose centers sit on the rectangle's edges reach half a pixel past
+ * it, so edge cells are drawn cut, inside the rectangle the user drew. Their
+ * numbers still come from the whole pixels. A rectangle crossing the date
+ * line (west above east) isn't cut. undefined when nothing is left.
+ */
+export function cellRing(north: number, south: number, west: number, east: number, bbox?: BBox): number[][] | undefined {
+  let [n, s, w, e] = [north, south, west, east];
+  if (bbox && bbox.east > bbox.west && bbox.north > bbox.south) {
+    n = Math.min(n, bbox.north);
+    s = Math.max(s, bbox.south);
+    w = Math.max(w, bbox.west);
+    e = Math.min(e, bbox.east);
+  }
+  if (!(n > s && e > w)) return undefined;
+  return [
+    [w, s],
+    [e, s],
+    [e, n],
+    [w, n],
+    [w, s],
+  ];
+}
+
+/** Whether a cell reaches past the rectangle, so it's drawn cut. */
+function reachesPast(north: number, south: number, west: number, east: number, bbox?: BBox): boolean {
+  if (!bbox || !(bbox.east > bbox.west && bbox.north > bbox.south)) return false;
+  return north > bbox.north || south < bbox.south || west < bbox.west || east > bbox.east;
+}
+
 export interface Heatmap {
   cells: FeatureCollection<Polygon, CellProps>;
+  /** Some edge cells reach past the rectangle and are drawn cut to it. */
+  cut: boolean;
   /** The colour scale runs from -max to +max. */
   max: number;
   tested: number;
@@ -93,6 +127,7 @@ export function heatmap(grid: Grid, analysis: GridAnalysis): Heatmap | undefined
   if (!layer || grid.rows !== analysis.rows || grid.cols !== analysis.cols) return undefined;
   if (grid.latEdges.length !== grid.rows + 1 || grid.lonEdges.length !== grid.cols + 1) return undefined;
   const features: Feature<Polygon, CellProps>[] = [];
+  let cut = false;
   for (let r = 0; r < grid.rows; r++) {
     for (let c = 0; c < grid.cols; c++) {
       const i = r * grid.cols + c;
@@ -102,10 +137,13 @@ export function heatmap(grid: Grid, analysis: GridAnalysis): Heatmap | undefined
       const s = grid.latEdges[r + 1] ?? 0;
       const w = grid.lonEdges[c] ?? 0;
       const e = grid.lonEdges[c + 1] ?? 0;
+      const ring = cellRing(n, s, w, e, grid.bbox);
+      if (!ring) continue;
+      cut ||= reachesPast(n, s, w, e, grid.bbox);
       features.push({
         type: "Feature",
         properties: { slope, significant: !!layer.significant[i], p: layer.pValues[i] ?? 1 },
-        geometry: { type: "Polygon", coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] },
+        geometry: { type: "Polygon", coordinates: [ring] },
       });
     }
   }
@@ -113,6 +151,7 @@ export function heatmap(grid: Grid, analysis: GridAnalysis): Heatmap | undefined
   const max = sizes.length ? sizes[Math.min(sizes.length - 1, Math.floor(0.95 * (sizes.length - 1)))] || sizes.at(-1) || 1 : 1;
   return {
     cells: { type: "FeatureCollection", features },
+    cut,
     max,
     tested: features.length,
     significant: features.filter((f) => f.properties.significant).length,

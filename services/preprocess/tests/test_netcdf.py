@@ -94,3 +94,20 @@ def test_clip_keeps_pixel_centers_inside_the_rectangle(tmp_path: Path):
     # A rectangle smaller than a pixel keeps the pixel it touches.
     tiny = canonical.clip_bbox(dec.data, common_pb2.BBox(west=20.11, south=10.11, east=20.12, north=10.12))
     assert tiny.sizes["lat"] == 3 and tiny.sizes["lon"] == 2
+
+
+def test_clip_keeps_centers_on_every_edge_despite_rounding():
+    # MERRA-2's grid as Harmony returns it for 0 to 20 east and 42 to 55
+    # north: 0 east comes as -5.9e-13, and centers sit on every edge.
+    lons = np.array([-5.920304394294029e-13, 0.625, 10.0, 19.375, 20.000000000001])
+    lats = np.array([55.0, 54.5, 42.5, 42.0])
+    ds = xr.Dataset({"v": (("lat", "lon"), np.ones((len(lats), len(lons))))}, coords={"lat": lats, "lon": lons})
+
+    clipped = canonical.clip_bbox(ds, common_pb2.BBox(west=0.0, south=42.0, east=20.0, north=55.0))
+    assert clipped.sizes["lon"] == 5
+    assert clipped.sizes["lat"] == 4
+
+    # Centers more than the tolerance outside still go.
+    inside = canonical.clip_bbox(ds, common_pb2.BBox(west=0.001, south=42.001, east=19.999, north=54.999))
+    assert list(inside["lon"].values) == [0.625, 10.0, 19.375]
+    assert list(inside["lat"].values) == [54.5, 42.5]

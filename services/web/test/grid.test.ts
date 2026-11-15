@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { create } from "@bufbuild/protobuf";
 import { GridAnalysisSchema } from "@gen/analysis/v1/results_pb";
+import { BBoxSchema } from "@gen/common/v1/common_pb";
 import { VariableSchema } from "@gen/gateway/v1/gateway_pb";
 import { GridSchema } from "@gen/preprocess/v1/data_pb";
-import { blockSize, heatmap, previewGrid } from "../src/lib/grid";
+import { blockSize, cellRing, heatmap, previewGrid } from "../src/lib/grid";
 
 describe("blockSize mirrors preprocess", () => {
   test.each([
@@ -72,7 +73,41 @@ describe("heatmap", () => {
     expect(first?.geometry.coordinates[0]).toEqual([[70, 25], [75, 25], [75, 30], [70, 30], [70, 25]]);
   });
 
+  test("edge cells are cut to the job's rectangle", () => {
+    // Pixel centers on the rectangle's edges reach half a pixel past it.
+    const wide = create(GridSchema, {
+      rows: 2,
+      cols: 2,
+      blockPixels: 1,
+      bbox: { west: 70, south: 20, east: 80, north: 30 },
+      latEdges: [30.25, 25, 19.75],
+      lonEdges: [69.6875, 75, 80.3125],
+    });
+    const h = heatmap(wide, analysis);
+    expect(h?.cut).toBe(true);
+    expect(h?.cells.features[0]?.geometry.coordinates[0]).toEqual([[70, 25], [75, 25], [75, 30], [70, 30], [70, 25]]);
+    expect(h?.cells.features.at(-1)?.geometry.coordinates[0]).toEqual([[75, 20], [80, 20], [80, 25], [75, 25], [75, 20]]);
+    expect(heatmap(grid, analysis)?.cut).toBe(false);
+  });
+
   test("a grid that doesn't match the analysis draws nothing", () => {
     expect(heatmap(create(GridSchema, { rows: 3, cols: 2 }), analysis)).toBeUndefined();
+  });
+});
+
+describe("cellRing", () => {
+  const box = create(BBoxSchema, { west: 0, south: 42, east: 20, north: 55 });
+
+  test("a cell inside the rectangle is left whole", () => {
+    expect(cellRing(50, 49.5, 5, 5.625, box)).toEqual([[5, 49.5], [5.625, 49.5], [5.625, 50], [5, 50], [5, 49.5]]);
+  });
+
+  test("a cell wholly outside is dropped", () => {
+    expect(cellRing(60, 56, 5, 6, box)).toBeUndefined();
+  });
+
+  test("a rectangle across the date line cuts nothing", () => {
+    const across = create(BBoxSchema, { west: 170, south: 0, east: -170, north: 10 });
+    expect(cellRing(10.25, 9.75, 169.7, 170.3, across)?.[0]).toEqual([169.7, 9.75]);
   });
 });

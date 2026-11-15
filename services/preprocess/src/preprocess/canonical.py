@@ -179,12 +179,21 @@ def trim(ds: xr.Dataset, dates: common_pb2.DateRange, step: int) -> xr.Dataset:
     return ds.isel(time=(t >= start) & (t <= end))
 
 
+# How far, in degrees, a pixel center may sit outside the rectangle and still
+# count as on its edge. Files store grid coordinates with rounding error:
+# MERRA-2's 0 degrees east arrives from Harmony as -5.9e-13, and without this
+# a rectangle from 0 to 20 east would lose its west column but keep its east
+# one.
+EDGE_TOLERANCE_DEG = 1e-6
+
+
 def clip_bbox(ds: xr.Dataset, bbox: common_pb2.BBox | None) -> xr.Dataset:
-    """Keeps pixels whose centers fall inside the rectangle.
+    """Keeps pixels whose centers fall inside the rectangle, edges included.
 
     Harmony returns every pixel that touches the rectangle, so edge pixels can
-    lie mostly outside it. When a rectangle is smaller than one pixel, no
-    center is inside it, and that axis is left as it came.
+    lie mostly outside it. A center on an edge counts as inside, on every
+    edge alike, within EDGE_TOLERANCE_DEG. When a rectangle is smaller than one
+    pixel, no center is inside it, and that axis is left as it came.
     """
     if bbox is None or not ("lat" in ds.dims and "lon" in ds.dims):
         return ds
@@ -192,8 +201,9 @@ def clip_bbox(ds: xr.Dataset, bbox: common_pb2.BBox | None) -> xr.Dataset:
         return ds
     lat = ds["lat"].values
     lon = ds["lon"].values
-    lat_in = (lat >= bbox.south) & (lat <= bbox.north)
-    lon_in = (lon >= bbox.west) & (lon <= bbox.east)
+    tol = EDGE_TOLERANCE_DEG
+    lat_in = (lat >= bbox.south - tol) & (lat <= bbox.north + tol)
+    lon_in = (lon >= bbox.west - tol) & (lon <= bbox.east + tol)
     if lat_in.any():
         ds = ds.isel(lat=lat_in)
     if lon_in.any():
