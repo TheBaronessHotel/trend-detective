@@ -1,4 +1,4 @@
-.PHONY: up down logs ps clean smoke smoke-harmony smoke-power smoke-giovanni smoke-appeears warm-examples test test-preprocess test-analysis gen lint fmt breaking web-dev web-check
+.PHONY: up down logs ps clean smoke smoke-harmony smoke-power smoke-giovanni smoke-appeears smoke-airs warm-examples test test-preprocess test-analysis gen lint fmt breaking web-dev web-check
 
 # Runs on Linux, macOS and Windows.
 #
@@ -64,6 +64,11 @@ smoke-power:
 # Live check against Giovanni's time-series API. Needs EARTHDATA_TOKEN in .env.
 smoke-giovanni:
 	$(SH) deploy/smoke/giovanni.sh
+
+# Live check of the AIRS map variables, methane's column average included.
+# Needs EARTHDATA_TOKEN in .env, and takes a few minutes per variable.
+smoke-airs:
+	$(SH) deploy/smoke/airs.sh
 
 # Live check against NASA AppEEARS. Needs EARTHDATA_USERNAME and
 # EARTHDATA_PASSWORD in .env, and can take 5 to 15 minutes.
