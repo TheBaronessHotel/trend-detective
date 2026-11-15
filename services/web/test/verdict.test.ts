@@ -9,6 +9,7 @@ import { rounded, verdict } from "../src/lib/verdict";
 const rising = create(SeriesAnalysisSchema, {
   units: "°C",
   field: SeriesField.ANOMALIES,
+  nTotal: 360,
   regression: { slopePerDecade: 0.25, slopeCiLow: 0.12, slopeCiHigh: 0.38, pValue: 0.0004, significant: true },
   mannKendall: { sensSlopePerDecade: 0.24, pValue: 0.001, significant: true },
   agreement: { sameDirection: true, sameSignificance: true },
@@ -76,6 +77,15 @@ describe("verdict", () => {
     expect(rounded(-12.64, 4)).toBe("−12.6");
     expect(rounded(-12.6, 40)).toBe("−13");
     expect(rounded(0.004567, 0.002)).toBe("+0.0046");
+  });
+
+  test("a passing test on a short record isn't called a trend", () => {
+    const v = verdict(create(SeriesAnalysisSchema, { ...rising, nTotal: 24 }));
+    expect(v).toMatchObject({ significant: true, short: true, headline: "Rising over 2 years, too short to call a trend" });
+    expect(v?.lines[0]).toContain("2 years is a short record");
+    expect(v?.lines[0]).toContain("at least 10 years");
+    // Ten years or more is a normal verdict.
+    expect(verdict(create(SeriesAnalysisSchema, { ...rising, nTotal: 120 }))?.short).toBe(false);
   });
 
   test("nothing to say without a trend test", () => {

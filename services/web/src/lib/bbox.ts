@@ -65,9 +65,9 @@ function latLabel(v: number): string {
   return `${Math.abs(v)}°${v < 0 ? "S" : v > 0 ? "N" : ""}`;
 }
 
-/** "74°E to 78°E, 28°N to 32°N". */
+/** "74°E to 78°E, 28°N to 32°N", to two decimals, as a map cell's edges need. */
 export function describe(b: Box): string {
-  return `${lonLabel(b.west)} to ${lonLabel(b.east)}, ${latLabel(b.south)} to ${latLabel(b.north)}`;
+  return `${lonLabel(round(b.west))} to ${lonLabel(round(b.east))}, ${latLabel(round(b.south))} to ${latLabel(round(b.north))}`;
 }
 
 /** "28.61°N, 77.21°E", for a point. */

@@ -69,7 +69,7 @@ describe("heatmap", () => {
     expect(h?.significant).toBe(2);
     expect(h).toMatchObject({ pThreshold: 0.04, units: "°C", k: 2 });
     const first = h?.cells.features[0];
-    expect(first?.properties).toEqual({ slope: 0.4, significant: true, p: 0.001 });
+    expect(first?.properties).toEqual({ slope: 0.4, significant: true, p: 0.001, cell: 0 });
     expect(first?.geometry.coordinates[0]).toEqual([[70, 25], [75, 25], [75, 30], [70, 30], [70, 25]]);
   });
 

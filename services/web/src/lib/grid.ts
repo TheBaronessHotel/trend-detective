@@ -71,6 +71,8 @@ export interface CellProps {
   slope: number;
   significant: boolean;
   p: number;
+  /** The cell's index in the Grid, row-major. */
+  cell: number;
 }
 
 /**
@@ -142,7 +144,7 @@ export function heatmap(grid: Grid, analysis: GridAnalysis): Heatmap | undefined
       cut ||= reachesPast(n, s, w, e, grid.bbox);
       features.push({
         type: "Feature",
-        properties: { slope, significant: !!layer.significant[i], p: layer.pValues[i] ?? 1 },
+        properties: { slope, significant: !!layer.significant[i], p: layer.pValues[i] ?? 1, cell: i },
         geometry: { type: "Polygon", coordinates: [ring] },
       });
     }
