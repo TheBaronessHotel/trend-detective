@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { scaleLinear } from "d3-scale";
-import type { ShuffleResult, TrendTriangleResult } from "@gen/analysis/v1/results_pb";
-import { type Bin, labelled, shuffleBins, type TriangleCell, triangle } from "../lib/evidence";
+import type { MonthlyTrend, ShuffleResult, TrendTriangleResult } from "@gen/analysis/v1/results_pb";
+import { type Bin, labelled, type MonthBar, monthBars, shuffleBins, type TriangleCell, triangle } from "../lib/evidence";
 import { DIVERGING } from "../lib/grid";
 import { formatSigned } from "../lib/series";
 import { useWidth } from "../lib/useWidth";
@@ -148,6 +148,79 @@ export function TriangleChart({ t, alpha, units }: { t: TrendTriangleResult; alp
         Each square is the trend over one stretch of at least {tri.minYears} years: blue falling, red rising, grey little
         change. Dots mark the stretches that pass the test on their own, {passing} of {tri.cells.length}. If the colour holds
         across the triangle, the trend doesn't hang on the years picked.
+      </p>
+    </figure>
+  );
+}
+
+/**
+ * The trend for each month of the year, tested on its own: is it the winters
+ * or the summers that changed? Bars that pass are solid and marked with a dot;
+ * the rest are pale. Twelve tests at once can turn up one or two by chance.
+ */
+export function MonthlyChart({ trends, units }: { trends: readonly MonthlyTrend[]; units: string }) {
+  const wrap = useRef<HTMLElement>(null);
+  const width = useWidth(wrap) || 480;
+  const bars = useMemo(() => monthBars(trends), [trends]);
+  const [hover, setHover] = useState<MonthBar>();
+  if (!bars) return null;
+
+  const u = units ? ` ${units}` : "";
+  const height = 140;
+  const m = { top: 14, right: 8, bottom: 22, left: 44 };
+  const top = Math.max(...bars.map((b) => Math.abs(b.slope)), 1e-9);
+  const y = scaleLinear()
+    .domain([-top, top])
+    .nice()
+    .range([height - m.bottom, m.top]);
+  const slot = (width - m.left - m.right) / 12;
+  const barW = Math.max(4, Math.min(28, slot - 6));
+  const cx = (month: number) => m.left + (month - 0.5) * slot;
+  const passing = bars.filter((b) => b.passes).length;
+
+  return (
+    <figure className="evidence" ref={wrap}>
+      <figcaption className="evidence-title">Which months changed?</figcaption>
+      <svg width={width} height={height} role="img" aria-label={`The trend for each month of the year; ${passing} of ${bars.length} months pass the test`}>
+        {y.ticks(4).map((t) => (
+          <g key={t} transform={`translate(0,${y(t)})`}>
+            <line className={t === 0 ? "evidence-zero" : "evidence-axis"} x1={m.left} x2={width - m.right} />
+            <text className="evidence-tick" x={m.left - 6} dy="0.32em" textAnchor="end">
+              {t === 0 ? "0" : signed(t)}
+            </text>
+          </g>
+        ))}
+        {bars.map((b) => {
+          const y0 = y(0);
+          const y1 = y(b.slope);
+          const x0 = cx(b.month) - barW / 2;
+          return (
+            <g key={b.month} onMouseEnter={() => setHover(b)} onMouseLeave={() => setHover(undefined)}>
+              <rect x={cx(b.month) - slot / 2} y={m.top} width={slot} height={height - m.top - m.bottom} fill="transparent" />
+              <rect
+                className={`month-bar ${b.slope >= 0 ? "up" : "down"}${b.passes ? " passes" : ""}${hover === b ? " on" : ""}`}
+                x={x0}
+                y={Math.min(y0, y1)}
+                width={barW}
+                height={Math.max(1, Math.abs(y1 - y0))}
+              />
+              {b.passes && <circle className="tri-dot" cx={cx(b.month)} cy={b.slope >= 0 ? y1 - 6 : y1 + 6} r={2.5} />}
+              <text className="evidence-tick" x={cx(b.month)} y={height - 6} textAnchor="middle">
+                {b.name.slice(0, 3)}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <p className="evidence-readout">
+        {hover
+          ? `${hover.name}: ${signed(hover.slope)}${u} per decade, ${hover.passes ? "passes the test" : "could be chance"} (p ${Number(hover.p.toPrecision(2))}).`
+          : `Each bar is one month of the year's trend, per decade${u ? `, in${u}` : ""}. ${passing} of ${bars.length} pass the test.`}
+      </p>
+      <p className="note">
+        Each month is tested on its own, against the same month in other years: blue bars falling, red rising, solid ones
+        with a dot passing the test. With twelve tests, one or two can pass by chance, so look for a run of neighbouring
+        months, like a whole season.
       </p>
     </figure>
   );

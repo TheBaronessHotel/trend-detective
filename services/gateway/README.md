@@ -73,6 +73,7 @@ body='{"jobId":"<id>","llm":{"provider":"PROVIDER_OPENAI_CHAT","model":"gpt-5.5"
    - if any task failed, the job fails;
    - if the stage is the last one, `stop_after` or analysis, the job succeeds;
    - otherwise the gateway builds the next stage's tasks from the results and publishes them.
+4. Once a minute, `FailStuck` fails any running job whose current stage has gone on longer than its deadline: `STAGE_DEADLINE` for preprocess and analysis, and `INGEST_DEADLINE` for ingest, which already gives up at NASA after `HARMONY_MAX_WAIT` or `APPEEARS_MAX_WAIT`. Each unfinished task gets a `StageDone` with a retryable error, so the job fails the usual way and its `WatchJob` stream ends. Without it, a job whose worker was down, or whose task message was lost, would run forever.
 
 Task IDs are predictable, like `<job>-preprocess-0`. If the gateway crashes halfway through starting a stage, the redelivered event starts it again with the same IDs, and JetStream drops the repeated publishes by `Nats-Msg-Id`.
 
@@ -145,6 +146,8 @@ Each entry also has a `topic`, a `measurement` and a `product`, which the web ap
 | `MAX_GRID` | 128 | Largest grid side. A request can lower it, never raise it |
 | `MAX_GRANULES` | 1000 | Most granules a Harmony job may fetch. Checked in preflight and again in ingest |
 | `TASK_CAP` | 256 | Most tasks one job may plan |
+| `STAGE_DEADLINE` | `30m` | How long preprocess or analysis may run before the job fails. `0` turns the check off |
+| `INGEST_DEADLINE` | `3h` | The same for ingest, above `APPEEARS_MAX_WAIT` so ingest's own limits act first |
 | `QUOTA_CUTOFF` | 0.9 | Share of the Giovanni quota after which Giovanni jobs are refused |
 | `HARMONY_CONCURRENCY` | 4 | Harmony slots per token, the same value ingest uses. Only for `GetQuota` |
 | `EARTHDATA_TOKEN` | empty | The team's token, for the Giovanni quota check |

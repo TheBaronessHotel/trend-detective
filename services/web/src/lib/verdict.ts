@@ -13,6 +13,11 @@ export interface Verdict {
   direction: Direction;
   /** Whether the trend is unlikely to be chance. */
   significant: boolean;
+  /**
+   * The test passes, but on a record too short to trust it: the headline
+   * says so instead of claiming a trend.
+   */
+  short: boolean;
   headline: string;
   /** The rate, for example "+0.25 °C per decade". */
   rate: string;
@@ -52,6 +57,20 @@ function years(n: number): string {
   return `${r} ${r === 1 ? "year" : "years"}`;
 }
 
+/**
+ * Below this many years a passing test isn't called a trend. A few unusual
+ * months move a short record a lot, and 10 years is the least most
+ * climate studies use.
+ */
+export const SHORT_RECORD_YEARS = 10;
+
+/** How many years the record spans, from analysis's count of months. */
+function recordYears(a: SeriesAnalysis): number | undefined {
+  if (a.nTotal > 0) return a.nTotal / 12;
+  const sofar = a.yearsToSignificance?.yearsSoFar;
+  return sofar && sofar > 0 ? sofar : undefined;
+}
+
 /** The verdict, or undefined when analysis ran no trend test. */
 export function verdict(a: SeriesAnalysis): Verdict | undefined {
   const reg = a.regression;
@@ -64,11 +83,21 @@ export function verdict(a: SeriesAnalysis): Verdict | undefined {
   const direction: Direction = slope > 0 ? "rising" : slope < 0 ? "falling" : "flat";
   const what = a.field === SeriesField.VALUES ? "the values" : "the values, with the seasons taken out,";
 
-  const headline = significant
-    ? `${direction === "rising" ? "Rising" : "Falling"}, and unlikely to be chance`
-    : "No clear trend yet";
+  const span = recordYears(a);
+  const short = significant && span !== undefined && span < SHORT_RECORD_YEARS;
+  const word = direction === "rising" ? "Rising" : "Falling";
+  const headline = short
+    ? `${word} over ${years(span)}, too short to call a trend`
+    : significant
+      ? `${word}, and unlikely to be chance`
+      : "No clear trend yet";
 
   const lines: string[] = [];
+  if (short) {
+    lines.push(
+      `${years(span)} is a short record: a few unusual months can make a trend look real, and a longer stretch can show something else. Pick at least ${SHORT_RECORD_YEARS} years before trusting it.`,
+    );
+  }
   const more: string[] = [];
   const half = reg ? Math.abs(reg.slopeCiHigh - reg.slopeCiLow) / 2 : mk ? Math.abs(mk.sensCiHigh - mk.sensCiLow) / 2 : 0;
   const fmt = (v: number) => (half > 0 ? rounded(v, half) : formatSigned(v));
@@ -120,5 +149,5 @@ export function verdict(a: SeriesAnalysis): Verdict | undefined {
     );
   }
 
-  return { direction, significant, headline, rate, lines, more, warnings: [...a.warnings] };
+  return { direction, significant, short, headline, rate, lines, more, warnings: [...a.warnings] };
 }

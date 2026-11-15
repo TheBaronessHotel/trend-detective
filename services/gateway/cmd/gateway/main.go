@@ -170,10 +170,12 @@ func run() error {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	errc := make(chan error, 4)
+	errc := make(chan error, 5)
 	go func() { errc <- events.Run(ctx, js, orch, log, 16) }()
 	go func() { errc <- events.RunAdvisories(ctx, js, orch, log) }()
 	go func() { errc <- events.RunProgress(ctx, js, orch, log) }()
+	// Fails jobs whose stage never finishes, as when a worker is down.
+	go func() { errc <- orch.WatchDeadlines(ctx, time.Minute) }()
 	go func() {
 		log.Info(ctx, "listening", "addr", srv.Addr, "variables", len(cat.Variables()))
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
@@ -211,7 +213,24 @@ func loadLimits() (jobs.Limits, error) {
 	if err != nil {
 		return jobs.Limits{}, err
 	}
-	return jobs.Limits{SubregionN: int32(subregionN), MaxGrid: int32(maxGrid), MaxGranules: int32(maxGranules), TaskCap: int32(taskCap)}, nil
+	// Above APPEEARS_MAX_WAIT (2h) and HARMONY_MAX_WAIT (40m), so ingest's
+	// own limits act first.
+	ingestDeadline, err := envx.Duration("INGEST_DEADLINE", 3*time.Hour)
+	if err != nil {
+		return jobs.Limits{}, err
+	}
+	stageDeadline, err := envx.Duration("STAGE_DEADLINE", 30*time.Minute)
+	if err != nil {
+		return jobs.Limits{}, err
+	}
+	return jobs.Limits{
+		SubregionN:     int32(subregionN),
+		MaxGrid:        int32(maxGrid),
+		MaxGranules:    int32(maxGranules),
+		TaskCap:        int32(taskCap),
+		IngestDeadline: ingestDeadline,
+		StageDeadline:  stageDeadline,
+	}, nil
 }
 
 // withCORS lets the web app call the API from its own dev server.

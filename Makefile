@@ -1,4 +1,4 @@
-.PHONY: up down logs ps clean smoke smoke-harmony smoke-power smoke-giovanni smoke-appeears smoke-airs test test-preprocess test-analysis gen lint fmt breaking web-dev web-check
+.PHONY: up down logs ps clean smoke smoke-harmony smoke-power smoke-giovanni smoke-appeears smoke-airs warm-examples test test-preprocess test-analysis gen lint fmt breaking web-dev web-check
 
 # Runs on Linux, macOS and Windows.
 #
@@ -74,6 +74,12 @@ smoke-airs:
 # EARTHDATA_PASSWORD in .env, and can take 5 to 15 minutes.
 smoke-appeears:
 	$(SH) deploy/smoke/appeears.sh
+
+# Run every "Try an example" job once, so a demo doesn't wait on NASA. Run
+# `make up` first. Needs EARTHDATA_TOKEN, and EARTHDATA_USERNAME and
+# EARTHDATA_PASSWORD for the AppEEARS one, in .env. New ones can take a while.
+warm-examples:
+	$(SH) deploy/warm-examples.sh
 
 # The web app with hot reload on http://localhost:5173, against the running
 # stack's gateway. Needs Bun (https://bun.sh).
