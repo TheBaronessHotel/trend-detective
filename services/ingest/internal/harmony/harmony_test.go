@@ -200,6 +200,23 @@ func wantCode(t *testing.T, err error, code gatewayv1.ErrorCode, transient bool)
 	}
 }
 
+// Harmony takes one variable parameter per variable and rejects a
+// comma-joined list. AIRS methane needs two: the profile and the surface
+// pressure.
+func TestSubmitSendsEachVariableAsItsOwnParameter(t *testing.T) {
+	h := newHarness(t, Config{})
+	tk := task(77)
+	tk.GetHarmonySubset().Variables = []string{"ascending/Data_Fields/CH4_VMR_A", "ascending/Data_Fields/SurfPres_Forecast_A"}
+
+	_, err := h.a.Fetch(context.Background(), tk, newSink())
+	wantPending(t, err)
+	got := h.nasa.lastQuery["variable"]
+	want := []string{"ascending/Data_Fields/CH4_VMR_A", "ascending/Data_Fields/SurfPres_Forecast_A"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Errorf("variable parameters %q, want %q", got, want)
+	}
+}
+
 func TestSubmitPollAndDownload(t *testing.T) {
 	h := newHarness(t, Config{})
 	ctx := context.Background()

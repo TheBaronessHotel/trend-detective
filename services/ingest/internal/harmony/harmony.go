@@ -521,8 +521,10 @@ func (a *Adapter) submit(ctx context.Context, token string, r *request) (string,
 	if len(r.granuleIDs) > 0 {
 		return a.submitByID(ctx, token, r)
 	}
+	// One variable parameter per variable. Harmony rejects a comma-joined
+	// list ("Coverages were not found for the provided variables: a,b").
 	q := url.Values{
-		"variable":    {strings.Join(r.variables, ",")},
+		"variable":    r.variables,
 		"subset":      {"lat(" + num(r.bbox.GetSouth()) + ":" + num(r.bbox.GetNorth()) + ")", "lon(" + num(r.bbox.GetWest()) + ":" + num(r.bbox.GetEast()) + ")", `time("` + r.start + `":"` + r.end + `")`},
 		"forceAsync":  {"true"},
 		"skipPreview": {"true"},
@@ -545,14 +547,18 @@ func (a *Adapter) submit(ctx context.Context, token string, r *request) (string,
 func (a *Adapter) submitByID(ctx context.Context, token string, r *request) (string, error) {
 	var body bytes.Buffer
 	form := multipart.NewWriter(&body)
-	for _, f := range [][2]string{
-		{"variable", strings.Join(r.variables, ",")},
+	// One variable field per variable, as in submit.
+	fields := make([][2]string, 0, len(r.variables)+5)
+	for _, v := range r.variables {
+		fields = append(fields, [2]string{"variable", v})
+	}
+	for _, f := range append(fields, [][2]string{
 		{"subset", "lat(" + num(r.bbox.GetSouth()) + ":" + num(r.bbox.GetNorth()) + ")"},
 		{"subset", "lon(" + num(r.bbox.GetWest()) + ":" + num(r.bbox.GetEast()) + ")"},
 		{"granuleId", strings.Join(r.granuleIDs, ",")},
 		{"forceAsync", "true"},
 		{"skipPreview", "true"},
-	} {
+	}...) {
 		if err := form.WriteField(f[0], f[1]); err != nil {
 			return "", core.Errorf(gatewayv1.ErrorCode_ERROR_CODE_INTERNAL, false, "Something went wrong while fetching the data.", "build form: %w", err)
 		}

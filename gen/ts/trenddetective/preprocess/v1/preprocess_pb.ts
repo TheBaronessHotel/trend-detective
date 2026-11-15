@@ -19,7 +19,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file trenddetective/preprocess/v1/preprocess.proto.
  */
 export const file_trenddetective_preprocess_v1_preprocess: GenFile = /*@__PURE__*/
-  fileDesc("Ci10cmVuZGRldGVjdGl2ZS9wcmVwcm9jZXNzL3YxL3ByZXByb2Nlc3MucHJvdG8SHHRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEi1QEKDlByZXByb2Nlc3NUYXNrEjEKA3JhdxgBIAMoCzIkLnRyZW5kZGV0ZWN0aXZlLmluZ2VzdC52MS5SYXdEYXRhc2V0EhQKDHNvdXJjZV91bml0cxgCIAEoCRI6CgdmaWx0ZXJzGAMgASgLMikudHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5GaWx0ZXJDaGFpbhI+CgthZ2dyZWdhdGlvbhgEIAEoCzIpLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEuQWdncmVnYXRpb24iQgoLRmlsdGVyQ2hhaW4SMwoDb3BzGAEgAygLMiYudHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5GaWx0ZXJPcCK+AwoIRmlsdGVyT3ASOQoIcWNfcmFuZ2UYASABKAsyJS50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLlFjUmFuZ2VIABI2CgZsaW5lYXIYAiABKAsyJC50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLkxpbmVhckgAEkEKDG1vbnRobHlfbWVhbhgDIAEoCzIpLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEuTW9udGhseU1lYW5IABI4Cgdhbm9tYWx5GAQgASgLMiUudHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5Bbm9tYWx5SAASNAoFbG9nMTAYBSABKAsyIy50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLkxvZzEwSAASPAoHY29hcnNlbhgGIAEoCzIlLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEuQ29hcnNlbkICGAFIABJIChBnYXBfZmlsbF9kaXNwbGF5GAcgASgLMiwudHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5HYXBGaWxsRGlzcGxheUgAQgQKAm9wIiMKB1FjUmFuZ2USCwoDbWluGAEgASgBEgsKA21heBgCIAEoASI2CgZMaW5lYXISDQoFc2NhbGUYASABKAESDgoGb2Zmc2V0GAIgASgBEg0KBXVuaXRzGAMgASgJIiUKC01vbnRobHlNZWFuEhYKDm1pbl92YWxpZF9kYXlzGAEgASgFIuwBCgdBbm9tYWx5EjcKBGtpbmQYASABKA4yKS50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLkFub21hbHlLaW5kEjUKCGJhc2VsaW5lGAIgASgLMiMudHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLlllYXJSYW5nZRIdChVtaW5fYmFzZWxpbmVfY292ZXJhZ2UYAyABKAESPwoGbWV0aG9kGAQgASgOMi8udHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5DbGltYXRvbG9neU1ldGhvZBIRCgloYXJtb25pY3MYBSABKAUiBwoFTG9nMTAiGQoHQ29hcnNlbhIOCgZmYWN0b3IYASABKAUiIQoOR2FwRmlsbERpc3BsYXkSDwoHbWF4X2dhcBgBIAEoBSJ8CgtBZ2dyZWdhdGlvbhITCgtzdWJyZWdpb25fbhgBIAEoBRIQCghtYXhfZ3JpZBgCIAEoBRIaChJtaW5fdmFsaWRfZnJhY3Rpb24YAyABKAESGQoMYmxvY2tfcGl4ZWxzGAQgASgFSACIAQFCDwoNX2Jsb2NrX3BpeGVscyKdAgoQUHJlcHJvY2Vzc1Jlc3VsdBIxCgZzZXJpZXMYASABKAsyIS50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuQmxvYlJlZhI1CgpzZXJpZXNfY3N2GAIgASgLMiEudHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLkJsb2JSZWYSLwoEZ3JpZBgDIAEoCzIhLnRyZW5kZGV0ZWN0aXZlLmNvbW1vbi52MS5CbG9iUmVmEjUKCnZhbHVlX2N1YmUYBCABKAsyIS50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuQmxvYlJlZhI3Cgxhbm9tYWx5X2N1YmUYBSABKAsyIS50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuQmxvYlJlZkKjAgogY29tLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjFCD1ByZXByb2Nlc3NQcm90b1ABWlxnaXRodWIuY29tL1RoZUJhcm9uZXNzSG90ZWwvdHJlbmQtZGV0ZWN0aXZlL2dlbi9nby90cmVuZGRldGVjdGl2ZS9wcmVwcm9jZXNzL3YxO3ByZXByb2Nlc3N2MaICA1RQWKoCHFRyZW5kZGV0ZWN0aXZlLlByZXByb2Nlc3MuVjHKAhxUcmVuZGRldGVjdGl2ZVxQcmVwcm9jZXNzXFYx4gIoVHJlbmRkZXRlY3RpdmVcUHJlcHJvY2Vzc1xWMVxHUEJNZXRhZGF0YeoCHlRyZW5kZGV0ZWN0aXZlOjpQcmVwcm9jZXNzOjpWMWIGcHJvdG8z", [file_trenddetective_common_v1_common, file_trenddetective_ingest_v1_ingest, file_trenddetective_preprocess_v1_data]);
+  fileDesc("Ci10cmVuZGRldGVjdGl2ZS9wcmVwcm9jZXNzL3YxL3ByZXByb2Nlc3MucHJvdG8SHHRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEi1QEKDlByZXByb2Nlc3NUYXNrEjEKA3JhdxgBIAMoCzIkLnRyZW5kZGV0ZWN0aXZlLmluZ2VzdC52MS5SYXdEYXRhc2V0EhQKDHNvdXJjZV91bml0cxgCIAEoCRI6CgdmaWx0ZXJzGAMgASgLMikudHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5GaWx0ZXJDaGFpbhI+CgthZ2dyZWdhdGlvbhgEIAEoCzIpLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEuQWdncmVnYXRpb24iQgoLRmlsdGVyQ2hhaW4SMwoDb3BzGAEgAygLMiYudHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5GaWx0ZXJPcCKFBAoIRmlsdGVyT3ASOQoIcWNfcmFuZ2UYASABKAsyJS50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLlFjUmFuZ2VIABI2CgZsaW5lYXIYAiABKAsyJC50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLkxpbmVhckgAEkEKDG1vbnRobHlfbWVhbhgDIAEoCzIpLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEuTW9udGhseU1lYW5IABI4Cgdhbm9tYWx5GAQgASgLMiUudHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5Bbm9tYWx5SAASNAoFbG9nMTAYBSABKAsyIy50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLkxvZzEwSAASPAoHY29hcnNlbhgGIAEoCzIlLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEuQ29hcnNlbkICGAFIABJIChBnYXBfZmlsbF9kaXNwbGF5GAcgASgLMiwudHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5HYXBGaWxsRGlzcGxheUgAEkUKDmNvbHVtbl9hdmVyYWdlGAggASgLMisudHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5Db2x1bW5BdmVyYWdlSABCBAoCb3AiIwoHUWNSYW5nZRILCgNtaW4YASABKAESCwoDbWF4GAIgASgBIjYKBkxpbmVhchINCgVzY2FsZRgBIAEoARIOCgZvZmZzZXQYAiABKAESDQoFdW5pdHMYAyABKAkiJQoLTW9udGhseU1lYW4SFgoObWluX3ZhbGlkX2RheXMYASABKAUi7AEKB0Fub21hbHkSNwoEa2luZBgBIAEoDjIpLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEuQW5vbWFseUtpbmQSNQoIYmFzZWxpbmUYAiABKAsyIy50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuWWVhclJhbmdlEh0KFW1pbl9iYXNlbGluZV9jb3ZlcmFnZRgDIAEoARI/CgZtZXRob2QYBCABKA4yLy50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLkNsaW1hdG9sb2d5TWV0aG9kEhEKCWhhcm1vbmljcxgFIAEoBSIHCgVMb2cxMCIZCgdDb2Fyc2VuEg4KBmZhY3RvchgBIAEoBSI/Cg1Db2x1bW5BdmVyYWdlEhgKEHN1cmZhY2VfcHJlc3N1cmUYASABKAkSFAoMbWluX2NvdmVyYWdlGAIgASgBIiEKDkdhcEZpbGxEaXNwbGF5Eg8KB21heF9nYXAYASABKAUifAoLQWdncmVnYXRpb24SEwoLc3VicmVnaW9uX24YASABKAUSEAoIbWF4X2dyaWQYAiABKAUSGgoSbWluX3ZhbGlkX2ZyYWN0aW9uGAMgASgBEhkKDGJsb2NrX3BpeGVscxgEIAEoBUgAiAEBQg8KDV9ibG9ja19waXhlbHMinQIKEFByZXByb2Nlc3NSZXN1bHQSMQoGc2VyaWVzGAEgASgLMiEudHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLkJsb2JSZWYSNQoKc2VyaWVzX2NzdhgCIAEoCzIhLnRyZW5kZGV0ZWN0aXZlLmNvbW1vbi52MS5CbG9iUmVmEi8KBGdyaWQYAyABKAsyIS50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuQmxvYlJlZhI1Cgp2YWx1ZV9jdWJlGAQgASgLMiEudHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLkJsb2JSZWYSNwoMYW5vbWFseV9jdWJlGAUgASgLMiEudHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLkJsb2JSZWZCowIKIGNvbS50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxQg9QcmVwcm9jZXNzUHJvdG9QAVpcZ2l0aHViLmNvbS9UaGVCYXJvbmVzc0hvdGVsL3RyZW5kLWRldGVjdGl2ZS9nZW4vZ28vdHJlbmRkZXRlY3RpdmUvcHJlcHJvY2Vzcy92MTtwcmVwcm9jZXNzdjGiAgNUUFiqAhxUcmVuZGRldGVjdGl2ZS5QcmVwcm9jZXNzLlYxygIcVHJlbmRkZXRlY3RpdmVcUHJlcHJvY2Vzc1xWMeICKFRyZW5kZGV0ZWN0aXZlXFByZXByb2Nlc3NcVjFcR1BCTWV0YWRhdGHqAh5UcmVuZGRldGVjdGl2ZTo6UHJlcHJvY2Vzczo6VjFiBnByb3RvMw", [file_trenddetective_common_v1_common, file_trenddetective_ingest_v1_ingest, file_trenddetective_preprocess_v1_data]);
 
 /**
  * Decode raw files, run the filter chain, and aggregate the region. The
@@ -132,6 +132,12 @@ export type FilterOp = Message<"trenddetective.preprocess.v1.FilterOp"> & {
      */
     value: GapFillDisplay;
     case: "gapFillDisplay";
+  } | {
+    /**
+     * @generated from field: trenddetective.preprocess.v1.ColumnAverage column_average = 8;
+     */
+    value: ColumnAverage;
+    case: "columnAverage";
   } | { case: undefined; value?: undefined };
 };
 
@@ -306,6 +312,45 @@ export const CoarsenSchema: GenMessage<Coarsen> = /*@__PURE__*/
   messageDesc(file_trenddetective_preprocess_v1_preprocess, 8);
 
 /**
+ * Collapse data on pressure levels, like AIRS methane, into one value per
+ * pixel: the average over the air column above it, each level weighted by the
+ * air it holds. For a mole fraction that's the column-average mole fraction,
+ * the way column methane and CO2 are usually reported.
+ *
+ * Each level's layer runs from halfway to the level below to halfway to the
+ * level above. The lowest layer ends at the surface pressure and the top one
+ * at 0 hPa, so layers under the ground weigh nothing. A pixel-step whose
+ * levels with data hold less than min_coverage of the column's air is
+ * missing, as a failed quality check.
+ *
+ * @generated from message trenddetective.preprocess.v1.ColumnAverage
+ */
+export type ColumnAverage = Message<"trenddetective.preprocess.v1.ColumnAverage"> & {
+  /**
+   * The surface pressure variable, in hPa: one of the dataset's variables
+   * after the first, for example "ascending/Data_Fields/SurfPres_Forecast_A".
+   * The source lists it after the measurement.
+   *
+   * @generated from field: string surface_pressure = 1;
+   */
+  surfacePressure: string;
+
+  /**
+   * Share of the column's air, by pressure, that needs a value. Default 0.9.
+   *
+   * @generated from field: double min_coverage = 2;
+   */
+  minCoverage: number;
+};
+
+/**
+ * Describes the message trenddetective.preprocess.v1.ColumnAverage.
+ * Use `create(ColumnAverageSchema)` to create a new message.
+ */
+export const ColumnAverageSchema: GenMessage<ColumnAverage> = /*@__PURE__*/
+  messageDesc(file_trenddetective_preprocess_v1_preprocess, 9);
+
+/**
  * Fill short gaps by linear interpolation in Series.display_values, for the
  * chart only. Statistics never see filled values.
  *
@@ -325,7 +370,7 @@ export type GapFillDisplay = Message<"trenddetective.preprocess.v1.GapFillDispla
  * Use `create(GapFillDisplaySchema)` to create a new message.
  */
 export const GapFillDisplaySchema: GenMessage<GapFillDisplay> = /*@__PURE__*/
-  messageDesc(file_trenddetective_preprocess_v1_preprocess, 9);
+  messageDesc(file_trenddetective_preprocess_v1_preprocess, 10);
 
 /**
  * How preprocess aggregates pixels.
@@ -386,7 +431,7 @@ export type Aggregation = Message<"trenddetective.preprocess.v1.Aggregation"> & 
  * Use `create(AggregationSchema)` to create a new message.
  */
 export const AggregationSchema: GenMessage<Aggregation> = /*@__PURE__*/
-  messageDesc(file_trenddetective_preprocess_v1_preprocess, 10);
+  messageDesc(file_trenddetective_preprocess_v1_preprocess, 11);
 
 /**
  * What preprocess wrote to the prep bucket. It reports this in StageDone.
@@ -435,5 +480,5 @@ export type PreprocessResult = Message<"trenddetective.preprocess.v1.PreprocessR
  * Use `create(PreprocessResultSchema)` to create a new message.
  */
 export const PreprocessResultSchema: GenMessage<PreprocessResult> = /*@__PURE__*/
-  messageDesc(file_trenddetective_preprocess_v1_preprocess, 11);
+  messageDesc(file_trenddetective_preprocess_v1_preprocess, 12);
 
