@@ -62,9 +62,22 @@ export function previewGrid(v: Variable, box: Box, block: number | undefined): G
   };
 }
 
-/** The layer the heatmap shows: regression's when it ran, else the first. */
-export function heatmapLayer(a: GridAnalysis): GridLayer | undefined {
-  return a.layers.find((l) => l.test?.test.case === "regression") ?? a.layers[0];
+/** The trend tests a map layer can come from. */
+export type Method = "regression" | "mannKendall";
+
+/** The methods analysis ran on the grid, regression first. */
+export function heatmapMethods(a: GridAnalysis): Method[] {
+  const ran = new Set(a.layers.map((l) => l.test?.test.case));
+  return (["regression", "mannKendall"] as const).filter((m) => ran.has(m));
+}
+
+/** The layer the heatmap shows: the method asked for, else regression's, else the first. */
+export function heatmapLayer(a: GridAnalysis, method?: Method): GridLayer | undefined {
+  return (
+    (method && a.layers.find((l) => l.test?.test.case === method)) ??
+    a.layers.find((l) => l.test?.test.case === "regression") ??
+    a.layers[0]
+  );
 }
 
 export interface CellProps {
@@ -73,6 +86,8 @@ export interface CellProps {
   p: number;
   /** The cell's index in the Grid, row-major. */
   cell: number;
+  /** Months with a value in this cell, or -1 when analysis didn't say. */
+  months: number;
 }
 
 /**
@@ -117,6 +132,9 @@ export interface Heatmap {
   pThreshold: number;
   units: string;
   k: number;
+  /** Which test the colours come from, and which others the grid has. */
+  method: Method;
+  methods: Method[];
 }
 
 /**
@@ -124,8 +142,8 @@ export interface Heatmap {
  * colour scale is symmetric around zero, out to the 95th percentile of the
  * slopes' sizes, so one extreme cell doesn't wash out the rest.
  */
-export function heatmap(grid: Grid, analysis: GridAnalysis): Heatmap | undefined {
-  const layer = heatmapLayer(analysis);
+export function heatmap(grid: Grid, analysis: GridAnalysis, method?: Method): Heatmap | undefined {
+  const layer = heatmapLayer(analysis, method);
   if (!layer || grid.rows !== analysis.rows || grid.cols !== analysis.cols) return undefined;
   if (grid.latEdges.length !== grid.rows + 1 || grid.lonEdges.length !== grid.cols + 1) return undefined;
   const features: Feature<Polygon, CellProps>[] = [];
@@ -144,7 +162,13 @@ export function heatmap(grid: Grid, analysis: GridAnalysis): Heatmap | undefined
       cut ||= reachesPast(n, s, w, e, grid.bbox);
       features.push({
         type: "Feature",
-        properties: { slope, significant: !!layer.significant[i], p: layer.pValues[i] ?? 1, cell: i },
+        properties: {
+          slope,
+          significant: !!layer.significant[i],
+          p: layer.pValues[i] ?? 1,
+          cell: i,
+          months: analysis.validSteps[i] ?? -1,
+        },
         geometry: { type: "Polygon", coordinates: [ring] },
       });
     }
@@ -160,6 +184,8 @@ export function heatmap(grid: Grid, analysis: GridAnalysis): Heatmap | undefined
     pThreshold: layer.pThreshold,
     units: analysis.units,
     k: grid.blockPixels || 1,
+    method: layer.test?.test.case === "mannKendall" ? "mannKendall" : "regression",
+    methods: heatmapMethods(analysis),
   };
 }
 

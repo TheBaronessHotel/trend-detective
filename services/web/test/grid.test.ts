@@ -69,7 +69,8 @@ describe("heatmap", () => {
     expect(h?.significant).toBe(2);
     expect(h).toMatchObject({ pThreshold: 0.04, units: "°C", k: 2 });
     const first = h?.cells.features[0];
-    expect(first?.properties).toEqual({ slope: 0.4, significant: true, p: 0.001, cell: 0 });
+    expect(first?.properties).toEqual({ slope: 0.4, significant: true, p: 0.001, cell: 0, months: -1 });
+    expect(h).toMatchObject({ method: "regression", methods: ["regression", "mannKendall"] });
     expect(first?.geometry.coordinates[0]).toEqual([[70, 25], [75, 25], [75, 30], [70, 30], [70, 25]]);
   });
 
@@ -88,6 +89,14 @@ describe("heatmap", () => {
     expect(h?.cells.features[0]?.geometry.coordinates[0]).toEqual([[70, 25], [75, 25], [75, 30], [70, 30], [70, 25]]);
     expect(h?.cells.features.at(-1)?.geometry.coordinates[0]).toEqual([[75, 20], [80, 20], [80, 25], [75, 25], [75, 20]]);
     expect(heatmap(grid, analysis)?.cut).toBe(false);
+  });
+
+  test("the Mann-Kendall layer, with each cell's months", () => {
+    const withMonths = create(GridAnalysisSchema, { ...analysis, validSteps: [40, 38, 0, 12] });
+    const h = heatmap(grid, withMonths, "mannKendall");
+    expect(h?.method).toBe("mannKendall");
+    expect(h?.cells.features.map((f) => f.properties.slope)).toEqual([9, 9, 9, 9]);
+    expect(h?.cells.features[1]?.properties.months).toBe(38);
   });
 
   test("a grid that doesn't match the analysis draws nothing", () => {
