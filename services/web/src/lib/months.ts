@@ -5,6 +5,7 @@ import { timestampMs } from "@bufbuild/protobuf/wkt";
 import type { TimeStep } from "@gen/common/v1/common_pb";
 import type { Grid } from "@gen/preprocess/v1/data_pb";
 import type { Feature, FeatureCollection, Polygon } from "geojson";
+import { cellRing } from "./grid";
 
 export type MonthsKind = "values" | "anomalies";
 
@@ -53,8 +54,9 @@ export function quantile(xs: Float32Array, q: number, abs = false): number | und
 }
 
 /**
- * The frames for a grid. Cells come from the Grid's exact edges, like the
- * heatmap's; a cell with no pixels that ever have data is left out.
+ * The frames for a grid. Cells come from the Grid's exact edges, cut to the
+ * job's rectangle like the heatmap's; a cell with no pixels that ever have
+ * data is left out.
  */
 export function monthFrames(grid: Grid, values: Float32Array, anomalies?: Float32Array): MonthFrames | undefined {
   if (grid.latEdges.length !== grid.rows + 1 || grid.lonEdges.length !== grid.cols + 1) return undefined;
@@ -65,16 +67,10 @@ export function monthFrames(grid: Grid, values: Float32Array, anomalies?: Float3
     for (let c = 0; c < grid.cols; c++) {
       const i = r * grid.cols + c;
       if (grid.cellPixels.length === size && !grid.cellPixels[i]) continue;
-      const n = grid.latEdges[r] ?? 0;
-      const s = grid.latEdges[r + 1] ?? 0;
-      const w = grid.lonEdges[c] ?? 0;
-      const e = grid.lonEdges[c + 1] ?? 0;
-      features.push({
-        type: "Feature",
-        id: i,
-        properties: {},
-        geometry: { type: "Polygon", coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] },
-      });
+      // Cut to the rectangle, like the heatmap's cells.
+      const ring = cellRing(grid.latEdges[r] ?? 0, grid.latEdges[r + 1] ?? 0, grid.lonEdges[c] ?? 0, grid.lonEdges[c + 1] ?? 0, grid.bbox);
+      if (!ring) continue;
+      features.push({ type: "Feature", id: i, properties: {}, geometry: { type: "Polygon", coordinates: [ring] } });
     }
   }
   const low = quantile(values, 0.02) ?? 0;

@@ -182,7 +182,7 @@ function addHeatmap(map: MapLibreMap, h: Heatmap | undefined, dark: boolean) {
         source: heatSource,
         filter: ["==", ["get", "significant"], true],
         // Thin, so a map where every cell passes still shows its colours.
-        paint: { "line-color": ink(dark), "line-width": 1, "line-opacity": 0.75 },
+        paint: { "line-color": ink(dark), "line-width": 1, "line-opacity": dark ? 0.45 : 0.7 },
       },
       before,
     );

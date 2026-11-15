@@ -24,7 +24,7 @@ PREP_BUCKET = "prep"
 # Changes whenever the documents this code writes could change for the same
 # task, like a new decoder rule or the filter chain arriving. It is part of the
 # cache key, so bumping it makes every cached result stale at once.
-CODE_VERSION = "5"
+CODE_VERSION = "6"
 KEY_VERSION = "preprocess/v1"
 
 RESULT_FILE = "result.json"
