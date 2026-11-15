@@ -10,6 +10,19 @@ It's written for high-school students: every number comes with a sentence saying
 
 https://github.com/user-attachments/assets/8b5c816f-39f9-4e28-94b7-072951ba995d
 
+## Screenshots
+
+| | |
+|---|---|
+| ![Europe's air temperature: the verdict, and the trend in every map cell](assets/02-results.png) | ![The region's monthly chart, with the normal range, anomaly bars and the trend](assets/03-chart.png) |
+| **The verdict**, and where it's changing. this part of Europe has warmed by about 0.46 °C per decade since 1981 | **The chart:** the monthly values, how far each month was from normal, and the trend with its band |
+| ![India's air temperature: warming in some cells, cooling in others](assets/09-trend-map.png) | ![One map cell's own chart, opened by clicking it](assets/10-cell-chart.png) |
+| **The trend map:** India is warmer here and cooler there. Outlined cells pass the test | **One cell:** click a cell for its own chart |
+| ![July 2024 against normal, on the globe](assets/08-month-by-month.png) | ![The results explained in plain words](assets/04-plain-words.png) |
+| **Month by month:** play the record back on the globe, here July 2024 against normal | **In plain words:** the results as a paragraph, written without an AI model |
+
+More in [assets/](assets): the start screen, the shuffle test, the trend over every stretch of years, which months changed, and the dark theme.
+
 ## Try it
 
 You need Docker, and a free [Earthdata Login](https://urs.earthdata.nasa.gov) account.
@@ -100,6 +113,8 @@ Files pass between the stages through SeaweedFS, an S3 store, and the browser do
 ```
 .
 ├── ARCHITECTURE.md
+├── LICENSE                                 MIT
+├── assets/                                 screenshots for this README
 ├── compose.yaml, .env.example               the local stack and its settings
 ├── Makefile                                up, down, logs, gen, lint and more
 ├── buf.yaml, buf.gen.yaml                  buf module and codegen settings
@@ -179,3 +194,7 @@ Preprocess and analysis, in Python, aren't covered yet: they carry the trace ID 
 
 - Data: NASA's Harmony, Giovanni, POWER and AppEEARS services, and the GES DISC, LP DAAC and other archives behind them. The catalog, `services/gateway/catalog.yaml`, links each variable's dataset page.
 - Maps: [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, through [OpenFreeMap](https://openfreemap.org), drawn with [MapLibre GL JS](https://maplibre.org).
+
+## License
+
+[MIT](LICENSE). The NASA data the app fetches keeps its own terms; see each dataset's page.
