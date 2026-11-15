@@ -111,3 +111,23 @@ def test_clip_keeps_centers_on_every_edge_despite_rounding():
     inside = canonical.clip_bbox(ds, common_pb2.BBox(west=0.001, south=42.001, east=19.999, north=54.999))
     assert list(inside["lon"].values) == [0.625, 10.0, 19.375]
     assert list(inside["lat"].values) == [54.5, 42.5]
+
+
+def test_many_threads_can_decode_at_once(tmp_path: Path):
+    # The worker decodes two tasks' files in parallel threads; unguarded,
+    # the netCDF C library crashed the process with a segfault.
+    from concurrent.futures import ThreadPoolExecutor
+
+    paths = []
+    for i in range(8):
+        path = tmp_path / f"{i}.nc4"
+        write_imerg_like(path, ["2020-01-01", "2020-02-01"], LATS, LONS)
+        paths.append(path)
+    raw = raw_dataset(ingest_pb2.FORMAT_NETCDF4, ["Grid/precipitation"], [p.name for p in paths])
+
+    def decode_one(path: Path) -> int:
+        return netcdf.decode([path], raw, "").data.sizes["time"]
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        sizes = list(pool.map(decode_one, paths * 4))
+    assert sizes == [2] * 32

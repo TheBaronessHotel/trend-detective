@@ -17,6 +17,7 @@ What differs between products, and how it's handled:
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 import numpy as np
@@ -29,6 +30,12 @@ from trenddetective.ingest.v1 import ingest_pb2
 from .. import canonical, errors
 from ..canonical import Decoded
 from .common import resolve_units, single_variable
+
+# The netCDF and HDF5 C libraries aren't safe to call from two threads at
+# once, and the worker runs tasks in threads: two tasks reading files at the
+# same time crashed the whole process with a segfault. Every file read goes
+# through this lock; the rest of a task still runs in parallel.
+_FILES = threading.Lock()
 
 _LAT_NAMES = {"lat", "latitude", "nlat", "y"}
 _LON_NAMES = {"lon", "longitude", "nlon", "x"}
@@ -63,7 +70,8 @@ def decode(paths: list[Path], raw: ingest_pb2.RawDataset, source_units: str) -> 
 
 def _read(path: Path, group: str | None, name: str) -> xr.DataArray:
     try:
-        with xr.open_dataset(path, group=group, engine="netcdf4", mask_and_scale=True) as ds:
+        # load() reads the data before the file closes, all under the lock.
+        with _FILES, xr.open_dataset(path, group=group, engine="netcdf4", mask_and_scale=True) as ds:
             if name not in ds.variables:
                 raise errors.invalid(
                     "The downloaded file doesn't have the variable this job asked for.",
