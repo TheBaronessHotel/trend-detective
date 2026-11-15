@@ -5,6 +5,7 @@
 # analysis through a signed URL and checks the regression, Mann-Kendall,
 # extras and diagnostics results are in it.
 set -eu
+. "$(dirname "$0")/python.sh"
 
 api=http://127.0.0.1:8080/trenddetective.gateway.v1.GatewayService
 
@@ -13,7 +14,7 @@ call() {
 }
 
 field() {
-  python3 -I -c '
+  "$PY" -I -c '
 import json, sys
 value = json.load(sys.stdin)
 for key in sys.argv[1].split("."):
@@ -34,7 +35,7 @@ if [ -z "$id" ]; then
 fi
 
 echo "Watching job $id"
-if ! python3 -I deploy/smoke/watch.py "$id" "$api"; then
+if ! "$PY" -I deploy/smoke/watch.py "$id" "$api"; then
   echo "FAIL: job $id didn't succeed: $(call GetJob "{\"jobId\": \"$id\"}")"
   docker compose logs --no-log-prefix --tail=30 analysis
   exit 1
@@ -46,7 +47,7 @@ if [ -z "$url" ]; then
   echo "FAIL: GetResultURL gave no URL for the trend analysis"
   exit 1
 fi
-summary=$(curl -s "$url" | python3 -I -c '
+summary=$(curl -s "$url" | "$PY" -I -c '
 import json, math, sys
 a = json.load(sys.stdin)
 assert a["variableId"] == "air-temperature-power", a["variableId"]

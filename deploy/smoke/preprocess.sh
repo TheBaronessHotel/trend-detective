@@ -5,6 +5,7 @@
 # signed URL and checks it has every month from 1981 to 2024, with the
 # anomalies, normals and display line the catalog's filter chain asks for.
 set -eu
+. "$(dirname "$0")/python.sh"
 
 api=http://127.0.0.1:8080/trenddetective.gateway.v1.GatewayService
 
@@ -13,7 +14,7 @@ call() {
 }
 
 field() {
-  python3 -I -c '
+  "$PY" -I -c '
 import json, sys
 value = json.load(sys.stdin)
 for key in sys.argv[1].split("."):
@@ -35,7 +36,7 @@ if [ -z "$id" ]; then
 fi
 
 echo "Watching job $id"
-if ! python3 -I deploy/smoke/watch.py "$id" "$api"; then
+if ! "$PY" -I deploy/smoke/watch.py "$id" "$api"; then
   echo "FAIL: job $id didn't succeed: $(call GetJob "{\"jobId\": \"$id\"}")"
   docker compose logs --no-log-prefix --tail=30 preprocess
   exit 1
@@ -47,7 +48,7 @@ if [ -z "$url" ]; then
   echo "FAIL: GetResultURL gave no URL for the series"
   exit 1
 fi
-count=$(curl -s "$url" | python3 -I -c '
+count=$(curl -s "$url" | "$PY" -I -c '
 import json, sys
 s = json.load(sys.stdin)
 n = len(s["times"])

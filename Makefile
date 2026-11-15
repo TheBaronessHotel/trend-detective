@@ -1,19 +1,34 @@
-.PHONY: up down logs ps clean smoke smoke-harmony smoke-power smoke-giovanni smoke-appeears test gen lint fmt breaking web-dev web-check
+.PHONY: up down logs ps clean smoke smoke-harmony smoke-power smoke-giovanni smoke-appeears test test-preprocess test-analysis gen lint fmt breaking web-dev web-check
+
+# Runs on Linux, macOS and Windows.
+#
+# On Windows, install GNU make (for example `winget install ezwinports.make`)
+# and Git for Windows, then run make from PowerShell, cmd or Git Bash. Recipes
+# run in cmd.exe, so they stick to commands that mean the same in cmd and sh:
+# no single quotes, no `$$(...)`, no `[ ]`, no `>/dev/null`. Anything that
+# needs a real shell lives in a script under deploy/ and runs through $(SH),
+# which is Git for Windows' bash there and sh everywhere else.
+ifeq ($(OS),Windows_NT)
+  SHELL := cmd.exe
+  # Git's install folder, from where its helpers live, like
+  # D:/Program Files/Git/mingw64/libexec/git-core. Set GIT_BASH to override.
+  GIT_EXEC := $(shell git --exec-path 2>NUL)
+  GIT_ROOT := $(subst /mingw64/libexec/git-core,,$(subst /mingw32/libexec/git-core,,$(subst /clangarm64/libexec/git-core,,$(GIT_EXEC))))
+  GIT_BASH ?= $(GIT_ROOT)/bin/bash.exe
+  ifneq ($(shell if exist "$(GIT_BASH)" echo yes),yes)
+    $(error Git for Windows' bash wasn't found at "$(GIT_BASH)". Install Git for Windows, or run make with GIT_BASH=<path to bash.exe>)
+  endif
+  SH := "$(GIT_BASH)"
+  COPY := copy /Y
+else
+  SH := sh
+  COPY := cp
+endif
 
 # Start the stack in the background and wait until bootstrap has finished.
-# The first run creates .env from .env.example. `up --wait` would treat
-# bootstrap exiting as a failure, so this waits on its exit code instead.
+# The first run creates .env from .env.example.
 up: .env
-	docker compose up -d --build
-	@docker compose wait bootstrap >/dev/null; \
-	code=$$(docker compose ps -a bootstrap --format '{{.ExitCode}}'); \
-	if [ "$$code" = 0 ]; then \
-		echo "Stack is up. Streams and buckets are ready. The web app is on http://localhost:3000"; \
-	else \
-		echo "Bootstrap failed with exit code $$code:"; \
-		docker compose logs --no-log-prefix bootstrap; \
-		exit 1; \
-	fi
+	$(SH) deploy/up.sh
 
 # Stop the stack. Data stays in the Docker volumes.
 down:
@@ -33,27 +48,27 @@ clean:
 
 # End-to-end checks against the running stack. Run `make up` first.
 smoke:
-	sh deploy/smoke/ingest.sh
-	sh deploy/smoke/gateway.sh
-	sh deploy/smoke/preprocess.sh
-	sh deploy/smoke/analysis.sh
+	$(SH) deploy/smoke/ingest.sh
+	$(SH) deploy/smoke/gateway.sh
+	$(SH) deploy/smoke/preprocess.sh
+	$(SH) deploy/smoke/analysis.sh
 
 # Live check against real NASA services. Needs EARTHDATA_TOKEN in .env.
 smoke-harmony:
-	sh deploy/smoke/harmony.sh
+	$(SH) deploy/smoke/harmony.sh
 
 # Live check against NASA POWER. No token needed, but CI skips it.
 smoke-power:
-	sh deploy/smoke/power.sh
+	$(SH) deploy/smoke/power.sh
 
 # Live check against Giovanni's time-series API. Needs EARTHDATA_TOKEN in .env.
 smoke-giovanni:
-	sh deploy/smoke/giovanni.sh
+	$(SH) deploy/smoke/giovanni.sh
 
 # Live check against NASA AppEEARS. Needs EARTHDATA_USERNAME and
 # EARTHDATA_PASSWORD in .env, and can take 5 to 15 minutes.
 smoke-appeears:
-	sh deploy/smoke/appeears.sh
+	$(SH) deploy/smoke/appeears.sh
 
 # The web app with hot reload on http://localhost:5173, against the running
 # stack's gateway. Needs Bun (https://bun.sh).
@@ -79,8 +94,8 @@ test-analysis:
 	cd services/analysis && uv lock --check && uv run --frozen ruff check . && uv run --frozen pytest -q
 
 .env:
-	cp .env.example .env
-	@echo "Created .env from .env.example. Set EARTHDATA_TOKEN in it before fetching NASA data."
+	$(COPY) .env.example .env
+	@echo Created .env from .env.example. Set EARTHDATA_TOKEN in it before fetching NASA data.
 
 # Regenerate gen/ from proto/. Commit the result together with the proto change.
 gen:
@@ -96,5 +111,7 @@ fmt:
 	buf format --write
 
 # Check the protos for changes that would break clients built against main.
+# Double quotes, because cmd.exe passes single quotes through as part of the
+# argument.
 breaking:
-	buf breaking --against '.git#branch=main'
+	buf breaking --against ".git#branch=main"

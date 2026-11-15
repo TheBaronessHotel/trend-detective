@@ -7,6 +7,7 @@
 # It asks for two years of monthly NDVI over a small box near Delhi, stopping
 # after preprocess, and checks the series has 24 months of plausible values.
 set -eu
+. "$(dirname "$0")/python.sh"
 
 api=http://127.0.0.1:8080/trenddetective.gateway.v1.GatewayService
 call() { curl -s -H 'Content-Type: application/json' -d "$2" "$api/$1"; }
@@ -15,12 +16,12 @@ spec='{"spec": {"variableId": "vegetation-modis",
   "bbox": {"west": 77.0, "south": 28.4, "east": 77.4, "north": 28.8},
   "dates": {"start": {"year": 2019, "month": 1, "day": 1}, "end": {"year": 2020, "month": 12, "day": 31}},
   "stopAfter": "STAGE_PREPROCESS"}}'
-id=$(call CreateJob "$spec" | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["job"]["id"])')
+id=$(call CreateJob "$spec" | "$PY" -I -c 'import json,sys; print(json.load(sys.stdin)["job"]["id"])')
 echo "Job $id: asking NASA AppEEARS for MODIS NDVI"
-python3 -I deploy/smoke/watch.py "$id" "$api" || { echo "FAIL: job didn't succeed"; call GetJob "{\"jobId\": \"$id\"}"; exit 1; }
+"$PY" -I deploy/smoke/watch.py "$id" "$api" || { echo "FAIL: job didn't succeed"; call GetJob "{\"jobId\": \"$id\"}"; exit 1; }
 
-url=$(call GetResultURL "{\"jobId\": \"$id\", \"artifact\": \"ARTIFACT_SERIES\"}" | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["url"])')
-curl -s "$url" | python3 -I -c '
+url=$(call GetResultURL "{\"jobId\": \"$id\", \"artifact\": \"ARTIFACT_SERIES\"}" | "$PY" -I -c 'import json,sys; print(json.load(sys.stdin)["url"])')
+curl -s "$url" | "$PY" -I -c '
 import json, sys
 s = json.load(sys.stdin)
 values = [v for v in s["values"] if v != "NaN"]
