@@ -1299,6 +1299,244 @@ variables:
       sea.
     dataset_url: https://disc.gsfc.nasa.gov/datasets/M2TMNXFLX_5.12.4/summary
 
+  # AIRS, the infrared sounder on NASA's Aqua satellite: monthly 1° maps from
+  # AIRS3STM v7. The daytime passes (the _A variables, about 1:30 pm local)
+  # are used throughout. Its variables live in ascending/Data_Fields and its
+  # coordinates at the file's root; preprocess's NetCDF decoder handles both.
+  - id: water-vapour-airs
+    name: Water vapour in the air (satellite map)
+    topic: Air
+    measurement: Humidity
+    product: AIRS
+    definition: >-
+      All the water vapour in the air above a place, from the ground to the
+      top of the sky, shown as the millimeters of rain it would make if it all
+      fell at once. Averaged over each month. It's measured from space by
+      AIRS, an instrument on NASA's Aqua satellite that reads the infrared
+      light the air gives off, around 1:30 in the afternoon.
+    units: mm
+    step: monthly
+    available: { start: 2002-09-01, end: 2026-10-31 }
+    grid: true
+    pixel_size: { lat: 1, lon: 1 }
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1701805662-GES_DISC
+        variables: [ascending/Data_Fields/TotH2OVap_A]
+    source_units: kg/m²
+    # Grid cells of 1x1 native pixels: AIRS pixels are already 1°.
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 100 }
+        - linear: { scale: 1, offset: 0, units: mm }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      AIRS total precipitable water vapour (TotH2OVap_A) from the daytime
+      passes, in kg/m², which equals mm of liquid water. It's a satellite
+      measurement on a 1 degree grid, about 110 km, unlike the MERRA-2 map,
+      which comes from a model. Water vapour grows about 7% for each degree of
+      warming.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/AIRS3STM_7.0/summary
+
+  - id: surface-air-temperature-airs
+    name: Air temperature (satellite map)
+    topic: Air
+    measurement: Temperature
+    product: AIRS
+    definition: >-
+      How warm the air is just above the ground, averaged over each month. It's
+      measured from space by AIRS, an instrument on NASA's Aqua satellite,
+      around 1:30 in the afternoon, so it shows afternoon warmth rather than a
+      day-and-night average.
+    units: °C
+    step: monthly
+    available: { start: 2002-09-01, end: 2026-10-31 }
+    grid: true
+    pixel_size: { lat: 1, lon: 1 }
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1701805662-GES_DISC
+        variables: [ascending/Data_Fields/SurfAirTemp_A]
+    source_units: K
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 150, max: 350 }
+        - linear: { scale: 1, offset: -273.15, units: °C }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      AIRS surface air temperature (SurfAirTemp_A) from the daytime passes, on
+      a 1 degree grid. It's one time of day, about 1:30 pm, so it can trend
+      differently from a daily mean. Aqua's orbit has been drifting since
+      about 2022, so it now passes over later in the afternoon, which can add
+      a small artificial change in recent years.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/AIRS3STM_7.0/summary
+
+  - id: skin-temperature-airs
+    name: Ground and sea surface temperature (satellite map)
+    topic: Air
+    measurement: Temperature
+    product: AIRS
+    definition: >-
+      How warm the surface itself is, the ground or the top of the sea, rather
+      than the air above it, averaged over each month. A sunny surface gets
+      much hotter than the air. It's measured from space by AIRS, an
+      instrument on NASA's Aqua satellite, around 1:30 in the afternoon.
+    units: °C
+    step: monthly
+    available: { start: 2002-09-01, end: 2026-10-31 }
+    grid: true
+    pixel_size: { lat: 1, lon: 1 }
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1701805662-GES_DISC
+        variables: [ascending/Data_Fields/SurfSkinTemp_A]
+    source_units: K
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 150, max: 360 }
+        - linear: { scale: 1, offset: -273.15, units: °C }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      AIRS surface skin temperature (SurfSkinTemp_A) from the daytime passes,
+      on a 1 degree grid. Over land at 1:30 pm it reacts strongly to sunshine,
+      dryness and plant cover, so it swings more than air temperature. Aqua's
+      orbit drift since about 2022 moves the overpass later in the afternoon,
+      which affects skin temperature more than air temperature.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/AIRS3STM_7.0/summary
+
+  - id: cloud-fraction-airs
+    name: Cloud cover (satellite map)
+    topic: Air
+    measurement: Clouds
+    product: AIRS
+    definition: >-
+      How much of the sky is covered by cloud, from 0% for clear sky to 100%
+      for overcast, averaged over each month. It's measured from space by
+      AIRS, an instrument on NASA's Aqua satellite, around 1:30 in the
+      afternoon.
+    units: "%"
+    step: monthly
+    available: { start: 2002-09-01, end: 2026-10-31 }
+    grid: true
+    pixel_size: { lat: 1, lon: 1 }
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1701805662-GES_DISC
+        variables: [ascending/Data_Fields/CloudFrc_A]
+    source_units: fraction
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 1 }
+        - linear: { scale: 100, offset: 0, units: "%" }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      AIRS total cloud fraction (CloudFrc_A) from the daytime passes, on a 1
+      degree grid. It's observed, unlike the MERRA-2 cloud map, but only in
+      the early afternoon, when clouds over land are often building up.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/AIRS3STM_7.0/summary
+
+  - id: ozone-airs
+    name: Ozone layer (satellite map)
+    topic: Air quality
+    measurement: Gases
+    product: AIRS
+    definition: >-
+      How much ozone is in the air above the ground, averaged over each month.
+      Most of it is in the ozone layer, 15 to 35 km up, which blocks harmful
+      ultraviolet light from the Sun. If all of it were squeezed down to
+      ground pressure, 100 Dobson units would be a layer 1 mm thick. It's
+      measured from space by AIRS, an instrument on NASA's Aqua satellite.
+    units: DU
+    step: monthly
+    available: { start: 2002-09-01, end: 2026-10-31 }
+    grid: true
+    pixel_size: { lat: 1, lon: 1 }
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1701805662-GES_DISC
+        variables: [ascending/Data_Fields/TotO3_A]
+    source_units: DU
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 50, max: 700 }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      AIRS total ozone column (TotO3_A) from the daytime passes, on a 1 degree
+      grid. The Antarctic ozone hole opens each September and October. Since
+      the 1987 Montreal Protocol the layer recovers slowly, so trends since
+      2002 are small next to the swings from year to year.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/AIRS3STM_7.0/summary
+
+  - id: methane-airs
+    name: Methane in the air (satellite map)
+    topic: Air quality
+    measurement: Gases
+    product: AIRS
+    definition: >-
+      How much methane is in the air, averaged over the whole column of air
+      above a place and over each month, in parts per billion. Methane is the
+      second most important greenhouse gas made by people, after carbon
+      dioxide. It's measured from space by AIRS, an instrument on NASA's Aqua
+      satellite.
+    units: ppb
+    step: monthly
+    available: { start: 2002-09-01, end: 2026-10-31 }
+    grid: true
+    pixel_size: { lat: 1, lon: 1 }
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1701805662-GES_DISC
+        # The methane profile, then the surface pressure column_average needs.
+        variables: [ascending/Data_Fields/CH4_VMR_A, ascending/Data_Fields/SurfPres_Forecast_A]
+    source_units: mol/mol
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 1.0e-7, max: 5.0e-6 }
+        # AIRS gives methane on 24 pressure levels. This averages them over
+        # the column above each pixel, weighted by the air each level holds.
+        - column_average: { surface_pressure: ascending/Data_Fields/SurfPres_Forecast_A }
+        - linear: { scale: 1.0e+9, offset: 0, units: ppb }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      Column-average methane computed by preprocess from the AIRS methane
+      profile (CH4_VMR_A, 24 pressure levels) and surface pressure, daytime
+      passes, 1 degree grid. AIRS senses methane mostly in the middle and
+      upper troposphere, so near-ground changes, like those from wetlands or
+      gas fields, show only weakly. The column includes the stratosphere,
+      where methane is lower, so values sit below surface readings of about
+      1900 ppb. Global methane has risen fast since about 2007.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/AIRS3STM_7.0/summary
+
   - id: user-csv
     name: Your own data (CSV upload)
     topic: Your data

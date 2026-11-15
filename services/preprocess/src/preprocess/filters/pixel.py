@@ -69,6 +69,11 @@ def monthly_mean(dec: Decoded, op: preprocess_pb2.MonthlyMean) -> None:
 
     ds = xr.Dataset({VALUE: mean.where(enough)})
     ds[REASON] = xr.where(enough, 0, data_pb2.MISSING_REASON_TOO_FEW_DAYS).astype("int8")
+    # Helpers, like surface pressure, become monthly means too, so a later
+    # step can still use them.
+    for name in dec.data.data_vars:
+        if str(name).startswith(canonical.HELPER_PREFIX):
+            ds[name] = dec.data[name].resample(time="MS").mean()
     dec.data = canonical.normalize_axes(ds)
     dec.step = common_pb2.TIME_STEP_MONTHLY
 

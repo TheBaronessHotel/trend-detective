@@ -14,6 +14,14 @@ every source:
 After the filter chain, the Dataset can also hold ``anomaly``: float64 over the
 same dims, the per-pixel anomaly. Values stay in ``value``.
 
+Before the chain runs, two more things can appear, and the chain must remove
+both:
+
+- a ``level`` dim, between ``time`` and ``lat``: pressure levels in hPa, for
+  profiles like AIRS methane. A column_average step collapses it.
+- helper variables, named ``helper:<variable path>``, like AIRS surface
+  pressure: inputs a filter step names, over ``(time, lat, lon)``.
+
 Nothing outside preprocess sees this form. The documents other services read
 are Series and Grid, written by output.py.
 """
@@ -34,6 +42,12 @@ from . import errors
 VALUE = "value"
 REASON = "reason"
 ANOMALY = "anomaly"
+HELPER_PREFIX = "helper:"
+
+
+def helper_name(variable_path: str) -> str:
+    """The Dataset name of a helper variable read from variable_path."""
+    return HELPER_PREFIX + variable_path
 
 FILL_VALUE = data_pb2.MISSING_REASON_FILL_VALUE
 
@@ -86,8 +100,8 @@ def make_dataset(values: xr.DataArray, reasons: xr.DataArray | None = None) -> x
 
 
 def normalize_axes(ds: xr.Dataset) -> xr.Dataset:
-    """Puts a grid in canonical axis order: (time, lat, lon), north first,
-    west first, longitudes in -180 to 180."""
+    """Puts a grid in canonical axis order: (time, level, lat, lon), north
+    first, west first, longitudes in -180 to 180."""
     if "lon" in ds.coords:
         lon = ds["lon"].values
         if np.nanmax(lon) > 180:
@@ -95,7 +109,7 @@ def normalize_axes(ds: xr.Dataset) -> xr.Dataset:
         ds = ds.sortby("lon")
     if "lat" in ds.coords:
         ds = ds.sortby("lat", ascending=False)
-    order = [d for d in ("time", "lat", "lon") if d in ds.dims]
+    order = [d for d in ("time", "level", "lat", "lon") if d in ds.dims]
     return ds.transpose(*order)
 
 

@@ -33,6 +33,9 @@ PRE-1 (decoders) and PRE-2 (the filter chain) are in. Still to come:
 Every decoder returns a `Decoded`: an xarray Dataset with a `value` variable (float64, NaN where missing) and a `reason` variable (int8 `MissingReason` codes) over the same dims.
 
 - Dims are `(time,)` for points or `(time, lat, lon)` for grids.
+- Before the filter chain, two more things can appear, and the chain must remove both:
+  - a `level` dim between `time` and `lat`: pressure levels in hPa, for profiles like AIRS methane. `column_average` collapses it, and data still on levels after the chain fails with `UNSUPPORTED`;
+  - helper variables named `helper:<variable path>`, like AIRS surface pressure, which a step names. They're dropped after the chain.
 - `time` is the start of each step in UTC. Monthly times are snapped to the 1st at 00:00, because products stamp months differently, like MERRA-2's 00:30.
 - Latitude runs north first and longitude west first, in -180 to 180.
 - Units are the task's `source_units` when set. A file that says otherwise is logged, because the catalog's unit filters are written against `source_units`.
@@ -55,6 +58,7 @@ The catalog gives each variable an ordered list of steps, and the gateway copies
 | `linear{scale, offset, units}` | `value × scale + offset`, then renames the units. An unset scale means 1 | |
 | `monthly_mean{min_valid_days}` | The mean of each month's valid days. A weekly value counts as 7 days. Monthly data passes through | `TOO_FEW_DAYS` |
 | `log10` | Units become `log₁₀(<units>)`, as the catalog writes them | `NOT_POSITIVE` |
+| `column_average{surface_pressure, min_coverage}` | Collapses data on pressure levels into the column average above each pixel, each level weighted by the air it holds: its layer runs halfway to the levels on either side, cut at the surface pressure (a helper variable) and 0 hPa at the top. Under 90% of the column's air with a value, by default, is missing | `QC_FAILED` |
 | `coarsen{factor}` | Deprecated for grids: it averages blocks before the region series and the anomaly step, unweighted. The `Grid`'s blocks replace it. Point data passes through | |
 | `anomaly{kind, baseline, min_baseline_coverage, method, harmonics}` | The difference from each calendar month's normal, per pixel | |
 | `gap_fill_display{max_gap}` | Draws straight lines across gaps of up to `max_gap` steps (default 2), never at the ends | |
@@ -66,7 +70,7 @@ Anomalies:
 - **Kinds:** absolute (the default); percent, skipped where a normal is under 1% of that pixel's largest monthly normal and refused for temperatures; standardized, skipped where a month's deviation is zero.
 - **Missing anomalies:** a step whose value is missing has no anomaly. A missing anomaly next to a present value always means that calendar month has `usable: false` in `Series.normals`.
 
-Chain checks fail the task with `INVALID_REQUEST`: an empty step, `anomaly`, `monthly_mean` or `gap_fill_display` twice, a pixel step after `anomaly`, or a `qc_range` whose max is below its min or whose limits are both 0. proto3 reads an unset limit as 0, so a `qc_range` needs both limits. One with only `min` set below 0 can't be caught and drops every value above 0.
+Chain checks fail the task with `INVALID_REQUEST`: an empty step, `anomaly`, `monthly_mean`, `gap_fill_display` or `column_average` twice, a `column_average` without levels or without its surface pressure helper, a pixel step after `anomaly`, or a `qc_range` whose max is below its min or whose limits are both 0. proto3 reads an unset limit as 0, so a `qc_range` needs both limits. One with only `min` set below 0 can't be caught and drops every value above 0.
 
 Daily or weekly data whose chain has no `monthly_mean` gets `monthly_mean{min_valid_days: 20}` before its first step other than `qc_range` or `linear`. Anomalies need calendar months, and a daily user CSV can't say so in the catalog.
 
@@ -77,7 +81,7 @@ Daily or weekly data whose chain has no `monthly_mean` gets `monthly_mean{min_va
 | Format | From | Notes |
 |---|---|---|
 | `FORMAT_POWER_JSON` | `power`, `bundle` | Drops the 13th "month", the annual mean. `-999` is missing |
-| `FORMAT_NETCDF4` | `harmony-subset` | `Grid/precipitation` means group `Grid`, variable `precipitation`. Handles `(time, lon, lat)` storage, 0-360 longitudes, fill values and packing |
+| `FORMAT_NETCDF4` | `harmony-subset` | `Grid/precipitation` means group `Grid`, variable `precipitation`. Handles `(time, lon, lat)` storage, 0-360 longitudes, fill values and packing. An axis with no values in the variable's own group takes them from the nearest group above that has a variable of that name, as AIRS keeps `YDim_ascending` and `XDim_ascending` at the root. `YDim`/`XDim` are latitude and longitude, and a `*PressureLev*` axis, or one in hPa or Pa, is a pressure `level`. The first of `RawDataset.variables` is the measurement; any others are read as helpers. A granule without a time axis takes its date from ingest's coverage |
 | `FORMAT_USER_CSV` | `csv-upload` | The first column of dates and the first mostly-numeric column. Comma, semicolon or tab |
 | `FORMAT_GIOVANNI_CSV` | `giovanni-area` | `key:,value` lines, a blank line, then `time,mean_<id>`. Empty values are missing, and timestamps may use a space instead of `T` |
 | `FORMAT_GIOVANNI_POINT_CSV` | `giovanni-point` | `key,value` lines, a blank line, then `Timestamp (UTC),Data`. The header's `undef` value, like `-9999` or `-1.26765e+30`, is missing. The header's `lat` and `lon` give the grid cell |
@@ -125,4 +129,6 @@ Logs are `key=value` lines with `time`, `level` and `msg`, plus `job_id`, `task_
 - `make test-preprocess` runs what CI's `preprocess` workflow runs, in a few seconds: the lockfile check, ruff with bug rules only, and the unit tests. It needs uv.
 - The unit tests also import the worker and every module in `gen/python`, and check that each `ingest.v1.Format` an adapter can produce has a decoder. A new format in the proto fails that test until it has one.
 - `tests/test_catalog.py` runs every filter chain in the catalog. The workflow also runs when `services/gateway/catalog.yaml` changes.
+- `tests/test_airs.py` decodes `tests/fixtures/airs3stm-2020-02-delhi.nc4`, a trimmed copy of a real Harmony subset of AIRS3STM v7 (February 2020, 27-29 N, 76-78 E) that keeps the layout that matters: coordinates at the root, data in `ascending/Data_Fields`. It also computes the methane column from it, about 1830 ppb.
+- `make smoke-airs` runs every AIRS variable live through all stages. It needs `EARTHDATA_TOKEN` in `.env`.
 - `make smoke`, with the stack up, runs the Delhi bundle through the gateway, ingest and preprocess, then downloads the series and checks it has 528 months.

@@ -28,7 +28,7 @@ class FilterChain(_message.Message):
     def __init__(self, ops: _Optional[_Iterable[_Union[FilterOp, _Mapping]]] = ...) -> None: ...
 
 class FilterOp(_message.Message):
-    __slots__ = ("qc_range", "linear", "monthly_mean", "anomaly", "log10", "coarsen", "gap_fill_display")
+    __slots__ = ("qc_range", "linear", "monthly_mean", "anomaly", "log10", "coarsen", "gap_fill_display", "column_average")
     QC_RANGE_FIELD_NUMBER: _ClassVar[int]
     LINEAR_FIELD_NUMBER: _ClassVar[int]
     MONTHLY_MEAN_FIELD_NUMBER: _ClassVar[int]
@@ -36,6 +36,7 @@ class FilterOp(_message.Message):
     LOG10_FIELD_NUMBER: _ClassVar[int]
     COARSEN_FIELD_NUMBER: _ClassVar[int]
     GAP_FILL_DISPLAY_FIELD_NUMBER: _ClassVar[int]
+    COLUMN_AVERAGE_FIELD_NUMBER: _ClassVar[int]
     qc_range: QcRange
     linear: Linear
     monthly_mean: MonthlyMean
@@ -43,7 +44,8 @@ class FilterOp(_message.Message):
     log10: Log10
     coarsen: Coarsen
     gap_fill_display: GapFillDisplay
-    def __init__(self, qc_range: _Optional[_Union[QcRange, _Mapping]] = ..., linear: _Optional[_Union[Linear, _Mapping]] = ..., monthly_mean: _Optional[_Union[MonthlyMean, _Mapping]] = ..., anomaly: _Optional[_Union[Anomaly, _Mapping]] = ..., log10: _Optional[_Union[Log10, _Mapping]] = ..., coarsen: _Optional[_Union[Coarsen, _Mapping]] = ..., gap_fill_display: _Optional[_Union[GapFillDisplay, _Mapping]] = ...) -> None: ...
+    column_average: ColumnAverage
+    def __init__(self, qc_range: _Optional[_Union[QcRange, _Mapping]] = ..., linear: _Optional[_Union[Linear, _Mapping]] = ..., monthly_mean: _Optional[_Union[MonthlyMean, _Mapping]] = ..., anomaly: _Optional[_Union[Anomaly, _Mapping]] = ..., log10: _Optional[_Union[Log10, _Mapping]] = ..., coarsen: _Optional[_Union[Coarsen, _Mapping]] = ..., gap_fill_display: _Optional[_Union[GapFillDisplay, _Mapping]] = ..., column_average: _Optional[_Union[ColumnAverage, _Mapping]] = ...) -> None: ...
 
 class QcRange(_message.Message):
     __slots__ = ("min", "max")
@@ -92,6 +94,14 @@ class Coarsen(_message.Message):
     FACTOR_FIELD_NUMBER: _ClassVar[int]
     factor: int
     def __init__(self, factor: _Optional[int] = ...) -> None: ...
+
+class ColumnAverage(_message.Message):
+    __slots__ = ("surface_pressure", "min_coverage")
+    SURFACE_PRESSURE_FIELD_NUMBER: _ClassVar[int]
+    MIN_COVERAGE_FIELD_NUMBER: _ClassVar[int]
+    surface_pressure: str
+    min_coverage: float
+    def __init__(self, surface_pressure: _Optional[str] = ..., min_coverage: _Optional[float] = ...) -> None: ...
 
 class GapFillDisplay(_message.Message):
     __slots__ = ("max_gap",)

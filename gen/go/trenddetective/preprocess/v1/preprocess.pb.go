@@ -156,6 +156,7 @@ type FilterOp struct {
 	//	*FilterOp_Log10
 	//	*FilterOp_Coarsen
 	//	*FilterOp_GapFillDisplay
+	//	*FilterOp_ColumnAverage
 	Op            isFilterOp_Op `protobuf_oneof:"op"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -262,6 +263,15 @@ func (x *FilterOp) GetGapFillDisplay() *GapFillDisplay {
 	return nil
 }
 
+func (x *FilterOp) GetColumnAverage() *ColumnAverage {
+	if x != nil {
+		if x, ok := x.Op.(*FilterOp_ColumnAverage); ok {
+			return x.ColumnAverage
+		}
+	}
+	return nil
+}
+
 type isFilterOp_Op interface {
 	isFilterOp_Op()
 }
@@ -295,6 +305,10 @@ type FilterOp_GapFillDisplay struct {
 	GapFillDisplay *GapFillDisplay `protobuf:"bytes,7,opt,name=gap_fill_display,json=gapFillDisplay,proto3,oneof"`
 }
 
+type FilterOp_ColumnAverage struct {
+	ColumnAverage *ColumnAverage `protobuf:"bytes,8,opt,name=column_average,json=columnAverage,proto3,oneof"`
+}
+
 func (*FilterOp_QcRange) isFilterOp_Op() {}
 
 func (*FilterOp_Linear) isFilterOp_Op() {}
@@ -308,6 +322,8 @@ func (*FilterOp_Log10) isFilterOp_Op() {}
 func (*FilterOp_Coarsen) isFilterOp_Op() {}
 
 func (*FilterOp_GapFillDisplay) isFilterOp_Op() {}
+
+func (*FilterOp_ColumnAverage) isFilterOp_Op() {}
 
 // Drop values outside [min, max] and record them as failed quality checks.
 // For example, negative rain or NDVI above 1.
@@ -640,6 +656,72 @@ func (x *Coarsen) GetFactor() int32 {
 	return 0
 }
 
+// Collapse data on pressure levels, like AIRS methane, into one value per
+// pixel: the average over the air column above it, each level weighted by the
+// air it holds. For a mole fraction that's the column-average mole fraction,
+// the way column methane and CO2 are usually reported.
+//
+// Each level's layer runs from halfway to the level below to halfway to the
+// level above. The lowest layer ends at the surface pressure and the top one
+// at 0 hPa, so layers under the ground weigh nothing. A pixel-step whose
+// levels with data hold less than min_coverage of the column's air is
+// missing, as a failed quality check.
+type ColumnAverage struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The surface pressure variable, in hPa: one of the dataset's variables
+	// after the first, for example "ascending/Data_Fields/SurfPres_Forecast_A".
+	// The source lists it after the measurement.
+	SurfacePressure string `protobuf:"bytes,1,opt,name=surface_pressure,json=surfacePressure,proto3" json:"surface_pressure,omitempty"`
+	// Share of the column's air, by pressure, that needs a value. Default 0.9.
+	MinCoverage   float64 `protobuf:"fixed64,2,opt,name=min_coverage,json=minCoverage,proto3" json:"min_coverage,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ColumnAverage) Reset() {
+	*x = ColumnAverage{}
+	mi := &file_trenddetective_preprocess_v1_preprocess_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ColumnAverage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ColumnAverage) ProtoMessage() {}
+
+func (x *ColumnAverage) ProtoReflect() protoreflect.Message {
+	mi := &file_trenddetective_preprocess_v1_preprocess_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ColumnAverage.ProtoReflect.Descriptor instead.
+func (*ColumnAverage) Descriptor() ([]byte, []int) {
+	return file_trenddetective_preprocess_v1_preprocess_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ColumnAverage) GetSurfacePressure() string {
+	if x != nil {
+		return x.SurfacePressure
+	}
+	return ""
+}
+
+func (x *ColumnAverage) GetMinCoverage() float64 {
+	if x != nil {
+		return x.MinCoverage
+	}
+	return 0
+}
+
 // Fill short gaps by linear interpolation in Series.display_values, for the
 // chart only. Statistics never see filled values.
 type GapFillDisplay struct {
@@ -652,7 +734,7 @@ type GapFillDisplay struct {
 
 func (x *GapFillDisplay) Reset() {
 	*x = GapFillDisplay{}
-	mi := &file_trenddetective_preprocess_v1_preprocess_proto_msgTypes[9]
+	mi := &file_trenddetective_preprocess_v1_preprocess_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -664,7 +746,7 @@ func (x *GapFillDisplay) String() string {
 func (*GapFillDisplay) ProtoMessage() {}
 
 func (x *GapFillDisplay) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_preprocess_v1_preprocess_proto_msgTypes[9]
+	mi := &file_trenddetective_preprocess_v1_preprocess_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -677,7 +759,7 @@ func (x *GapFillDisplay) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GapFillDisplay.ProtoReflect.Descriptor instead.
 func (*GapFillDisplay) Descriptor() ([]byte, []int) {
-	return file_trenddetective_preprocess_v1_preprocess_proto_rawDescGZIP(), []int{9}
+	return file_trenddetective_preprocess_v1_preprocess_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GapFillDisplay) GetMaxGap() int32 {
@@ -724,7 +806,7 @@ type Aggregation struct {
 
 func (x *Aggregation) Reset() {
 	*x = Aggregation{}
-	mi := &file_trenddetective_preprocess_v1_preprocess_proto_msgTypes[10]
+	mi := &file_trenddetective_preprocess_v1_preprocess_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -736,7 +818,7 @@ func (x *Aggregation) String() string {
 func (*Aggregation) ProtoMessage() {}
 
 func (x *Aggregation) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_preprocess_v1_preprocess_proto_msgTypes[10]
+	mi := &file_trenddetective_preprocess_v1_preprocess_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -749,7 +831,7 @@ func (x *Aggregation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Aggregation.ProtoReflect.Descriptor instead.
 func (*Aggregation) Descriptor() ([]byte, []int) {
-	return file_trenddetective_preprocess_v1_preprocess_proto_rawDescGZIP(), []int{10}
+	return file_trenddetective_preprocess_v1_preprocess_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Aggregation) GetSubregionN() int32 {
@@ -799,7 +881,7 @@ type PreprocessResult struct {
 
 func (x *PreprocessResult) Reset() {
 	*x = PreprocessResult{}
-	mi := &file_trenddetective_preprocess_v1_preprocess_proto_msgTypes[11]
+	mi := &file_trenddetective_preprocess_v1_preprocess_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -811,7 +893,7 @@ func (x *PreprocessResult) String() string {
 func (*PreprocessResult) ProtoMessage() {}
 
 func (x *PreprocessResult) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_preprocess_v1_preprocess_proto_msgTypes[11]
+	mi := &file_trenddetective_preprocess_v1_preprocess_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -824,7 +906,7 @@ func (x *PreprocessResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreprocessResult.ProtoReflect.Descriptor instead.
 func (*PreprocessResult) Descriptor() ([]byte, []int) {
-	return file_trenddetective_preprocess_v1_preprocess_proto_rawDescGZIP(), []int{11}
+	return file_trenddetective_preprocess_v1_preprocess_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *PreprocessResult) GetSeries() *v11.BlobRef {
@@ -873,7 +955,7 @@ const file_trenddetective_preprocess_v1_preprocess_proto_rawDesc = "" +
 	"\afilters\x18\x03 \x01(\v2).trenddetective.preprocess.v1.FilterChainR\afilters\x12K\n" +
 	"\vaggregation\x18\x04 \x01(\v2).trenddetective.preprocess.v1.AggregationR\vaggregation\"G\n" +
 	"\vFilterChain\x128\n" +
-	"\x03ops\x18\x01 \x03(\v2&.trenddetective.preprocess.v1.FilterOpR\x03ops\"\x85\x04\n" +
+	"\x03ops\x18\x01 \x03(\v2&.trenddetective.preprocess.v1.FilterOpR\x03ops\"\xdb\x04\n" +
 	"\bFilterOp\x12B\n" +
 	"\bqc_range\x18\x01 \x01(\v2%.trenddetective.preprocess.v1.QcRangeH\x00R\aqcRange\x12>\n" +
 	"\x06linear\x18\x02 \x01(\v2$.trenddetective.preprocess.v1.LinearH\x00R\x06linear\x12N\n" +
@@ -881,7 +963,8 @@ const file_trenddetective_preprocess_v1_preprocess_proto_rawDesc = "" +
 	"\aanomaly\x18\x04 \x01(\v2%.trenddetective.preprocess.v1.AnomalyH\x00R\aanomaly\x12;\n" +
 	"\x05log10\x18\x05 \x01(\v2#.trenddetective.preprocess.v1.Log10H\x00R\x05log10\x12E\n" +
 	"\acoarsen\x18\x06 \x01(\v2%.trenddetective.preprocess.v1.CoarsenB\x02\x18\x01H\x00R\acoarsen\x12X\n" +
-	"\x10gap_fill_display\x18\a \x01(\v2,.trenddetective.preprocess.v1.GapFillDisplayH\x00R\x0egapFillDisplayB\x04\n" +
+	"\x10gap_fill_display\x18\a \x01(\v2,.trenddetective.preprocess.v1.GapFillDisplayH\x00R\x0egapFillDisplay\x12T\n" +
+	"\x0ecolumn_average\x18\b \x01(\v2+.trenddetective.preprocess.v1.ColumnAverageH\x00R\rcolumnAverageB\x04\n" +
 	"\x02op\"-\n" +
 	"\aQcRange\x12\x10\n" +
 	"\x03min\x18\x01 \x01(\x01R\x03min\x12\x10\n" +
@@ -900,7 +983,10 @@ const file_trenddetective_preprocess_v1_preprocess_proto_rawDesc = "" +
 	"\tharmonics\x18\x05 \x01(\x05R\tharmonics\"\a\n" +
 	"\x05Log10\"!\n" +
 	"\aCoarsen\x12\x16\n" +
-	"\x06factor\x18\x01 \x01(\x05R\x06factor\")\n" +
+	"\x06factor\x18\x01 \x01(\x05R\x06factor\"]\n" +
+	"\rColumnAverage\x12)\n" +
+	"\x10surface_pressure\x18\x01 \x01(\tR\x0fsurfacePressure\x12!\n" +
+	"\fmin_coverage\x18\x02 \x01(\x01R\vminCoverage\")\n" +
 	"\x0eGapFillDisplay\x12\x17\n" +
 	"\amax_gap\x18\x01 \x01(\x05R\x06maxGap\"\xb0\x01\n" +
 	"\vAggregation\x12\x1f\n" +
@@ -932,7 +1018,7 @@ func file_trenddetective_preprocess_v1_preprocess_proto_rawDescGZIP() []byte {
 	return file_trenddetective_preprocess_v1_preprocess_proto_rawDescData
 }
 
-var file_trenddetective_preprocess_v1_preprocess_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_trenddetective_preprocess_v1_preprocess_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_trenddetective_preprocess_v1_preprocess_proto_goTypes = []any{
 	(*PreprocessTask)(nil),   // 0: trenddetective.preprocess.v1.PreprocessTask
 	(*FilterChain)(nil),      // 1: trenddetective.preprocess.v1.FilterChain
@@ -943,19 +1029,20 @@ var file_trenddetective_preprocess_v1_preprocess_proto_goTypes = []any{
 	(*Anomaly)(nil),          // 6: trenddetective.preprocess.v1.Anomaly
 	(*Log10)(nil),            // 7: trenddetective.preprocess.v1.Log10
 	(*Coarsen)(nil),          // 8: trenddetective.preprocess.v1.Coarsen
-	(*GapFillDisplay)(nil),   // 9: trenddetective.preprocess.v1.GapFillDisplay
-	(*Aggregation)(nil),      // 10: trenddetective.preprocess.v1.Aggregation
-	(*PreprocessResult)(nil), // 11: trenddetective.preprocess.v1.PreprocessResult
-	(*v1.RawDataset)(nil),    // 12: trenddetective.ingest.v1.RawDataset
-	(AnomalyKind)(0),         // 13: trenddetective.preprocess.v1.AnomalyKind
-	(*v11.YearRange)(nil),    // 14: trenddetective.common.v1.YearRange
-	(ClimatologyMethod)(0),   // 15: trenddetective.preprocess.v1.ClimatologyMethod
-	(*v11.BlobRef)(nil),      // 16: trenddetective.common.v1.BlobRef
+	(*ColumnAverage)(nil),    // 9: trenddetective.preprocess.v1.ColumnAverage
+	(*GapFillDisplay)(nil),   // 10: trenddetective.preprocess.v1.GapFillDisplay
+	(*Aggregation)(nil),      // 11: trenddetective.preprocess.v1.Aggregation
+	(*PreprocessResult)(nil), // 12: trenddetective.preprocess.v1.PreprocessResult
+	(*v1.RawDataset)(nil),    // 13: trenddetective.ingest.v1.RawDataset
+	(AnomalyKind)(0),         // 14: trenddetective.preprocess.v1.AnomalyKind
+	(*v11.YearRange)(nil),    // 15: trenddetective.common.v1.YearRange
+	(ClimatologyMethod)(0),   // 16: trenddetective.preprocess.v1.ClimatologyMethod
+	(*v11.BlobRef)(nil),      // 17: trenddetective.common.v1.BlobRef
 }
 var file_trenddetective_preprocess_v1_preprocess_proto_depIdxs = []int32{
-	12, // 0: trenddetective.preprocess.v1.PreprocessTask.raw:type_name -> trenddetective.ingest.v1.RawDataset
+	13, // 0: trenddetective.preprocess.v1.PreprocessTask.raw:type_name -> trenddetective.ingest.v1.RawDataset
 	1,  // 1: trenddetective.preprocess.v1.PreprocessTask.filters:type_name -> trenddetective.preprocess.v1.FilterChain
-	10, // 2: trenddetective.preprocess.v1.PreprocessTask.aggregation:type_name -> trenddetective.preprocess.v1.Aggregation
+	11, // 2: trenddetective.preprocess.v1.PreprocessTask.aggregation:type_name -> trenddetective.preprocess.v1.Aggregation
 	2,  // 3: trenddetective.preprocess.v1.FilterChain.ops:type_name -> trenddetective.preprocess.v1.FilterOp
 	3,  // 4: trenddetective.preprocess.v1.FilterOp.qc_range:type_name -> trenddetective.preprocess.v1.QcRange
 	4,  // 5: trenddetective.preprocess.v1.FilterOp.linear:type_name -> trenddetective.preprocess.v1.Linear
@@ -963,20 +1050,21 @@ var file_trenddetective_preprocess_v1_preprocess_proto_depIdxs = []int32{
 	6,  // 7: trenddetective.preprocess.v1.FilterOp.anomaly:type_name -> trenddetective.preprocess.v1.Anomaly
 	7,  // 8: trenddetective.preprocess.v1.FilterOp.log10:type_name -> trenddetective.preprocess.v1.Log10
 	8,  // 9: trenddetective.preprocess.v1.FilterOp.coarsen:type_name -> trenddetective.preprocess.v1.Coarsen
-	9,  // 10: trenddetective.preprocess.v1.FilterOp.gap_fill_display:type_name -> trenddetective.preprocess.v1.GapFillDisplay
-	13, // 11: trenddetective.preprocess.v1.Anomaly.kind:type_name -> trenddetective.preprocess.v1.AnomalyKind
-	14, // 12: trenddetective.preprocess.v1.Anomaly.baseline:type_name -> trenddetective.common.v1.YearRange
-	15, // 13: trenddetective.preprocess.v1.Anomaly.method:type_name -> trenddetective.preprocess.v1.ClimatologyMethod
-	16, // 14: trenddetective.preprocess.v1.PreprocessResult.series:type_name -> trenddetective.common.v1.BlobRef
-	16, // 15: trenddetective.preprocess.v1.PreprocessResult.series_csv:type_name -> trenddetective.common.v1.BlobRef
-	16, // 16: trenddetective.preprocess.v1.PreprocessResult.grid:type_name -> trenddetective.common.v1.BlobRef
-	16, // 17: trenddetective.preprocess.v1.PreprocessResult.value_cube:type_name -> trenddetective.common.v1.BlobRef
-	16, // 18: trenddetective.preprocess.v1.PreprocessResult.anomaly_cube:type_name -> trenddetective.common.v1.BlobRef
-	19, // [19:19] is the sub-list for method output_type
-	19, // [19:19] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	10, // 10: trenddetective.preprocess.v1.FilterOp.gap_fill_display:type_name -> trenddetective.preprocess.v1.GapFillDisplay
+	9,  // 11: trenddetective.preprocess.v1.FilterOp.column_average:type_name -> trenddetective.preprocess.v1.ColumnAverage
+	14, // 12: trenddetective.preprocess.v1.Anomaly.kind:type_name -> trenddetective.preprocess.v1.AnomalyKind
+	15, // 13: trenddetective.preprocess.v1.Anomaly.baseline:type_name -> trenddetective.common.v1.YearRange
+	16, // 14: trenddetective.preprocess.v1.Anomaly.method:type_name -> trenddetective.preprocess.v1.ClimatologyMethod
+	17, // 15: trenddetective.preprocess.v1.PreprocessResult.series:type_name -> trenddetective.common.v1.BlobRef
+	17, // 16: trenddetective.preprocess.v1.PreprocessResult.series_csv:type_name -> trenddetective.common.v1.BlobRef
+	17, // 17: trenddetective.preprocess.v1.PreprocessResult.grid:type_name -> trenddetective.common.v1.BlobRef
+	17, // 18: trenddetective.preprocess.v1.PreprocessResult.value_cube:type_name -> trenddetective.common.v1.BlobRef
+	17, // 19: trenddetective.preprocess.v1.PreprocessResult.anomaly_cube:type_name -> trenddetective.common.v1.BlobRef
+	20, // [20:20] is the sub-list for method output_type
+	20, // [20:20] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_trenddetective_preprocess_v1_preprocess_proto_init() }
@@ -993,15 +1081,16 @@ func file_trenddetective_preprocess_v1_preprocess_proto_init() {
 		(*FilterOp_Log10)(nil),
 		(*FilterOp_Coarsen)(nil),
 		(*FilterOp_GapFillDisplay)(nil),
+		(*FilterOp_ColumnAverage)(nil),
 	}
-	file_trenddetective_preprocess_v1_preprocess_proto_msgTypes[10].OneofWrappers = []any{}
+	file_trenddetective_preprocess_v1_preprocess_proto_msgTypes[11].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_trenddetective_preprocess_v1_preprocess_proto_rawDesc), len(file_trenddetective_preprocess_v1_preprocess_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -4,14 +4,18 @@ decoded data.
 The steps act at three points, whatever their place in the list:
 
 1. **Pixel steps** change the values in list order: qc_range, linear,
-   monthly_mean, log10, coarsen.
+   monthly_mean, log10, coarsen, column_average. column_average collapses
+   data on pressure levels into one value per pixel, using a helper variable
+   for the surface pressure.
 2. **anomaly** adds a per-pixel anomaly layer next to the values. It has to
    come after every pixel step.
 3. **gap_fill_display** works on the finished region series, so it only
    records its max_gap here. output.py fills Series.display_values.
 
 The chain is checked before any work, and a chain that can't run fails with
-INVALID_REQUEST, which points at the catalog entry.
+INVALID_REQUEST, which points at the catalog entry. After the last step, the
+data must be back to (time, lat, lon) or (time,): data still on pressure
+levels fails with UNSUPPORTED, and helper variables are dropped.
 
 Daily or weekly data whose chain has no monthly_mean gets one, with
 AUTO_MIN_VALID_DAYS, before its first step other than qc_range or linear.
@@ -30,7 +34,7 @@ from trenddetective.preprocess.v1 import data_pb2, preprocess_pb2
 
 from .. import canonical, errors
 from ..canonical import ANOMALY, VALUE, Decoded
-from . import anomaly, pixel
+from . import anomaly, column, pixel
 
 AUTO_MIN_VALID_DAYS = 20
 DEFAULT_MAX_GAP = 2
@@ -41,6 +45,7 @@ PIXEL_STEPS: dict[str, Callable[[Decoded, Message], None]] = {
     "monthly_mean": pixel.monthly_mean,
     "log10": pixel.log10,
     "coarsen": pixel.coarsen,
+    "column_average": column.column_average,
 }
 
 Step = tuple[str, Message]
@@ -63,7 +68,7 @@ def plan(chain: preprocess_pb2.FilterChain, step: int) -> list[Step]:
             raise _bad(f"qc_range needs both min and max, with max above min; got min {op.min}, max {op.max}")
 
     names = [n for n, _ in steps]
-    for once in ("anomaly", "monthly_mean", "gap_fill_display"):
+    for once in ("anomaly", "monthly_mean", "gap_fill_display", "column_average"):
         if names.count(once) > 1:
             raise _bad(f"{once} appears {names.count(once)} times")
     if "anomaly" in names:
@@ -94,6 +99,15 @@ def apply(dec: Decoded, chain: preprocess_pb2.FilterChain) -> Decoded:
         elif name == "gap_fill_display":
             dec.gap_fill_max = op.max_gap or DEFAULT_MAX_GAP
         dec.applied.append(name)
+
+    if "level" in dec.data.dims:
+        raise errors.unsupported(
+            "This product has more layers than the app can show yet.",
+            "filter chain: the data is on pressure levels; add a column_average step",
+        )
+    helpers = [n for n in dec.data.data_vars if str(n).startswith(canonical.HELPER_PREFIX)]
+    if helpers:
+        dec.data = dec.data.drop_vars(helpers)
     return dec
 
 
