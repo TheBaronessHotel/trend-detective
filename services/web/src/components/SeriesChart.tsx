@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { scaleLinear, scaleUtc } from "d3-scale";
 import { area, line } from "d3-shape";
 import { TimeStep } from "@gen/common/v1/common_pb";
@@ -23,6 +23,7 @@ import {
 } from "../lib/series";
 import { stepLabel } from "../lib/sources";
 import { type TrendPoint, trendLine } from "../lib/trend";
+import { useWidth } from "../lib/useWidth";
 
 interface Props {
   series: Series;
@@ -39,19 +40,6 @@ const valuesHeight = 170;
 const anomaliesHeight = 100;
 const panelGap = 30;
 const tipWidth = 240;
-
-/** The element's width, kept up to date as the layout changes. */
-function useWidth(ref: React.RefObject<HTMLElement | null>): number {
-  const [width, setWidth] = useState(0);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(entry?.contentRect.width ?? 0));
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [ref]);
-  return width;
-}
 
 /** A bar from the zero line to v, rounded only at its data end, as the chart specs ask. */
 function barPath(x: number, w: number, zero: number, end: number): string {

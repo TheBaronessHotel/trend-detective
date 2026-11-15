@@ -93,8 +93,9 @@ The NASA checks fail open. If CMR, Harmony or Giovanni can't answer within 5 sec
 
 Files go straight between the browser and SeaweedFS through presigned URLs, so they never pass through the gateway.
 
-- **`GetResultURL(job_id, artifact)`** signs a download for one output: the series, the series CSV, a value or anomaly cube, or the series or grid analysis.
+- **`GetResultURL(job_id, artifact)`** signs a download for one output: the series, the series CSV, a value or anomaly cube, the map grid, or the series or grid analysis.
   - For a cube, `data_url` is the cube's binary data. The gateway reads the cube header to find it.
+  - For the grid, `data_url` is its month-by-month values and `anomalies_url` its anomalies, both little-endian float32 in `[time][row][col]` order. The gateway reads the Grid to find them. The web app's time slider draws from these.
   - An output the job doesn't have yet gets `failed_precondition`, with a message like "The trend analysis isn't ready yet."
   - Only the prep and analysis buckets are ever signed.
 - **`CreateUploadURL(filename, size_bytes)`** signs a PUT for a CSV of up to `MAX_UPLOAD_MB`, at `uploads/<uuid>/<cleaned-up name>`. Pass the returned `upload` as `JobSpec.upload`. A presigned PUT can't enforce the size, so the csv-upload adapter checks it again when reading. `CreateJob` refuses an upload ref outside the `uploads` bucket. The `user-csv` catalog entry runs CSV jobs.

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { FeatureCollection } from "geojson";
 import {
   type ExpressionSpecification,
@@ -16,7 +16,8 @@ import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { type Box, type Corner, fromCorners } from "../lib/bbox";
 import { DIVERGING, type Heatmap } from "../lib/grid";
-import { formatSigned } from "../lib/series";
+import { cellAt, type MonthFrames, type MonthsKind, SEQUENTIAL } from "../lib/months";
+import { formatSigned, formatTime, formatValue } from "../lib/series";
 import { useDarkTheme } from "../lib/useDarkTheme";
 
 interface Props {
@@ -24,6 +25,19 @@ interface Props {
   onBox: (b: Box) => void;
   /** Per-cell trends from a finished job, drawn over the map. */
   heatmap?: Heatmap;
+  /** Bumped to move the view to the rectangle. */
+  focus?: number;
+  /** The month-by-month map, shown instead of the heatmap while it's set. */
+  months?: MonthsView;
+  /** Drawn over the map, at the bottom. */
+  children?: ReactNode;
+}
+
+export interface MonthsView {
+  frames: MonthFrames;
+  kind: MonthsKind;
+  /** The time step shown. */
+  t: number;
 }
 
 // MapLibre picks its worker file by a name built at run time, which no
@@ -167,16 +181,100 @@ function addHeatmap(map: MapLibreMap, h: Heatmap | undefined, dark: boolean) {
         type: "line",
         source: heatSource,
         filter: ["==", ["get", "significant"], true],
-        paint: { "line-color": ink(dark), "line-width": 1.5 },
+        // Thin, so a map where every cell passes still shows its colours.
+        paint: { "line-color": ink(dark), "line-width": 1, "line-opacity": 0.75 },
       },
       before,
     );
   }
 }
 
+function showHeatmap(map: MapLibreMap, shown: boolean) {
+  for (const id of ["heat-sig", "heat-fill"]) {
+    if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", shown ? "visible" : "none");
+  }
+}
+
 function removeHeatmap(map: MapLibreMap) {
   for (const id of ["heat-sig", "heat-fill"]) if (map.getLayer(id)) map.removeLayer(id);
   if (map.getSource(heatSource)) map.removeSource(heatSource);
+}
+
+const monthsSource = "months";
+
+/**
+ * The month's colour scale, fixed across every frame so months compare:
+ * values on the sequential scale, anomalies on the trend's diverging one,
+ * centred on zero.
+ */
+function monthsColour(m: MonthsView, dark: boolean): ExpressionSpecification {
+  const v: ExpressionSpecification = ["number", ["feature-state", "v"], 0];
+  if (m.kind === "anomalies") {
+    const a = m.frames.anomalyMax;
+    return ["interpolate", ["linear"], v, -a, DIVERGING.low, 0, DIVERGING.mid, a, DIVERGING.high];
+  }
+  const [lo, hi] = m.frames.valueRange;
+  const ramp = dark ? SEQUENTIAL.dark : SEQUENTIAL.light;
+  const stops = ramp.flatMap((c, i) => [lo + ((hi - lo) * i) / (ramp.length - 1), c]);
+  return ["interpolate", ["linear"], v, ...stops] as ExpressionSpecification;
+}
+
+/** The month-by-month cells, under the rectangle's outline, with the heatmap hidden. */
+function addMonths(map: MapLibreMap, m: MonthsView | undefined, dark: boolean, shown: { current?: MonthFrames }) {
+  if (!m) return;
+  const source = map.getSource(monthsSource) as GeoJSONSource | undefined;
+  if (!source) map.addSource(monthsSource, { type: "geojson", data: m.frames.cells });
+  else if (shown.current !== m.frames) source.setData(m.frames.cells);
+  shown.current = m.frames;
+  const colour = monthsColour(m, dark);
+  if (map.getLayer("months-fill")) map.setPaintProperty("months-fill", "fill-color", colour);
+  else
+    map.addLayer(
+      {
+        id: "months-fill",
+        type: "fill",
+        source: monthsSource,
+        paint: { "fill-color": colour, "fill-opacity": ["case", ["boolean", ["feature-state", "has"], false], 0.8, 0] },
+      },
+      map.getLayer("bbox-line") ? "bbox-line" : undefined,
+    );
+  showHeatmap(map, false);
+}
+
+/** Colours every cell for the time step shown. */
+function paintMonth(map: MapLibreMap, m: MonthsView | undefined) {
+  if (!m || !map.getSource(monthsSource)) return;
+  for (const f of m.frames.cells.features) {
+    const i = f.id as number;
+    const v = cellAt(m.frames, m.kind, m.t, i);
+    map.setFeatureState({ source: monthsSource, id: i }, v === undefined ? { has: false } : { has: true, v });
+  }
+}
+
+function removeMonths(map: MapLibreMap, shown: { current?: MonthFrames }) {
+  if (map.getLayer("months-fill")) map.removeLayer("months-fill");
+  if (map.getSource(monthsSource)) map.removeSource(monthsSource);
+  shown.current = undefined;
+  showHeatmap(map, true);
+}
+
+/** A cell's number in the month shown, for the hover popup. */
+function monthText(m: MonthsView, cell: number): string {
+  const when = formatTime(m.frames.times[m.t] ?? 0, m.frames.step);
+  const v = cellAt(m.frames, m.kind, m.t, cell);
+  const units = m.frames.units ? ` ${m.frames.units}` : "";
+  if (v === undefined) return `${when}: no data`;
+  return m.kind === "anomalies" ? `${when}: ${formatSigned(v)}${units} from normal` : `${when}: ${formatValue(v)}${units}`;
+}
+
+/**
+ * Runs fn once the map can take layers. isStyleLoaded is false while tiles
+ * load too, say right after the view moves, so then it waits for the map to
+ * settle. fn reads the latest props itself, as it may run later.
+ */
+function whenReady(map: MapLibreMap, fn: () => void) {
+  if (map.isStyleLoaded()) fn();
+  else map.once("idle", fn);
 }
 
 function addRectangle(map: MapLibreMap, b: Box | undefined, dark: boolean) {
@@ -198,15 +296,17 @@ function showRectangle(map: MapLibreMap | undefined, b: Box | undefined) {
  * rectangle" and drag to draw one instead; spinning is off while drawing.
  * The rectangle can also be typed in beside the globe.
  */
-export function MapView({ box, onBox, heatmap }: Props) {
+export function MapView({ box, onBox, heatmap, focus, months, children }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | undefined>(undefined);
   const [drawing, setDrawing] = useState(false);
   const dark = useDarkTheme();
 
   // The map's handlers outlive renders, so they read the latest values here.
-  const latest = useRef({ box, onBox, drawing, dark, heatmap });
-  latest.current = { box, onBox, drawing, dark, heatmap };
+  const latest = useRef({ box, onBox, drawing, dark, heatmap, months });
+  latest.current = { box, onBox, drawing, dark, heatmap, months };
+  // The frames the months source holds, so new ones replace its data.
+  const shownFrames = useRef<MonthFrames | undefined>(undefined);
 
   // Which theme's style the map shows, or is loading. A quick double toggle
   // can leave an older style still loading; only the newest one is applied.
@@ -247,6 +347,10 @@ export function MapView({ box, onBox, heatmap }: Props) {
       created.on("style.load", () => {
         addRectangle(created, latest.current.box, latest.current.dark);
         addHeatmap(created, latest.current.heatmap, latest.current.dark);
+        // A new style has none of the months' cells or their colours.
+        shownFrames.current = undefined;
+        addMonths(created, latest.current.months, latest.current.dark, shownFrames);
+        paintMonth(created, latest.current.months);
       });
 
       // A cell's numbers, on hover.
@@ -263,6 +367,13 @@ export function MapView({ box, onBox, heatmap }: Props) {
           .addTo(created);
       });
       created.on("mouseleave", "heat-fill", () => popup.remove());
+      created.on("mousemove", "months-fill", (e: MapLayerMouseEvent) => {
+        const f = e.features?.[0];
+        const m = latest.current.months;
+        if (!f || f.id === undefined || !m) return;
+        popup.setLngLat(e.lngLat).setText(monthText(m, Number(f.id))).addTo(created);
+      });
+      created.on("mouseleave", "months-fill", () => popup.remove());
 
       let start: Corner | undefined;
       const corner = (e: MapMouseEvent): Corner => ({ lat: e.lngLat.lat, lng: e.lngLat.lng });
@@ -298,18 +409,49 @@ export function MapView({ box, onBox, heatmap }: Props) {
     showRectangle(map.current, box);
   }, [box]);
 
+  useEffect(() => {
+    const b = latest.current.box;
+    if (focus && b) map.current?.fitBounds([b.west, b.south, b.east, b.north], { padding: 64, maxZoom: 7 });
+  }, [focus]);
+
   // A new heatmap goes on the map, and the view moves to it.
   useEffect(() => {
     const m = map.current;
-    if (!m || !m.isStyleLoaded()) return;
-    if (!heatmap) {
-      removeHeatmap(m);
-      return;
-    }
-    addHeatmap(m, heatmap, latest.current.dark);
+    if (!m) return;
+    whenReady(m, () => {
+      const { heatmap: h, months: mv, dark: d } = latest.current;
+      if (!h) {
+        removeHeatmap(m);
+        return;
+      }
+      addHeatmap(m, h, d);
+      // The month-by-month map, if it's on, stays on top.
+      if (mv) showHeatmap(m, false);
+    });
     const b = latest.current.box;
-    if (b) m.fitBounds([b.west, b.south, b.east, b.north], { padding: 48, maxZoom: 7 });
+    if (heatmap && b) m.fitBounds([b.west, b.south, b.east, b.north], { padding: 48, maxZoom: 7 });
   }, [heatmap]);
+
+  // The month-by-month map replaces the heatmap while it's on.
+  const frames = months?.frames;
+  const kind = months?.kind;
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    whenReady(m, () => {
+      const mv = latest.current.months;
+      if (!mv) removeMonths(m, shownFrames);
+      else {
+        addMonths(m, mv, latest.current.dark, shownFrames);
+        paintMonth(m, mv);
+      }
+    });
+  }, [frames, kind]);
+
+  useEffect(() => {
+    const m = map.current;
+    if (m && months && m.getSource(monthsSource)) paintMonth(m, months);
+  }, [months]);
 
   useEffect(() => {
     if (map.current) showTheme(map.current, dark);
@@ -339,6 +481,7 @@ export function MapView({ box, onBox, heatmap }: Props) {
         )}
       </div>
       <div ref={container} className={drawing ? "map drawing" : "map"} />
+      {children}
     </div>
   );
 }

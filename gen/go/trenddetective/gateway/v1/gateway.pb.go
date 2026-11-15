@@ -213,7 +213,8 @@ const (
 	Artifact_ARTIFACT_ANOMALY_CUBE    Artifact = 4
 	Artifact_ARTIFACT_SERIES_ANALYSIS Artifact = 5
 	Artifact_ARTIFACT_GRID_ANALYSIS   Artifact = 6
-	// Preprocess's Grid document, for the heatmap's cell edges and sizes.
+	// Preprocess's Grid document, for the heatmap's cell edges and sizes. Its
+	// data_url and anomalies_url hold the month-by-month values.
 	Artifact_ARTIFACT_GRID Artifact = 7
 )
 
@@ -1326,9 +1327,13 @@ func (x *GetResultURLRequest) GetArtifact() Artifact {
 type GetResultURLResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Url   string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
-	// For cubes, the binary data the header points to. Empty otherwise.
-	DataUrl       string                 `protobuf:"bytes,2,opt,name=data_url,json=dataUrl,proto3" json:"data_url,omitempty"`
-	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	// The binary data the result points to: a cube's data, or the grid's
+	// values (Grid.values). Empty otherwise.
+	DataUrl   string                 `protobuf:"bytes,2,opt,name=data_url,json=dataUrl,proto3" json:"data_url,omitempty"`
+	ExpiresAt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	// For the grid, its anomalies (Grid.anomalies). Empty otherwise, and for a
+	// grid without an anomaly step.
+	AnomaliesUrl  string `protobuf:"bytes,4,opt,name=anomalies_url,json=anomaliesUrl,proto3" json:"anomalies_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1382,6 +1387,13 @@ func (x *GetResultURLResponse) GetExpiresAt() *timestamppb.Timestamp {
 		return x.ExpiresAt
 	}
 	return nil
+}
+
+func (x *GetResultURLResponse) GetAnomaliesUrl() string {
+	if x != nil {
+		return x.AnomaliesUrl
+	}
+	return ""
 }
 
 type CreateUploadURLRequest struct {
@@ -1815,12 +1827,13 @@ const file_trenddetective_gateway_v1_gateway_proto_rawDesc = "" +
 	"\x03job\x18\x01 \x01(\v2\x1e.trenddetective.gateway.v1.JobR\x03job\"m\n" +
 	"\x13GetResultURLRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12?\n" +
-	"\bartifact\x18\x02 \x01(\x0e2#.trenddetective.gateway.v1.ArtifactR\bartifact\"~\n" +
+	"\bartifact\x18\x02 \x01(\x0e2#.trenddetective.gateway.v1.ArtifactR\bartifact\"\xa3\x01\n" +
 	"\x14GetResultURLResponse\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x19\n" +
 	"\bdata_url\x18\x02 \x01(\tR\adataUrl\x129\n" +
 	"\n" +
-	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"S\n" +
+	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12#\n" +
+	"\ranomalies_url\x18\x04 \x01(\tR\fanomaliesUrl\"S\n" +
 	"\x16CreateUploadURLRequest\x12\x1a\n" +
 	"\bfilename\x18\x01 \x01(\tR\bfilename\x12\x1d\n" +
 	"\n" +

@@ -137,7 +137,7 @@ Result messages hold only `BlobRef`s. The documents themselves are protojson fil
 - `CreateJob`: variable, rectangle, dates, source, stages to run, filter chain, test list
 - `GetJob`, plus `WatchJob` as a stream
 - `CancelJob`: stops a job, and its Harmony job at NASA
-- `GetResultURL`: presigned JSON or CSV
+- `GetResultURL`: presigned JSON or CSV, plus the binary data for cubes and the grid's month-by-month values
 - `CreateUploadURL`: presigned PUT for CSV uploads
 - `Narrate`: a stream that takes the job, the question and the chat history
 - `GetQuota`: the Giovanni quota used, and Harmony jobs running against the limit
@@ -246,7 +246,7 @@ Settings are env vars per service, set in `compose.yaml` and read from `.env`. T
 | `LOG_LEVEL` | `info`. Go services: trace, debug, info, warn or error |
 | `ADMIN_ADDR` | `:9090`. Go services serve `/metrics` and `/debug/pprof/` here, inside the compose network only |
 | `BUNDLE_DIR` | `/bundle`. Ingest's bundled datasets, mounted from `services/ingest/bundle` |
-| `INGEST_CONCURRENCY` | 4 |
+| `INGEST_CONCURRENCY` | 16. Most ingest tasks wait on NASA, so this is well above `HARMONY_CONCURRENCY` |
 | `INGEST_ACK_WAIT` | `2m`. Ingest sends a heartbeat every third of this while a task runs |
 | `PREPROCESS_CONCURRENCY` | 2 |
 | `PREPROCESS_ACK_WAIT` | `2m`. Preprocess sends a heartbeat every third of this while a task runs |
@@ -290,6 +290,7 @@ One public monorepo, [TheBaronessHotel/trend-detective](https://github.com/TheBa
 | `make smoke-harmony` | Runs a real GPM job through Harmony. Needs `EARTHDATA_TOKEN`, so CI skips it |
 | `make smoke-power` | Runs a real job through NASA POWER. No token, but CI skips it |
 | `make smoke-giovanni` | Runs a real point job through Giovanni's time-series API. Needs `EARTHDATA_TOKEN`, so CI skips it |
+| `make smoke-appeears` | Runs a real NDVI job through AppEEARS. Needs `EARTHDATA_USERNAME` and `EARTHDATA_PASSWORD`, so CI skips it |
 | `make web-dev` | The web app with hot reload on port 5173, against the running stack's gateway |
 | `make web-check` | The web app's type check, unit tests and production build. CI runs it |
 | `make gen` | Regenerates `gen/` from `proto/` |

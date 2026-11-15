@@ -205,7 +205,8 @@ enum Artifact {
   ARTIFACT_ANOMALY_CUBE = 4;
   ARTIFACT_SERIES_ANALYSIS = 5;
   ARTIFACT_GRID_ANALYSIS = 6;
-  // Preprocess's Grid document, for the heatmap's cell edges and sizes.
+  // Preprocess's Grid document, for the heatmap's cell edges and sizes. Its
+  // data_url and anomalies_url hold the month-by-month values.
   ARTIFACT_GRID = 7;
 }
 
@@ -216,9 +217,13 @@ message GetResultURLRequest {
 
 message GetResultURLResponse {
   string url = 1;
-  // For cubes, the binary data the header points to. Empty otherwise.
+  // The binary data the result points to: a cube's data, or the grid's
+  // values (Grid.values). Empty otherwise.
   string data_url = 2;
   google.protobuf.Timestamp expires_at = 3;
+  // For the grid, its anomalies (Grid.anomalies). Empty otherwise, and for a
+  // grid without an anomaly step.
+  string anomalies_url = 4;
 }
 
 message CreateUploadURLRequest {

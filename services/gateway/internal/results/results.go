@@ -75,9 +75,12 @@ func New(orch *jobs.Orchestrator, prep ProtoReader, signer Signer, ttl time.Dura
 // Link is a signed download.
 type Link struct {
 	URL string
-	// For cubes, the binary data the header points to. Empty otherwise.
-	DataURL   string
-	ExpiresAt time.Time
+	// The binary data the result points to: a cube's data or the grid's
+	// values. Empty otherwise.
+	DataURL string
+	// The grid's anomalies. Empty otherwise.
+	AnomaliesURL string
+	ExpiresAt    time.Time
 }
 
 // Singular nouns, so "The %s isn't ready yet" reads right.
@@ -115,13 +118,30 @@ func (s *Service) ResultURL(ctx context.Context, jobID string, a gatewayv1.Artif
 	if link.URL, err = s.sign(ctx, ref); err != nil {
 		return nil, err
 	}
-	if a == gatewayv1.Artifact_ARTIFACT_VALUE_CUBE || a == gatewayv1.Artifact_ARTIFACT_ANOMALY_CUBE {
+	switch a {
+	case gatewayv1.Artifact_ARTIFACT_VALUE_CUBE, gatewayv1.Artifact_ARTIFACT_ANOMALY_CUBE:
 		header := &preprocessv1.CubeHeader{}
 		if err := s.prep.GetProto(ctx, ref.GetKey(), header); err != nil {
 			return nil, fmt.Errorf("read cube header %s: %w", ref.GetKey(), err)
 		}
 		if link.DataURL, err = s.sign(ctx, header.GetData()); err != nil {
 			return nil, err
+		}
+	case gatewayv1.Artifact_ARTIFACT_GRID:
+		// The month-by-month map draws from these.
+		grid := &preprocessv1.Grid{}
+		if err := s.prep.GetProto(ctx, ref.GetKey(), grid); err != nil {
+			return nil, fmt.Errorf("read grid %s: %w", ref.GetKey(), err)
+		}
+		if grid.GetValues().GetKey() != "" {
+			if link.DataURL, err = s.sign(ctx, grid.GetValues()); err != nil {
+				return nil, err
+			}
+		}
+		if grid.GetAnomalies().GetKey() != "" {
+			if link.AnomaliesURL, err = s.sign(ctx, grid.GetAnomalies()); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return link, nil

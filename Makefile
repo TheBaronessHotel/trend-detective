@@ -1,4 +1,4 @@
-.PHONY: up down logs ps clean smoke smoke-harmony smoke-power smoke-giovanni test gen lint fmt breaking web-dev web-check
+.PHONY: up down logs ps clean smoke smoke-harmony smoke-power smoke-giovanni smoke-appeears test gen lint fmt breaking web-dev web-check
 
 # Start the stack in the background and wait until bootstrap has finished.
 # The first run creates .env from .env.example. `up --wait` would treat
@@ -49,6 +49,11 @@ smoke-power:
 # Live check against Giovanni's time-series API. Needs EARTHDATA_TOKEN in .env.
 smoke-giovanni:
 	sh deploy/smoke/giovanni.sh
+
+# Live check against NASA AppEEARS. Needs EARTHDATA_USERNAME and
+# EARTHDATA_PASSWORD in .env, and can take 5 to 15 minutes.
+smoke-appeears:
+	sh deploy/smoke/appeears.sh
 
 # The web app with hot reload on http://localhost:5173, against the running
 # stack's gateway. Needs Bun (https://bun.sh).

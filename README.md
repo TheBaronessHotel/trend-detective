@@ -2,9 +2,44 @@
 
 Our entry for NASA Space Apps 2026, [Be An Earth System Trend Detective!](https://www.spaceappschallenge.org/2026/challenges/earth-system-trend-detective/).
 
-Pick a rectangle on the map and an Earth science variable, such as rainfall, groundwater or NO2. The app plots the region's monthly series with the seasonal cycle removed. It reports how fast the variable is changing and whether that trend is statistically significant. A heatmap shows where inside the rectangle the change is happening.
+Pick something to measure, such as air temperature, groundwater or NO2, draw a rectangle on the globe and pick the years. Trend Detective fetches the data from NASA, removes the seasonal cycle and tells you, in plain words, whether it's changing, how fast, and how likely that is to be chance. For map variables it also shows where inside the rectangle the change is, and lets you play the months back on the globe.
 
-The design is in [ARCHITECTURE.md](ARCHITECTURE.md). Tasks and decisions live in the team's Notion.
+It's written for high-school students: every number comes with a sentence saying what it means, and the caveats sit next to the result.
+
+## What it does
+
+- **One answer up top.** "Rising, and unlikely to be chance", "Falling…" or "No clear trend yet", with the rate per decade, the range it likely falls in, and how often chance alone would give a trend this strong.
+- **Where it's changing.** For map variables, a heatmap on the globe colours each cell by its own trend. Cells that still pass after correcting for testing hundreds of cells at once are outlined.
+- **Month by month.** A time slider plays the grid back, as measured values or as the difference from normal, so you can watch a trend build up.
+- **Why we think so.** The shuffle test as a histogram, and a triangle of the trend over every stretch of years, to show whether the answer hangs on the years picked. Plus the caveats the tests raised: short records, a sudden shift, odd months.
+- **The chart.** The region's monthly values and anomalies, with the fitted trend and its band, a crosshair, a table view, and a CSV download.
+- **Examples.** One click runs a curated case: Europe warming, CO2 rising, cleaner air over China, groundwater falling in northwest India, farmland greening in Punjab, a mixed picture over India, and London rain with no clear trend.
+- **In plain words.** An explanation of the results, written from the numbers without any AI model. Questions about them work with your own Anthropic or OpenAI-compatible key, which stays in the page.
+- **Your own data.** Upload a CSV of dates and values and run the same tests on it.
+
+## Where the data comes from
+
+All from NASA, fetched live when a job runs and cached afterwards.
+
+| Service | Variables | What we ask it for |
+|---|---|---|
+| [Harmony](https://harmony.earthdata.nasa.gov) | Air temperature, ozone and haze (MERRA-2), soil moisture and snow (GLDAS), rain and snow (GPM IMERG) | The rectangle cut out of each monthly file, for the maps |
+| [Giovanni](https://giovanni.gsfc.nasa.gov) | NO2 (OMI), groundwater (GLDAS), CO2 (OCO-2), ocean chlorophyll (NOBM) | The rectangle's average over time |
+| [POWER](https://power.larc.nasa.gov) | Air temperature, rain and snow | A point's monthly series |
+| [AppEEARS](https://appeears.earthdatacloud.nasa.gov) | Plant greenness (MODIS NDVI), land surface temperature (MODIS) | The rectangle's statistics per image |
+
+## How it decides
+
+The tests run on anomalies, each month's difference from its own normal, so the seasons don't pass for a trend.
+
+- **Least squares** on time, with the effective sample size correction for autocorrelation (Santer et al. 2000).
+- **Mann-Kendall** with the Hamed and Rao correction, and Sen's slope. The verdict says when it and least squares disagree.
+- **A block shuffle test**: the record cut into years, shuffled 1,000 times, refitted each time.
+- **The Pettitt test** for a sudden shift, residual checks and outlier months, all reported as caveats.
+- **The trend triangle**, the trend over every stretch of at least 10 years, and **years to significance** (Weatherhead et al. 1998).
+- **On the map**, a test per cell, then the Benjamini-Hochberg false discovery rate across cells (Wilks 2016).
+
+As a check, run on NOAA's Mauna Loa CO2 record, our trend comes within 0.02 ppm a year of the growth NOAA publishes for 2010 to 2019 and for 2000 to 2024. The methods and their sources are in [services/analysis/README.md](services/analysis/README.md), and the whole system in [ARCHITECTURE.md](ARCHITECTURE.md). Tasks and decisions live in the team's Notion.
 
 ## Layout
 
@@ -38,7 +73,9 @@ make up
 
 The first run copies `.env.example` to `.env`. Put your Earthdata token in it as `EARTHDATA_TOKEN`. You get one at [urs.earthdata.nasa.gov](https://urs.earthdata.nasa.gov) under "Generate Token". The same account also has to approve the [NASA GESDISC DATA ARCHIVE](https://urs.earthdata.nasa.gov/approve_app?client_id=e2WVk8Pw6weeLUKZYOxvTQ) app once, or GPM and MERRA-2 requests fail with 403.
 
-So far `make up` starts NATS, Redis and SeaweedFS, runs bootstrap to create the JetStream streams and the S3 buckets, and starts ingest, the gateway and the web app. Open [http://localhost:3000](http://localhost:3000), pick a variable, draw a rectangle and press Fetch the data. The other services join compose as they get built. To try the API with curl, see [services/gateway/README.md](services/gateway/README.md). Other targets:
+AppEEARS logs in with an Earthdata account rather than the token, so the MODIS variables also need `EARTHDATA_USERNAME` and `EARTHDATA_PASSWORD` in `.env`.
+
+`make up` starts NATS, Redis and SeaweedFS, runs bootstrap to create the JetStream streams and the S3 buckets, and starts ingest, preprocess, analysis, the narrator, the gateway and the web app. Open [http://localhost:3000](http://localhost:3000) and press one of the examples, or pick a variable, draw a rectangle and press Fetch the data. A first run of a long record can take several minutes while NASA prepares the files; the same request again comes from the cache. To try the API with curl, see [services/gateway/README.md](services/gateway/README.md). Other targets:
 
 | Target | What it does |
 |---|---|
@@ -52,6 +89,7 @@ So far `make up` starts NATS, Redis and SeaweedFS, runs bootstrap to create the 
 | `make smoke-harmony` | Runs a real GPM job through NASA Harmony. Needs `EARTHDATA_TOKEN` in `.env` |
 | `make smoke-power` | Runs a real job through NASA POWER. Needs no token |
 | `make smoke-giovanni` | Runs a real point job through NASA Giovanni. Needs `EARTHDATA_TOKEN` in `.env` |
+| `make smoke-appeears` | Runs a real NDVI job through NASA AppEEARS. Needs `EARTHDATA_USERNAME` and `EARTHDATA_PASSWORD` in `.env`, and 5 to 15 minutes |
 | `make web-dev` | Runs the web app with hot reload on http://localhost:5173, against the running stack. Needs [Bun](https://bun.sh) |
 | `make web-check` | The web app's type check, unit tests and production build |
 
