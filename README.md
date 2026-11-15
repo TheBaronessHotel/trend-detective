@@ -8,15 +8,7 @@ It's written for high-school students: every number comes with a sentence saying
 
 ## Demo video
 
-<!--
-  To add the video: open this file on GitHub, press the pencil to edit, and
-  drag the video file onto the line below. GitHub uploads it and writes a
-  https://github.com/user-attachments/assets/... link in its place. Keep that
-  link on a line of its own, so GitHub shows a player, delete this comment and
-  the placeholder line, and commit.
--->
-
-_The demo video goes here._
+https://github.com/user-attachments/assets/818eb1e8-1ef3-45ff-a75f-3e6d60450326
 
 ## Try it
 
