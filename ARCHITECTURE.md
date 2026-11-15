@@ -85,7 +85,13 @@ A one-shot Go program in `deploy/bootstrap`. It runs on every `make up`, creates
 - `traceparent` travels in NATS headers through a NATS carrier that keeps keys lowercase. OTel's `HeaderCarrier` capitalizes it to `Traceparent`, which Python's extractor won't find.
 - Every log record carries `job_id` and `task_id`, added through `WithContextAttrs`.
 - Python services use the same log field names and metric names.
-- Jaeger, Prometheus, Grafana and Pyroscope run in an opt-in compose profile started with `make up-obs`.
+- Jaeger, Prometheus, Grafana and Pyroscope run in an opt-in compose profile, `obs`, started with `make up-obs`. Config is in `deploy/obs`.
+  - Traces: `make up-obs` sets `OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318`. When it is set, `internal/obs` installs the OTel SDK with an OTLP/HTTP batch exporter (the-watchers only uses the OTel API and leaves the SDK to the app). When it is empty, there is no exporter and spans stay no-ops.
+  - The gateway and narrator wrap their mux in `obs.HTTP`: a server span per request, parented on an incoming `traceparent`, and `watchers_http_operations_total` / `watchers_http_operation_duration_seconds` labelled by mux pattern, which is one per Connect procedure. `/healthz` is skipped. The gateway's narrator client sends `traceparent`, and NATS headers carry it to ingest, so a job is one trace from the request through ingest.
+  - Metrics: Prometheus scrapes `/metrics` on each Go service's `ADMIN_ADDR`.
+  - Profiles: Pyroscope doesn't scrape, so Grafana Alloy pulls `/debug/pprof/` from the same port (CPU, memory, goroutines) and pushes to Pyroscope.
+  - Grafana has the three as provisioned data sources and one dashboard, `deploy/obs/grafana/dashboards/trend-detective.json`. Jaeger is pinned to 2.20.0, the last release with the `/api` endpoints Grafana's Jaeger data source searches with; 2.21 and later serve only `/api/v3`.
+  - Not covered: preprocess and analysis send no spans or metrics yet. They keep `traceparent` on the `StageDone` they publish and log its trace ID.
 - The gateway exposes `/debug/jobs/{id}` with each task's stage, attempts and errors, plus the raw `StageDone` events.
 - While a task runs, a stage may publish `TaskProgress` on `events.task.progress`: once when it starts, then a percent and a line for people, such as "NASA's Harmony service is cutting the files to your rectangle" or "Downloading the files from NASA, 12 of 60". The gateway marks the task running and keeps the newest percent, so the app can show it. Progress is best effort. The gateway never lets an update overwrite a finished task, and drops one it can't record after three deliveries. Ingest reports it so far; preprocess and analysis can add it the same way.
 
@@ -245,6 +251,7 @@ Settings are env vars per service, set in `compose.yaml` and read from `.env`. T
 | `MAX_UPLOAD_MB` | 20. Largest CSV upload. The gateway and ingest both read it |
 | `LOG_LEVEL` | `info`. Go services: trace, debug, info, warn or error |
 | `ADMIN_ADDR` | `:9090`. Go services serve `/metrics` and `/debug/pprof/` here, inside the compose network only |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | empty, so no spans leave the process. `make up-obs` sets `http://jaeger:4318`. Go services export spans over OTLP/HTTP when it is set; the other `OTEL_EXPORTER_OTLP_*` variables work too |
 | `BUNDLE_DIR` | `/bundle`. Ingest's bundled datasets, mounted from `services/ingest/bundle` |
 | `INGEST_CONCURRENCY` | 16. Most ingest tasks wait on NASA, so this is well above `HARMONY_CONCURRENCY` |
 | `INGEST_ACK_WAIT` | `2m`. Ingest sends a heartbeat every third of this while a task runs |
@@ -279,8 +286,8 @@ One public monorepo, [TheBaronessHotel/trend-detective](https://github.com/TheBa
 | Target | What it does |
 |---|---|
 | `make up` | Creates `.env` on the first run, starts everything, and waits for bootstrap to finish |
-| `make up-obs` | Starts everything plus the observability stack. Not built yet, comes with PLAT-5 |
-| `make down` | Stops everything. Data stays in the Docker volumes |
+| `make up-obs` | `make up` plus the `obs` profile: Jaeger, Prometheus, Grafana, and Pyroscope with Alloy. Points the Go services' spans at Jaeger |
+| `make down` | Stops everything, the `obs` profile too. Data stays in the Docker volumes |
 | `make logs` | Follows logs |
 | `make ps` | Lists containers, including bootstrap after it exits |
 | `make clean` | Stops everything and deletes all data |

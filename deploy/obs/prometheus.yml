@@ -1,0 +1,16 @@
+# Prometheus for the obs compose profile (`make up-obs`). It scrapes /metrics
+# on each Go service's admin listener (ADMIN_ADDR, :9090 inside the container).
+# The Python services don't expose metrics yet.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: trend-detective
+    static_configs:
+      - targets: ["gateway:9090"]
+        labels: { service: gateway }
+      - targets: ["ingest:9090"]
+        labels: { service: ingest }
+      - targets: ["narrator:9090"]
+        labels: { service: narrator }

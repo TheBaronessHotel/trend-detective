@@ -81,7 +81,8 @@ AppEEARS logs in with an Earthdata account rather than the token, so the MODIS v
 
 | Target | What it does |
 |---|---|
-| `make down` | Stops everything. Data stays in the Docker volumes |
+| `make up-obs` | `make up` plus Jaeger, Prometheus, Grafana and Pyroscope. See [Observability](#observability) |
+| `make down` | Stops everything, the observability stack too. Data stays in the Docker volumes |
 | `make logs` | Follows the logs |
 | `make ps` | Lists the containers |
 | `make clean` | Stops everything and deletes all data |
@@ -102,6 +103,18 @@ The ports listen on 127.0.0.1 only:
 - Gateway: 8080, the Connect API.
 - Narrator: 8081, the Connect stream the gateway proxies.
 - Web app: 3000, and 5173 for `make web-dev`.
+- With `make up-obs`: Grafana 3001, Jaeger 16686 (and 4318 for OTLP), Prometheus 9091, Pyroscope 4040.
+
+### Observability
+
+`make up-obs` starts the stack with the `obs` compose profile. Without it none of this runs, and the services behave as with `make up`.
+
+- [Grafana](http://localhost:3001) opens on the Trend Detective dashboard: which services are up, HTTP requests, 5xx errors and p95 latency per Connect procedure, and ingest tasks by outcome. Prometheus, Jaeger and Pyroscope are set up as data sources, so Explore reaches all three. No login; the port is local only.
+- [Jaeger](http://localhost:16686) has the traces. Each gateway request is a span, and a job's ingest task, and a Narrate call to the narrator, join the same trace.
+- [Prometheus](http://localhost:9091/targets) scrapes `/metrics` on the gateway, ingest and the narrator.
+- [Pyroscope](http://localhost:4040) has CPU, memory and goroutine profiles of the same three, pulled by Grafana Alloy.
+
+Preprocess and analysis, in Python, aren't covered yet: they carry the trace ID into their logs, but send no spans or metrics. Their time shows up as the gap between ingest's span and the job's end.
 
 ## Working here
 

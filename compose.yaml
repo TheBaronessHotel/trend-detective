@@ -4,6 +4,10 @@
 #   4222  NATS clients        8222  NATS monitoring (/jsz?streams=true)
 #   6379  Redis
 #   8333  SeaweedFS S3        9333  SeaweedFS master UI    8888  filer UI
+#
+# The obs profile (`make up-obs`) adds:
+#   16686 Jaeger UI           4318  OTLP/HTTP into Jaeger
+#   9091  Prometheus          3001  Grafana                4040  Pyroscope
 
 name: trend-detective
 
@@ -58,7 +62,7 @@ services:
       - "127.0.0.1:9333:9333"
       - "127.0.0.1:8888:8888"
     volumes:
-      - ./deploy/seaweedfs/start.sh:/deploy/start.sh:ro
+      - ./deploy/seaweedfs/start.sh:/deploy/start.sh:ro,z
       - seaweedfs-data:/data
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8333/healthz"]
@@ -101,8 +105,10 @@ services:
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-20}
       BUNDLE_DIR: /bundle
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Empty unless `make up-obs` points it at Jaeger. Empty means no exporter.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     volumes:
-      - ./services/ingest/bundle:/bundle:ro
+      - ./services/ingest/bundle:/bundle:ro,z
     depends_on:
       bootstrap:
         condition: service_completed_successfully
@@ -163,6 +169,8 @@ services:
       NARRATOR_URL: ${NARRATOR_URL:-http://narrator:8081}
       NARRATOR_TIMEOUT: ${NARRATOR_TIMEOUT:-4m}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Empty unless `make up-obs` points it at Jaeger. Empty means no exporter.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
@@ -213,6 +221,8 @@ services:
       HTTP_PROXY: ${NARRATOR_HTTP_PROXY:-}
       NO_PROXY: ${NARRATOR_NO_PROXY:-localhost,127.0.0.1,::1,host.docker.internal,ollama,seaweedfs,nats,redis,gateway,narrator}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Empty unless `make up-obs` points it at Jaeger. Empty means no exporter.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     ports:
       - "127.0.0.1:8081:8081"
     # Lets a base_url of http://host.docker.internal:11434/v1 reach Ollama on
@@ -230,6 +240,70 @@ services:
     # The narrator lets streams finish for 10s after SIGTERM, then closes
     # them. This leaves it room to exit on its own.
     stop_grace_period: 15s
+    restart: unless-stopped
+
+  # The observability stack, off unless the obs profile is on (`make up-obs`).
+  # Spans go to Jaeger over OTLP, Prometheus scrapes /metrics and Alloy pulls
+  # pprof from each Go service's admin listener (:9090 inside the network),
+  # and Grafana shows all three. Nothing here keeps data across `down`.
+  # Pinned to 2.20.0, the last release with the /api endpoints Grafana's
+  # Jaeger data source searches with. 2.21 and later serve only /api/v3.
+  jaeger:
+    image: jaegertracing/jaeger:2.20.0
+    profiles: [obs]
+    environment:
+      # The default config listens on localhost only.
+      JAEGER_LISTEN_HOST: 0.0.0.0
+    ports:
+      - "127.0.0.1:16686:16686"
+      - "127.0.0.1:4318:4318"
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.16.0
+    profiles: [obs]
+    volumes:
+      - ./deploy/obs/prometheus.yml:/etc/prometheus/prometheus.yml:ro,z
+    ports:
+      - "127.0.0.1:9091:9090"
+    restart: unless-stopped
+
+  pyroscope:
+    image: grafana/pyroscope:2.4.3
+    profiles: [obs]
+    ports:
+      - "127.0.0.1:4040:4040"
+    restart: unless-stopped
+
+  # Pyroscope doesn't scrape, so Alloy pulls the profiles and pushes them.
+  alloy:
+    image: grafana/alloy:v1.21.3
+    profiles: [obs]
+    command: ["run", "--storage.path=/var/lib/alloy/data", "/etc/alloy/config.alloy"]
+    volumes:
+      - ./deploy/obs/alloy.alloy:/etc/alloy/config.alloy:ro,z
+    depends_on:
+      - pyroscope
+    restart: unless-stopped
+
+  # Anonymous admin, which is fine only because the port binds to 127.0.0.1.
+  grafana:
+    image: grafana/grafana:13.3.1
+    profiles: [obs]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/trend-detective.json
+    volumes:
+      - ./deploy/obs/grafana/provisioning:/etc/grafana/provisioning:ro,z
+      - ./deploy/obs/grafana/dashboards:/var/lib/grafana/dashboards:ro,z
+    ports:
+      - "127.0.0.1:3001:3000"
+    depends_on:
+      - prometheus
+      - jaeger
+      - pyroscope
     restart: unless-stopped
 
 volumes:
