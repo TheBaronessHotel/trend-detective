@@ -1,0 +1,560 @@
+{
+  "uid": "td-ingest-sources",
+  "title": "Trend Detective: Ingest sources",
+  "description": "How long ingest spends on each data source, and which sources it works on. Counts are attempts, not tasks.",
+  "tags": [
+    "trend-detective"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(watchers_ingest_operations_total{job=\"trend-detective\"}, service)",
+        "query": {
+          "query": "label_values(watchers_ingest_operations_total{job=\"trend-detective\"}, service)",
+          "refId": "service"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "name": "source",
+        "label": "Source",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(watchers_ingest_operations_total{job=\"trend-detective\",service=~\"$service\"}, operation)",
+        "query": {
+          "query": "label_values(watchers_ingest_operations_total{job=\"trend-detective\",service=~\"$service\"}, operation)",
+          "refId": "source"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      }
+    ]
+  },
+  "links": [
+    {
+      "title": "Trend Detective",
+      "type": "dashboards",
+      "tags": [
+        "trend-detective"
+      ],
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": true,
+      "targetBlank": false,
+      "icon": "external link"
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Attempt latency p95 by source",
+      "description": "95th percentile attempt duration over the rate window. One attempt is one pass of ingest over a task: a first try, a retry or a pending poll, not a whole task. Duration buckets stop at 120 s, so slower attempts show as 120 s. Idle sources show no data, not zero.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (operation, le) (rate(watchers_ingest_operation_duration_seconds_bucket{job=\"trend-detective\",service=~\"$service\",operation=~\"$source\"}[$__rate_interval])))",
+          "legendFormat": "{{operation}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Attempt latency p50 by source",
+      "description": "Median attempt duration over the rate window. One attempt is one pass of ingest over a task: a first try, a retry or a pending poll, not a whole task. Duration buckets stop at 120 s, so slower attempts show as 120 s. Idle sources show no data, not zero.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.50, sum by (operation, le) (rate(watchers_ingest_operation_duration_seconds_bucket{job=\"trend-detective\",service=~\"$service\",operation=~\"$source\"}[$__rate_interval])))",
+          "legendFormat": "{{operation}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Mean attempt duration by source",
+      "description": "Average attempt duration over the rate window, from the exact sum, so not capped at 120 s. One attempt is one pass of ingest over a task: a first try, a retry or a pending poll, not a whole task.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (operation) (rate(watchers_ingest_operation_duration_seconds_sum{job=\"trend-detective\",service=~\"$service\",operation=~\"$source\"}[$__rate_interval])) / sum by (operation) (rate(watchers_ingest_operation_duration_seconds_count{job=\"trend-detective\",service=~\"$service\",operation=~\"$source\"}[$__rate_interval]))",
+          "legendFormat": "{{operation}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "heatmap",
+      "title": "Attempt duration heatmap",
+      "description": "How many attempts finished in each duration bucket, all selected sources together. One attempt is one pass of ingest over a task: a first try, a retry or a pending poll, not a whole task. Duration buckets stop at 120 s, so slower attempts show as 120 s.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "yAxis": {
+          "axisPlacement": "left",
+          "unit": "s"
+        },
+        "rowsFrame": {
+          "layout": "auto"
+        },
+        "cellValues": {
+          "unit": "short"
+        },
+        "color": {
+          "mode": "scheme",
+          "scheme": "Oranges",
+          "fill": "dark-orange",
+          "scale": "exponential",
+          "exponent": 0.5,
+          "steps": 64,
+          "reverse": false
+        },
+        "filterValues": {
+          "le": 1e-09
+        },
+        "legend": {
+          "show": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "yHistogram": false,
+          "showColorScale": false
+        },
+        "exemplars": {
+          "color": "rgba(255,0,255,0.7)"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (le) (increase(watchers_ingest_operation_duration_seconds_bucket{job=\"trend-detective\",service=~\"$service\",operation=~\"$source\"}[$__rate_interval]))",
+          "legendFormat": "{{le}}",
+          "format": "heatmap"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "bargauge",
+      "title": "Attempts by source and outcome",
+      "description": "Attempts since the ingest process started, by source and outcome. One attempt is one pass of ingest over a task: a first try, a retry or a pending poll, not a whole task. Pending polls count as success.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (operation, status) (watchers_ingest_operations_total{job=\"trend-detective\",service=~\"$service\",operation=~\"$source\"})",
+          "legendFormat": "{{operation}} {{status}}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "piechart",
+      "title": "Attempt share by source",
+      "description": "Each source's share of ingest attempts since the process started. One attempt is one pass of ingest over a task: a first try, a retry or a pending poll, not a whole task.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "pieType": "donut",
+        "displayLabels": [
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (operation) (watchers_ingest_operations_total{job=\"trend-detective\",service=~\"$service\",operation=~\"$source\"})",
+          "legendFormat": "{{operation}}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Attempt latency by source, since ingest started",
+      "description": "Totals since the ingest process started; they reset when it restarts. Useful when there are too few attempts for the windowed panels. One attempt is one pass of ingest over a task: a first try, a retry or a pending poll, not a whole task. Duration buckets stop at 120 s, so slower attempts show as 120 s.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Attempts"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Source"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "string"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Attempts",
+            "desc": true
+          }
+        ]
+      },
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "operation": "Source",
+              "Value #A": "Attempts",
+              "Value #B": "Mean",
+              "Value #C": "p50",
+              "Value #D": "p95"
+            },
+            "indexByName": {
+              "operation": 0,
+              "Value #A": 1,
+              "Value #B": 2,
+              "Value #C": 3,
+              "Value #D": 4
+            }
+          }
+        }
+      ],
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (operation) (watchers_ingest_operations_total{job=\"trend-detective\",service=~\"$service\",operation=~\"$source\"})",
+          "legendFormat": "",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (operation) (watchers_ingest_operation_duration_seconds_sum{job=\"trend-detective\",service=~\"$service\",operation=~\"$source\"}) / sum by (operation) (watchers_ingest_operation_duration_seconds_count{job=\"trend-detective\",service=~\"$service\",operation=~\"$source\"})",
+          "legendFormat": "",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.50, sum by (operation, le) (watchers_ingest_operation_duration_seconds_bucket{job=\"trend-detective\",service=~\"$service\",operation=~\"$source\"}))",
+          "legendFormat": "",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (operation, le) (watchers_ingest_operation_duration_seconds_bucket{job=\"trend-detective\",service=~\"$service\",operation=~\"$source\"}))",
+          "legendFormat": "",
+          "instant": true,
+          "format": "table"
+        }
+      ]
+    }
+  ]
+}
