@@ -178,6 +178,7 @@ The ports listen on 127.0.0.1 only:
 `make up-obs` starts the stack with the `obs` compose profile. Without it none of this runs, and the services behave as with `make up`.
 
 - [Grafana](http://localhost:3001) opens on the Trend Detective dashboard: which services are up, HTTP requests, 5xx errors and p95 latency per Connect procedure, and ingest tasks by outcome. Prometheus, Jaeger and Pyroscope are set up as data sources, so Explore reaches all three. No login; the port is local only.
+  Links at the top lead to three more: **Go resources** (CPU, memory, heap, allocation rate, GC pauses, file descriptors, uptime and restarts per service), **Ingest sources** (attempt latency and workload mix per data source) and **HTTP streams** (open WatchJob and Narrate streams, completed calls, 5xx share, slow unary calls).
 - [Jaeger](http://localhost:16686) has the traces. Each gateway request is a span, and a job's ingest task, and a Narrate call to the narrator, join the same trace.
 - [Prometheus](http://localhost:9091/targets) scrapes `/metrics` on the gateway, ingest and the narrator.
 - [Pyroscope](http://localhost:4040) has CPU, memory and goroutine profiles of the same three, pulled by Grafana Alloy.
