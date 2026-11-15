@@ -8,15 +8,20 @@ import {
   gateway,
   loadGrid,
   loadGridAnalysis,
+  loadGridMonths,
   loadSeries,
   loadSeriesAnalysis,
   saveSeriesCsv,
   uploadCsv,
 } from "./api";
+import type { Example } from "./lib/examples";
 import { heatmap } from "./lib/grid";
+import type { MonthFrames, MonthsKind } from "./lib/months";
 import { CellSizePicker } from "./components/CellSizePicker";
 import { DatesPicker } from "./components/DatesPicker";
+import { ExamplesBar } from "./components/ExamplesBar";
 import { JobPanel, type Run } from "./components/JobPanel";
+import { MonthsBar } from "./components/MonthsBar";
 import { PlaceFields } from "./components/PlaceFields";
 import { SourcePicker } from "./components/SourcePicker";
 import { ThemeButton } from "./components/ThemeButton";
@@ -73,6 +78,50 @@ export function App() {
   const [run, setRun] = useState<Run>();
   const abort = useRef<AbortController | undefined>(undefined);
 
+  // The month-by-month map, downloaded the first time it's opened.
+  const [frames, setFrames] = useState<MonthFrames>();
+  const [monthsOn, setMonthsOn] = useState(false);
+  const [monthsLoading, setMonthsLoading] = useState(false);
+  const [monthsError, setMonthsError] = useState<string>();
+  const [kind, setKind] = useState<MonthsKind>("anomalies");
+  const [t, setT] = useState(0);
+  const months = useMemo(() => (monthsOn && frames ? { frames, kind, t } : undefined), [monthsOn, frames, kind, t]);
+
+  function resetMonths() {
+    setFrames(undefined);
+    setMonthsOn(false);
+    setMonthsLoading(false);
+    setMonthsError(undefined);
+    setT(0);
+  }
+
+  async function openMonths() {
+    const job = run?.job;
+    const grid = run?.grid;
+    if (!job || !grid) return;
+    if (frames) {
+      setMonthsOn(true);
+      return;
+    }
+    // A new job aborts this one's signal, so a late download is dropped.
+    const signal = abort.current?.signal;
+    setMonthsLoading(true);
+    setMonthsError(undefined);
+    try {
+      const f = await loadGridMonths(job.id, grid, signal);
+      if (signal?.aborted) return;
+      if (!f) throw new Error("This job has no month-by-month map.");
+      setFrames(f);
+      setKind(f.anomalies ? "anomalies" : "values");
+      setT(0);
+      setMonthsOn(true);
+    } catch (err) {
+      if (!signal?.aborted) setMonthsError(`Couldn't load the months. ${errorMessage(err)}`);
+    } finally {
+      if (!signal?.aborted) setMonthsLoading(false);
+    }
+  }
+
   useEffect(() => {
     gateway
       .listVariables({})
@@ -106,30 +155,62 @@ export function App() {
           : undefined;
   const busy = run !== undefined && run.phase !== "done";
 
-  async function startJob() {
-    if (blocker || !variable || !box || !start || !end) return;
+  // Bumped to move the globe to the rectangle, as when an example fills it in.
+  const [focus, setFocus] = useState(0);
+
+  /** Fills in the steps with an example and runs it at once. */
+  function pickExample(e: Example) {
+    const v = variables?.find((x) => x.id === e.variableId);
+    if (!v) return;
+    setVariableId(v.id);
+    setBox(e.box);
+    setStart(e.start);
+    setEnd(e.end);
+    setSource(v.defaultSource);
+    setFile(undefined);
+    setBlock(undefined);
+    setFocus((n) => n + 1);
+    void startJob({ variable: v, box: e.box, start: e.start, end: e.end, source: v.defaultSource, file: undefined, block: undefined });
+  }
+
+  interface JobInput {
+    variable: Variable;
+    box: Box;
+    start: Day;
+    end: Day;
+    source: Source | undefined;
+    file: File | undefined;
+    block: number | undefined;
+  }
+
+  // An example passes its own values, since state set in the same click
+  // isn't there yet.
+  async function startJob(given?: JobInput) {
+    if (!given && (blocker || !variable || !box || !start || !end)) return;
+    const input = given ?? { variable: variable!, box: box!, start: start!, end: end!, source, file, block };
     abort.current?.abort();
+    resetMonths();
     const ctrl = new AbortController();
     abort.current = ctrl;
     const signal = ctrl.signal;
     try {
       let upload;
-      if (source === Source.CSV_UPLOAD && file) {
+      if (input.source === Source.CSV_UPLOAD && input.file) {
         setRun({ phase: "uploading" });
-        upload = await uploadCsv(file, signal);
+        upload = await uploadCsv(input.file, signal);
       }
       setRun({ phase: "creating" });
-      const dates = jobRange(start, end, variable.available);
+      const dates = jobRange(input.start, input.end, input.variable.available);
       const { job } = await gateway.createJob(
         {
           spec: {
-            variableId: variable.id,
-            bbox: box,
+            variableId: input.variable.id,
+            bbox: input.box,
             dates,
-            source,
+            source: input.source,
             upload,
             stopAfter: STOP_AFTER,
-            ...(block ? { aggregation: { blockPixels: block } } : {}),
+            ...(input.block ? { aggregation: { blockPixels: input.block } } : {}),
           },
         },
         { signal },
@@ -164,6 +245,7 @@ export function App() {
           grid.status === "fulfilled" && gridAnalysis.status === "fulfilled" && grid.value && gridAnalysis.value
             ? heatmap(grid.value, gridAnalysis.value)
             : undefined,
+        grid: grid.status === "fulfilled" ? grid.value : undefined,
       });
     } catch (err) {
       if (signal.aborted) return;
@@ -207,6 +289,7 @@ export function App() {
           </p>
         )}
         {!variables && !loadError && <p className="note">Loading the variables…</p>}
+        <ExamplesBar variables={variables} busy={busy} onPick={pickExample} />
         {variables && <VariablePicker variables={variables} selected={variable} onSelect={selectVariable} />}
         <PlaceFields box={box} onBox={setBox} />
         <DatesPicker
@@ -220,16 +303,32 @@ export function App() {
         />
         <SourcePicker variable={variable} source={source} onSource={setSource} file={file} onFile={setFile} />
         <CellSizePicker variable={variable} source={source} box={box} block={block} onBlock={setBlock} />
-        <button type="button" className="action primary run" disabled={!!blocker || busy} onClick={startJob}>
+        <button type="button" className="action primary run" disabled={!!blocker || busy} onClick={() => void startJob()}>
           {busy ? "Working…" : "Fetch the data"}
         </button>
         {blocker && <p className="note">{blocker}</p>}
       </aside>
       <main className="main">
         <Suspense fallback={<div className="map-wrap" />}>
-          <MapView box={box} onBox={setBox} heatmap={run?.heatmap} />
+          <MapView box={box} onBox={setBox} heatmap={run?.heatmap} focus={focus} months={months}>
+            {run?.heatmap && run.grid && (
+              <MonthsBar
+                frames={frames}
+                loading={monthsLoading}
+                error={monthsError}
+                on={monthsOn}
+                kind={kind}
+                t={t}
+                onOpen={() => void openMonths()}
+                onClose={() => setMonthsOn(false)}
+                onKind={setKind}
+                onT={setT}
+              />
+            )}
+          </MapView>
         </Suspense>
-        <JobPanel run={run} stopAfter={STOP_AFTER} seriesTitle={seriesTitle} onSaveCsv={saveCsv} onStop={stopJob} />
+        {/* Keyed by job, so a new job starts with the panel open. */}
+        <JobPanel key={run?.job?.id ?? "new"} run={run} stopAfter={STOP_AFTER} seriesTitle={seriesTitle} onSaveCsv={saveCsv} onStop={stopJob} />
       </main>
     </div>
   );

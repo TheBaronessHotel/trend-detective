@@ -43,7 +43,9 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	concurrency, err := envx.Int("INGEST_CONCURRENCY", 4)
+	// Most tasks wait on NASA rather than work, and an AppEEARS task can wait
+	// for hours, so this is high. Harmony has its own limit, HARMONY_CONCURRENCY.
+	concurrency, err := envx.Int("INGEST_CONCURRENCY", 16)
 	if err != nil {
 		return err
 	}

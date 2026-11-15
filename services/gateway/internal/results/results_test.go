@@ -26,10 +26,10 @@ type nopPublisher struct{}
 
 func (nopPublisher) Publish(context.Context, string, string, proto.Message) error { return nil }
 
-// cubeHeaders plays the prep bucket for cube headers.
-type cubeHeaders map[string]*preprocessv1.CubeHeader
+// prepDocs plays the prep bucket for cube headers and grids.
+type prepDocs map[string]proto.Message
 
-func (c cubeHeaders) GetProto(_ context.Context, key string, msg proto.Message) error {
+func (c prepDocs) GetProto(_ context.Context, key string, msg proto.Message) error {
 	h, ok := c[key]
 	if !ok {
 		return blob.ErrNotFound
@@ -56,7 +56,13 @@ func newHarness(t *testing.T) *harness {
 	if err != nil {
 		t.Fatal(err)
 	}
-	headers := cubeHeaders{"cubes/values.json": {Data: &commonv1.BlobRef{Bucket: "prep", Key: "cubes/values.u16"}}}
+	headers := prepDocs{
+		"cubes/values.json": &preprocessv1.CubeHeader{Data: &commonv1.BlobRef{Bucket: "prep", Key: "cubes/values.u16"}},
+		"grids/abc.json": &preprocessv1.Grid{
+			Values:    &commonv1.BlobRef{Bucket: "prep", Key: "grids/abc.values.f32"},
+			Anomalies: &commonv1.BlobRef{Bucket: "prep", Key: "grids/abc.anomalies.f32"},
+		},
+	}
 	return &harness{svc: New(orch, headers, signer, 15*time.Minute, 20<<20), orch: orch}
 }
 
@@ -87,6 +93,7 @@ func (h *harness) preprocessedJob(t *testing.T) string {
 	report(gatewayv1.Stage_STAGE_PREPROCESS, &gatewayv1.StageDone{Result: &gatewayv1.StageDone_Preprocess{Preprocess: &preprocessv1.PreprocessResult{
 		Series:    &commonv1.BlobRef{Bucket: "prep", Key: "series/abc.json"},
 		ValueCube: &commonv1.BlobRef{Bucket: "prep", Key: "cubes/values.json"},
+		Grid:      &commonv1.BlobRef{Bucket: "prep", Key: "grids/abc.json"},
 		SeriesCsv: &commonv1.BlobRef{Bucket: "raw", Key: "not-allowed.csv"},
 	}}})
 	return id
@@ -124,6 +131,20 @@ func TestCubeGetsADataURL(t *testing.T) {
 	}
 	if !strings.Contains(link.URL, "/prep/cubes/values.json") || !strings.Contains(link.DataURL, "/prep/cubes/values.u16") {
 		t.Errorf("cube links: %s and %s", link.URL, link.DataURL)
+	}
+}
+
+func TestGridGetsItsValuesAndAnomalies(t *testing.T) {
+	h := newHarness(t)
+	id := h.preprocessedJob(t)
+	link, err := h.svc.ResultURL(context.Background(), id, gatewayv1.Artifact_ARTIFACT_GRID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(link.URL, "/prep/grids/abc.json") ||
+		!strings.Contains(link.DataURL, "/prep/grids/abc.values.f32") ||
+		!strings.Contains(link.AnomaliesURL, "/prep/grids/abc.anomalies.f32") {
+		t.Errorf("grid links: %s, %s and %s", link.URL, link.DataURL, link.AnomaliesURL)
 	}
 }
 

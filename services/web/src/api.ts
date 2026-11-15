@@ -13,6 +13,7 @@ import {
   type SeriesAnalysis,
   SeriesAnalysisSchema,
 } from "@gen/analysis/v1/results_pb";
+import { type MonthFrames, monthFrames, readCube } from "./lib/months";
 
 /** Where the browser reaches the gateway. Set VITE_GATEWAY_URL to change it. */
 export const gatewayUrl: string = import.meta.env.VITE_GATEWAY_URL ?? "http://localhost:8080";
@@ -73,6 +74,22 @@ export async function loadSeriesAnalysis(jobId: string, signal?: AbortSignal): P
 export async function loadGrid(jobId: string, signal?: AbortSignal): Promise<Grid> {
   const res = await download(jobId, Artifact.GRID, signal);
   return fromJson(GridSchema, await res.json(), { ignoreUnknownFields: true });
+}
+
+/**
+ * The grid's month-by-month values and anomalies, for the time slider.
+ * undefined when the grid has no values, or they don't match its size.
+ */
+export async function loadGridMonths(jobId: string, grid: Grid, signal?: AbortSignal): Promise<MonthFrames | undefined> {
+  const { dataUrl, anomaliesUrl } = await gateway.getResultURL({ jobId, artifact: Artifact.GRID }, { signal });
+  if (!dataUrl) return undefined;
+  const blob = async (url: string) => {
+    const res = await fetch(url, { signal });
+    if (!res.ok) throw new Error(`The download failed (HTTP ${res.status}).`);
+    return readCube(await res.arrayBuffer(), grid);
+  };
+  const [values, anomalies] = await Promise.all([blob(dataUrl), anomaliesUrl ? blob(anomaliesUrl) : undefined]);
+  return values ? monthFrames(grid, values, anomalies) : undefined;
 }
 
 /** The trend tests on every grid cell, for the heatmap. */

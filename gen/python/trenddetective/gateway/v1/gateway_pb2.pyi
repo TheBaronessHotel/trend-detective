@@ -253,14 +253,16 @@ class GetResultURLRequest(_message.Message):
     def __init__(self, job_id: _Optional[str] = ..., artifact: _Optional[_Union[Artifact, str]] = ...) -> None: ...
 
 class GetResultURLResponse(_message.Message):
-    __slots__ = ("url", "data_url", "expires_at")
+    __slots__ = ("url", "data_url", "expires_at", "anomalies_url")
     URL_FIELD_NUMBER: _ClassVar[int]
     DATA_URL_FIELD_NUMBER: _ClassVar[int]
     EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
+    ANOMALIES_URL_FIELD_NUMBER: _ClassVar[int]
     url: str
     data_url: str
     expires_at: _timestamp_pb2.Timestamp
-    def __init__(self, url: _Optional[str] = ..., data_url: _Optional[str] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    anomalies_url: str
+    def __init__(self, url: _Optional[str] = ..., data_url: _Optional[str] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., anomalies_url: _Optional[str] = ...) -> None: ...
 
 class CreateUploadURLRequest(_message.Message):
     __slots__ = ("filename", "size_bytes")

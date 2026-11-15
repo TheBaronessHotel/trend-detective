@@ -121,7 +121,12 @@ func (s *Server) GetResultURL(ctx context.Context, req *gatewayv1.GetResultURLRe
 	if err != nil {
 		return nil, s.toConnect(ctx, err)
 	}
-	return &gatewayv1.GetResultURLResponse{Url: link.URL, DataUrl: link.DataURL, ExpiresAt: timestamppb.New(link.ExpiresAt)}, nil
+	return &gatewayv1.GetResultURLResponse{
+		Url:          link.URL,
+		DataUrl:      link.DataURL,
+		AnomaliesUrl: link.AnomaliesURL,
+		ExpiresAt:    timestamppb.New(link.ExpiresAt),
+	}, nil
 }
 
 // CreateUploadURL implements GatewayService.

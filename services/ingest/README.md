@@ -154,7 +154,7 @@ Asks NASA AppEEARS for one MODIS layer over the rectangle and dates, and keeps t
 | `APPEEARS_MAX_WAIT` | `2h` | How long AppEEARS may queue and process a request before it's deleted |
 | `MAX_UPLOAD_MB` | 20 | Largest CSV upload. Keep it the same as the gateway's |
 | `BUNDLE_DIR` | `/bundle` | Compose mounts `services/ingest/bundle` here |
-| `INGEST_CONCURRENCY` | 4 | Tasks in flight at once |
+| `INGEST_CONCURRENCY` | 16 | Tasks in flight at once. Most of them wait on NASA, and an AppEEARS task can wait for hours, so keep it well above `HARMONY_CONCURRENCY` |
 | `INGEST_ACK_WAIT` | `2m` | How long JetStream waits for a heartbeat before it redelivers |
 | `LOG_LEVEL` | `info` | trace, debug, info, warn or error |
 | `ADMIN_ADDR` | `:9090` | Serves `/metrics` and `/debug/pprof/` inside the compose network |
@@ -166,3 +166,4 @@ Asks NASA AppEEARS for one MODIS layer over the rectangle and dates, and keeps t
 - `make smoke-power` runs a real job through NASA POWER at a point near Lisbon. It needs no token, but CI skips it so CI doesn't depend on NASA.
 - `make smoke-harmony` runs a real GPM job through the gateway and Harmony. It needs `EARTHDATA_TOKEN` in `.env`, so CI doesn't run it.
 - `make smoke-giovanni` runs twenty years of daily groundwater at a point in Punjab through the gateway and Giovanni, and checks the grid cell and the rows. It needs `EARTHDATA_TOKEN` too.
+- `make smoke-appeears` runs two years of MODIS NDVI near Delhi through AppEEARS and preprocess, and checks 24 months of plausible values in NDVI units. It needs `EARTHDATA_USERNAME` and `EARTHDATA_PASSWORD`, and can take 5 to 15 minutes while AppEEARS works through its queue.

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { type Job, JobState } from "@gen/gateway/v1/gateway_pb";
 import { Stage } from "@gen/gateway/v1/task_pb";
 import type { RawDataset } from "@gen/ingest/v1/ingest_pb";
-import type { Series } from "@gen/preprocess/v1/data_pb";
+import type { Grid, Series } from "@gen/preprocess/v1/data_pb";
 import type { SeriesAnalysis } from "@gen/analysis/v1/results_pb";
 import type { Heatmap } from "../lib/grid";
 import { errorMessage } from "../api";
@@ -31,6 +31,8 @@ export interface Run {
   analysisError?: string;
   /** Per-cell trends, for gridded jobs, drawn on the globe. */
   heatmap?: Heatmap;
+  /** The map grid behind the heatmap, for the month-by-month map. */
+  grid?: Grid;
 }
 
 interface Props {
@@ -195,8 +197,10 @@ function Results({
 
   return (
     <div className="job-chart">
-      {analysis && <VerdictPanel analysis={analysis} />}
-      {heatmap && <HeatmapLegend heatmap={heatmap} />}
+      <div className={heatmap ? "results-top with-heatmap" : "results-top"}>
+        {analysis && <VerdictPanel analysis={analysis} />}
+        {heatmap && <HeatmapLegend heatmap={heatmap} />}
+      </div>
       <SeriesChart
         series={series}
         analysis={analysis}
@@ -216,13 +220,61 @@ function Results({
 /** The job: each stage as it runs, what went wrong, and what came back. */
 export function JobPanel({ run, stopAfter, seriesTitle, onSaveCsv, onStop }: Props) {
   const [stopping, setStopping] = useState(false);
+  // Folded down to one line, so the globe gets the room.
+  const [folded, setFolded] = useState(false);
   const views = stageViews(run?.job, stopAfter);
   const now = useNow(views.some((v) => v.state === "running"));
   if (!run) return null;
   const raw = run.job?.results?.raw[0];
 
+  // With results, how the job ran folds away under them.
+  if (run.series) {
+    const done = views.filter((v) => v.state === "done").length;
+    return (
+      <section className={folded ? "job with-chart folded" : "job with-chart"}>
+        <div className="job-head">
+          <h2 className="step-title">Results</h2>
+          <button type="button" className="action small" aria-expanded={!folded} onClick={() => setFolded((f) => !f)}>
+            {folded ? "Show the results" : "Bigger map"}
+          </button>
+        </div>
+        {!folded && (
+          <>
+            {run.error && <Alert>{run.error}</Alert>}
+            {run.analysisError && <Alert>{run.analysisError}</Alert>}
+            <Results
+              jobId={run.job?.id ?? ""}
+              series={run.series}
+              analysis={run.analysis}
+              heatmap={run.heatmap}
+              title={seriesTitle(run.series.variableId)}
+              onSaveCsv={onSaveCsv}
+            />
+            <details className="job-details">
+              <summary>
+                How it ran: {done} of {views.length} steps done
+              </summary>
+              <ol className="stages">
+                {views.map((v) => (
+                  <li key={v.stage} className={`stage stage-${v.state}`}>
+                    <span className="stage-glyph" aria-hidden="true">
+                      {glyphs[v.state]}
+                    </span>
+                    <span>{v.label}</span>
+                    <span className="stage-status">{status(v, now)}</span>
+                  </li>
+                ))}
+              </ol>
+              {raw && <Fetched ds={raw} />}
+            </details>
+          </>
+        )}
+      </section>
+    );
+  }
+
   return (
-    <section className={run.series ? "job with-chart" : "job"}>
+    <section className="job">
       <div className="job-status" aria-live="polite">
         <div className="job-head">
           <h2 className="step-title">{run.job?.state === JobState.CANCELED ? "Job stopped" : titles[run.phase]}</h2>
@@ -266,16 +318,6 @@ export function JobPanel({ run, stopAfter, seriesTitle, onSaveCsv, onStop }: Pro
         {run.seriesError && <Alert>{run.seriesError}</Alert>}
         {run.analysisError && <Alert>{run.analysisError}</Alert>}
       </div>
-      {run.series && (
-        <Results
-          jobId={run.job?.id ?? ""}
-          series={run.series}
-          analysis={run.analysis}
-          heatmap={run.heatmap}
-          title={seriesTitle(run.series.variableId)}
-          onSaveCsv={onSaveCsv}
-        />
-      )}
     </section>
   );
 }
