@@ -42,6 +42,12 @@ type Limits struct {
 	MaxGranules int32
 	// Most tasks one job may plan. Zero means no limit.
 	TaskCap int32
+	// How long a stage may run before FailStuck fails its job: IngestDeadline
+	// for ingest, which already gives up at NASA after HARMONY_MAX_WAIT or
+	// APPEEARS_MAX_WAIT, and StageDeadline for preprocess and analysis. Zero
+	// turns the check off.
+	IngestDeadline time.Duration
+	StageDeadline  time.Duration
 }
 
 // Preflight decides, before a job is queued, whether its ingest task can run.

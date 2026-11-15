@@ -345,6 +345,26 @@ func (s *Store) stageDones(ctx context.Context, id string, stage gatewayv1.Stage
 }
 
 // load reads a whole job.
+// runningJobIDs lists the jobs whose state is running. It scans the job
+// keys, which is fine at a demo's scale of hundreds of jobs a week.
+func (s *Store) runningJobIDs(ctx context.Context) ([]string, error) {
+	var ids []string
+	iter := s.rdb.Scan(ctx, 0, "td:job:{*}", 500).Iterator()
+	for iter.Next(ctx) {
+		key := iter.Val()
+		// Only the job hashes, not their :tasks, :done or :stage:n keys.
+		if !strings.HasSuffix(key, "}") {
+			continue
+		}
+		state, err := s.rdb.HGet(ctx, key, "state").Result()
+		if err != nil || state != gatewayv1.JobState_JOB_STATE_RUNNING.String() {
+			continue
+		}
+		ids = append(ids, strings.TrimSuffix(strings.TrimPrefix(key, "td:job:{"), "}"))
+	}
+	return ids, iter.Err()
+}
+
 func (s *Store) load(ctx context.Context, id string) (*gatewayv1.Job, int32, error) {
 	h, err := s.rdb.HGetAll(ctx, jobKey(id)).Result()
 	if err != nil {
