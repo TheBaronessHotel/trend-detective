@@ -114,7 +114,7 @@ The consumer's delivery limit is 3. Preprocess never polls, so JetStream's deliv
 | Variable | Default | |
 |---|---|---|
 | `NATS_URL`, `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | required | Set by compose |
-| `PREPROCESS_CONCURRENCY` | 2 | Tasks in flight at once |
+| `PREPROCESS_CONCURRENCY` | 2 | Tasks in flight at once, in threads. The netCDF and HDF5 C libraries aren't thread-safe, so file reads take turns behind one lock in `decoders/netcdf.py`; without it, two tasks reading at once crashed the process with a segfault |
 | `PREPROCESS_ACK_WAIT` | `2m` | A heartbeat goes out every third of this while a task runs |
 | `LOG_LEVEL` | `info` | trace, debug, info, warn or error |
 
