@@ -6,15 +6,52 @@ Pick one of 40 things to measure, such as air temperature, sea ice, methane, gro
 
 It's written for high-school students: every number comes with a sentence saying what it means, and the caveats sit next to the result.
 
+## Demo video
+
+<!--
+  To add the video: open this file on GitHub, press the pencil to edit, and
+  drag the video file onto the line below. GitHub uploads it and writes a
+  https://github.com/user-attachments/assets/... link in its place. Keep that
+  link on a line of its own, so GitHub shows a player, delete this comment and
+  the placeholder line, and commit.
+-->
+
+_The demo video goes here._
+
+## Try it
+
+You need Docker, and a free [Earthdata Login](https://urs.earthdata.nasa.gov) account.
+
+```
+make up              # the first run creates .env: put your EARTHDATA_TOKEN in it, then run make up again
+make warm-examples   # fetches the examples' NASA data once; the first run can take a while
+```
+
+Then open [http://localhost:3000](http://localhost:3000) and press one of the examples under "Try an example". [Running it](#running-it) has the details, including the one-time approval GES DISC needs and the AppEEARS login.
+
+## How it meets the challenge
+
+| The challenge asks for | Where it is in Trend Detective |
+|---|---|
+| Choose Earth science variables | 40 variables in a browser like Giovanni's: search, topics and measurements, a plain definition for each, and a filter for the ones with a map |
+| Get the data for a region | Draw a rectangle on the globe or type its edges. The data comes live from NASA Harmony, Giovanni, POWER and AppEEARS, and is cached afterwards |
+| A time series and a visualisation | The region's monthly chart, with the normal range, anomaly bars and the trend with its band. For map variables, a heatmap of the trend in every cell, and the months played back on the globe |
+| The trend's rate and whether it's significant | Least squares with an autocorrelation correction, its confidence interval and p-value, with Mann-Kendall and Sen's slope alongside. On the map, a test per cell with a false discovery rate correction |
+| Take out the seasonal cycle | Every test runs on anomalies, each month's difference from its own normal |
+| For students and the public | Every number comes with a sentence. Caveats sit next to the result, and "Why we think so" shows the evidence as charts |
+| Demo walkthroughs | Eight examples, one click each, from Europe warming to London rain with no clear trend |
+| "A trend may need a longer record to become significant" | The verdict says how many years it would take to tell, and a record under 10 years is never called a trend |
+| Help from AI | "In plain words" writes an overview from the numbers without any AI model. Questions about the results work with your own AI key, and any number in an answer that isn't in the results is flagged |
+
 ## What it does
 
 - **A variable browser.** Like Giovanni's: search, topics (air, air quality, water, land and plants, ocean, snow and ice) and measurements, and a filter for the ones with a map.
 - **Choose what to make.** The region's chart always comes; the trend tests, the trend map and the month-by-month map are each optional, so a quick look at the map skips the tests.
-- **One answer up top.** "Rising, and unlikely to be chance", "Falling…" or "No clear trend yet", with the rate per decade, the range it likely falls in, and how often chance alone would give a trend this strong.
-- **Where it's changing.** For map variables, a heatmap on the globe colours each cell by its own trend. Cells that still pass after correcting for testing hundreds of cells at once are outlined.
-- **Month by month.** A time slider plays the grid back, as measured values or as the difference from normal, so you can watch a trend build up.
-- **Why we think so.** The shuffle test as a histogram, and a triangle of the trend over every stretch of years, to show whether the answer hangs on the years picked. Plus the caveats the tests raised: short records, a sudden shift, odd months.
-- **The chart.** The region's monthly values and anomalies, with the fitted trend and its band, a crosshair, a table view, and a CSV download.
+- **One answer up top.** "Rising, and unlikely to be chance", "Falling…" or "No clear trend yet", with the rate per decade, the range it likely falls in, and how often chance alone would give a trend this strong. Under 10 years of record, a passing test reads "too short to call a trend".
+- **Where it's changing.** For map variables, a heatmap on the globe colours each cell by its own trend, from least squares or Mann-Kendall at the press of a button. Cells that still pass after correcting for testing hundreds of cells at once are outlined. Clicking a cell opens its own chart.
+- **Month by month.** A time slider plays the grid back, as measured values or as the difference from normal, so you can watch a trend build up, or a heatwave pass.
+- **Why we think so.** The shuffle test as a histogram, a triangle of the trend over every stretch of years to show whether the answer hangs on the years picked, and which months of the year changed. Plus the caveats the tests raised: short records, a sudden shift, unusual months.
+- **The chart.** The region's monthly values and anomalies, with the fitted trend and its band, unusual months ringed and a likely sudden shift marked, a crosshair, a table view, and a CSV download.
 - **Examples.** One click runs a curated case: Europe warming, CO2 rising, methane rising over the Ganges plain, cleaner air over China, groundwater falling in northwest India, farmland greening in Punjab, a mixed picture over India, and London rain with no clear trend.
 - **In plain words.** An explanation of the results, written from the numbers without any AI model. Questions about them work with your own Anthropic or OpenAI-compatible key, which stays in the page.
 - **Your own data.** Upload a CSV of dates and values and run the same tests on it.
@@ -41,9 +78,30 @@ The tests run on anomalies, each month's difference from its own normal, so the 
 - **A block shuffle test**: the record cut into years, shuffled 1,000 times, refitted each time.
 - **The Pettitt test** for a sudden shift, residual checks and outlier months, all reported as caveats.
 - **The trend triangle**, the trend over every stretch of at least 10 years, and **years to significance** (Weatherhead et al. 1998).
+- **Each month of the year** tested on its own, to show which seasons changed.
 - **On the map**, a test per cell, then the Benjamini-Hochberg false discovery rate across cells (Wilks 2016).
+- **Short records:** under 10 years, a test that passes isn't called a trend, in the app or in the plain-words explanation, since a few unusual months can make one look real.
 
 As a check, run on NOAA's Mauna Loa CO2 record, our trend comes within 0.02 ppm a year of the growth NOAA publishes for 2010 to 2019 and for 2000 to 2024. The methods and their sources are in [services/analysis/README.md](services/analysis/README.md), and the whole system in [ARCHITECTURE.md](ARCHITECTURE.md). Tasks and decisions live in the team's Notion.
+
+## How it's built
+
+```
+browser ── Connect ──▶ gateway ◀── NATS JetStream ──▶ ingest → preprocess → analysis
+   │                     │                                        │
+   │                     ├── job state in Redis                   ├── fetches from NASA
+   │                     └── narrator, for the explanations       │
+   └──── downloads results ──────────────────────────▶ files in SeaweedFS (S3)
+```
+
+- **The web app** (React, MapLibre and d3) talks to **the gateway** over Connect, and follows a job through a stream.
+- **The gateway** (Go) owns the catalog of variables and every job's state, and hands out work over NATS JetStream.
+- **Ingest** (Go) fetches from NASA: Harmony, Giovanni, POWER and AppEEARS.
+- **Preprocess** (Python) cleans and averages the files into a series and a grid.
+- **Analysis** (Python) runs the tests.
+- **The narrator** (Go) writes the plain-words explanation.
+
+Files pass between the stages through SeaweedFS, an S3 store, and the browser downloads its results straight from there. Contracts are Protocol Buffers in `proto/`. Everything runs in Docker Compose. [ARCHITECTURE.md](ARCHITECTURE.md) has the whole design.
 
 ## Layout
 
@@ -124,3 +182,8 @@ Preprocess and analysis, in Python, aren't covered yet: they carry the trace ID 
 - Each service has its own folder and Dockerfile. Its owner decides what goes inside.
 - A contract change goes in `proto/`. Run `make gen` and commit the generated code in the same PR.
 - Never commit `.env`.
+
+## Credits
+
+- Data: NASA's Harmony, Giovanni, POWER and AppEEARS services, and the GES DISC, LP DAAC and other archives behind them. The catalog, `services/gateway/catalog.yaml`, links each variable's dataset page.
+- Maps: [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, through [OpenFreeMap](https://openfreemap.org), drawn with [MapLibre GL JS](https://maplibre.org).

@@ -23,7 +23,7 @@ Still open:
 |---|---|---|---|
 | gateway | Orchestrates jobs, owns job state, the catalog and the browser API, runs preflight checks | Connect to browser and narrator, NATS to stages, Redis | Go |
 | ingest | Fetches raw bytes from sources through hexagonal adapters. Never parses scientific formats | NATS, SeaweedFS, Redis | Go |
-| preprocess | Decodes formats into canonical `Series` and `Grid`, runs filter chains, aggregates regions, computes anomalies, builds slider cubes | NATS, SeaweedFS | team's choice, Python expected |
+| preprocess | Decodes formats into canonical `Series` and `Grid`, runs filter chains, aggregates regions, computes anomalies, writes the grid's month-by-month values for the slider | NATS, SeaweedFS | team's choice, Python expected |
 | analysis | Runs the full test suite on series and fast per-cell tests on grids | NATS, SeaweedFS | team's choice, Python expected |
 | narrator | Streams the LLM overview and Q&A from finished analysis results | Connect, SeaweedFS | team's choice |
 | web | Map, time slider, charts, heatmap, chat | Connect to gateway, presigned URLs to SeaweedFS | TypeScript, React, Vite and Bun |
@@ -108,7 +108,7 @@ A one-shot Go program in `deploy/bootstrap`. It runs on every `make up`, creates
    The gateway then writes the job and its tasks to Redis and publishes `tasks.ingest`.
 2. **Ingest.** It checks the cache, then calls the adapter. For Harmony, it counts granules in CMR, submits the job, sends itself delayed rechecks with `NakWithDelay` instead of making a worker wait, downloads the output files into `raw`, and publishes `StageDone` with a `RawDataset` reference. Those rechecks are JetStream deliveries too, so ingest counts failed attempts in Redis, and the consumer's delivery limit is only a high ceiling.
 3. The gateway publishes `tasks.preprocess` with the filter chain.
-4. **Preprocess.** It decodes the files, runs the chain, aggregates regions and writes `Series` and `Grid` documents plus the slider cubes to `prep`. Then it publishes `StageDone`.
+4. **Preprocess.** It decodes the files, runs the chain, aggregates regions and writes `Series` and `Grid` documents to `prep`, with the grid's values and anomalies as raw float32 files beside them. Then it publishes `StageDone`.
 5. The gateway publishes `tasks.analysis` with the test list.
 6. **Analysis.** It writes results to `analysis` and publishes `StageDone`.
 7. The gateway updates Redis at every step and streams progress to the browser through `WatchJob`.
@@ -184,7 +184,7 @@ Size guards, all configurable:
 - `MAX_GRID`. Larger grids get bigger blocks, and the UI shows the resulting cell size.
 - Daily products become monthly values in preprocess, using a minimum-valid-days rule.
 
-**Slider cube.** One compact binary file per cube: 16-bit values with a scale, offset and missing-data mask. A JSON header gives the axes, units and color range. There's one cube for raw values and one for anomalies. The browser downloads it once and draws any month locally.
+**The slider's data.** The browser downloads the grid's values and anomalies once, as the float32 files `GetResultURL(ARTIFACT_GRID)` signs, and draws any month locally. A compact slider cube (16-bit values with a scale, offset and missing-data mask, and a JSON header; PRE-4) would halve that download; the contract has it, but nothing builds it yet.
 
 ## Preprocessing
 
@@ -312,7 +312,7 @@ Each service has its own Dockerfile in its folder. Compose builds with the repo 
 - Dynamic regression and prediction. The model parameters are already in the results.
 - Polygon regions. HOSS already accepts shapes.
 - Images on GHCR.
-- Demo cases for the video. Candidates:
-  - OMI NO2 over Asia: east China falling, India rising.
-  - GRACE groundwater in northwest India.
-  - GPM rain in a noisy region, as the "not significant yet" case.
+- Slider cubes (PRE-4), to halve the month-by-month map's download.
+- Groundwater and other daily-only products as maps. Harmony can't cut a monthly grid for them.
+- Spans and metrics from the Python services, preprocess and analysis.
+- Shareable links to a result, once there's a hosted demo.
