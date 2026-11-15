@@ -214,3 +214,40 @@ def test_surface_pressure_that_cant_be_hpa_is_refused(tmp_path: Path):
     with pytest.raises(errors.TaskFailure) as info:
         _column(path)
     assert "looks like Pa" in info.value.detail
+
+
+def _write_nobm_like(path: Path, months_since: list[float], units: str = "months since 1998-01-01 00:00:00") -> None:
+    """A file shaped like a HOSS subset of NOBM monthly chlorophyll: `tot` at
+    the root, (time, lat, lon), and a time axis in months since 1998."""
+    lats = np.array([17.5, 16.83, 16.17])
+    lons = np.array([86.25, 87.5])
+    data = np.arange(len(months_since) * 6, dtype="float32").reshape(len(months_since), 3, 2) / 10 + 0.1
+    ds = xr.Dataset(
+        {"tot": (("time", "lat", "lon"), data, {"units": "mg/m^3"})},
+        coords={
+            "time": ("time", np.array(months_since, dtype="float64"), {"units": units, "standard_name": "time"}),
+            "lat": ("lat", lats, {"units": "degrees_north"}),
+            "lon": ("lon", lons, {"units": "degrees_east"}),
+        },
+    )
+    ds.to_netcdf(path, engine="netcdf4")
+
+
+def test_months_since_a_date_become_months(tmp_path: Path):
+    # NOBM counts months since January 1998, which xarray won't decode:
+    # 180 is January 2013 and 181.5, a mid-month stamp, February.
+    path = tmp_path / "nobm.nc4"
+    _write_nobm_like(path, [180.0, 181.5])
+    raw = raw_dataset(ingest_pb2.FORMAT_NETCDF4, ["tot"], ["nobm.nc4"])
+    dec = netcdf.decode([path], raw, "mg/m³")
+    assert [str(t)[:10] for t in dec.data["time"].values] == ["2013-01-01", "2013-02-01"]
+    assert dec.step == common_pb2.TIME_STEP_MONTHLY
+    assert dec.values.dims == ("time", "lat", "lon")
+
+
+def test_years_since_a_date_become_years(tmp_path: Path):
+    path = tmp_path / "yearly.nc4"
+    _write_nobm_like(path, [0.0, 1.0], units="years since 2010-07-01")
+    raw = raw_dataset(ingest_pb2.FORMAT_NETCDF4, ["tot"], ["yearly.nc4"])
+    dec = netcdf.decode([path], raw, "mg/m³")
+    assert [str(t)[:10] for t in dec.data["time"].values] == ["2010-07-01", "2011-07-01"]

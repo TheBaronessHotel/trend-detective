@@ -447,13 +447,13 @@ variables:
     dataset_url: https://disc.gsfc.nasa.gov/datasets/OCO2_GEOS_L3CO2_DAY_10r/summary
 
   - id: chlorophyll-nobm
-    name: Ocean chlorophyll (area average)
+    name: Ocean chlorophyll (map)
     topic: Ocean
     measurement: Ocean colour
     product: NOBM
     definition: >-
-      How much chlorophyll is in the sea's surface water, averaged over the
-      rectangle and over each month. Chlorophyll is the green pigment in
+      How much chlorophyll is in the sea's surface water, averaged over each
+      month. Chlorophyll is the green pigment in
       phytoplankton, the tiny plants at the base of the ocean food web, so
       more chlorophyll means more of them. It comes from NASA's Ocean
       Biogeochemical Model, which takes in chlorophyll measured from space.
@@ -462,26 +462,35 @@ variables:
     units: log₁₀(mg/m³)
     step: monthly
     available: { start: 1998-01-01, end: 2015-12-31 }
-    grid: false
+    grid: true
+    pixel_size: { lat: 0.667, lon: 1.25 }
     domain: ocean
-    default_source: giovanni-area
+    default_source: harmony-subset
     sources:
-      # NOBM's monthly files would give a map, but Harmony's subsetter can't
-      # read their time units ("months since"), so it's averages only.
+      # NOBM's monthly files, for the map. Harmony's subsetter can't read
+      # their time units ("months since 1998"), so ingest names the files by
+      # granule ID instead of asking for a time subset.
+      harmony-subset:
+        collection_id: C1404080681-GES_DISC
+        variables: [tot]
+        by_granule_id: true
       giovanni-area:
         data_field_id: NOBM_DAY_R2017_tot
         collection_id: C1404080675-GES_DISC
       giovanni-point: { data_field_id: NOBM_DAY_R2017_tot }
     source_units: mg/m³
+    # Grid cells of 1x1 native pixels: NOBM pixels are already 2/3° by 1.25°.
+    aggregation: { block_pixels: 1 }
     filters:
       ops:
         - qc_range: { min: 0.001, max: 100 }
-        # The data is daily, with no gaps outside sea ice.
+        # Giovanni's average is daily, with no gaps outside sea ice; the map's
+        # files are monthly already.
         - monthly_mean: { min_valid_days: 20 }
         - log10: {}
         - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
         - gap_fill_display: { max_gap: 2 }
-    tests: *series-tests
+    tests: *grid-tests
     llm_hints: >-
       This is model output that takes in satellite chlorophyll from SeaWiFS
       and MODIS, on a grid about 100 km across, so narrow coastal waters and

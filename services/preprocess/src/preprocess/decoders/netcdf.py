@@ -26,10 +26,14 @@ What differs between products, and how it's handled:
 - **Time stamps.** Monthly products stamp their months differently, like
   MERRA-2's 00:30. Monthly times are snapped to the 1st at 00:00. A granule
   with no time axis, like AIRS, takes its date from ingest's coverage.
+  NOBM's monthly chlorophyll counts ``months since 1998-01-01``, which
+  xarray won't decode, so such a file is opened without decoding times and
+  its months (or years) are added to the reference date here.
 """
 
 from __future__ import annotations
 
+import re
 import threading
 from pathlib import Path
 
@@ -103,7 +107,7 @@ def _read(path: Path, variables: list[str]) -> list[xr.DataArray]:
                 for var in variables:
                     group, _, name = var.rpartition("/")
                     if group not in groups:
-                        groups[group] = xr.open_dataset(path, group=group or None, engine="netcdf4", mask_and_scale=True)
+                        groups[group] = _open(path, group)
                     ds = groups[group]
                     if name not in ds.variables:
                         raise errors.invalid(
@@ -129,6 +133,18 @@ def _read(path: Path, variables: list[str]) -> list[xr.DataArray]:
             "NASA sent a file we couldn't read.", f"{path.name}: {type(err).__name__}: {err}"
         ) from err
     return out
+
+
+def _open(path: Path, group: str) -> xr.Dataset:
+    """Opens one group. Times in months or years since a date, like NOBM's
+    "months since 1998-01-01", have no fixed length, so xarray refuses them;
+    such a file opens with its times as numbers, for _as_datetime64."""
+    try:
+        return xr.open_dataset(path, group=group or None, engine="netcdf4", mask_and_scale=True)
+    except ValueError as err:
+        if "unable to decode time units" not in str(err):
+            raise
+        return xr.open_dataset(path, group=group or None, engine="netcdf4", mask_and_scale=True, decode_times=False)
 
 
 def _coords_from_parents(handle: nc.Dataset, group: str, da: xr.DataArray, dims: list[str]) -> xr.DataArray:
@@ -245,9 +261,21 @@ def _hpa(level: xr.DataArray) -> np.ndarray:
     return level.values.astype("float64") * factor
 
 
+# "months since 1998-01-01 00:00:00", the units xarray won't decode.
+_CALENDAR_UNITS = re.compile(r"^\s*(months?|years?)\s+since\s+(\d{1,4})-(\d{1,2})", re.IGNORECASE)
+
+
 def _as_datetime64(time: xr.DataArray) -> np.ndarray:
     values = time.values
     if np.issubdtype(values.dtype, np.datetime64):
         return values.astype("datetime64[ns]")
+    m = _CALENDAR_UNITS.match(str(time.attrs.get("units", "")))
+    if m and np.issubdtype(values.dtype, np.number):
+        # Whole months (or years) after the reference month; a fraction, like
+        # a mid-month stamp of 181.5, stays in its month.
+        per = 12 if m.group(1).lower().startswith("year") else 1
+        start = int(m.group(2)) * 12 + int(m.group(3)) - 1
+        months = [start + int(np.floor(float(v) * per + 1e-9)) for v in values]
+        return np.array([f"{n // 12:04d}-{n % 12 + 1:02d}-01" for n in months], dtype="datetime64[ns]")
     # cftime objects, from calendars xarray can't map to numpy.
     return pd.to_datetime([str(v) for v in values]).values.astype("datetime64[ns]")
