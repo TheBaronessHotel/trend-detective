@@ -8,7 +8,7 @@ It's written for high-school students: every number comes with a sentence saying
 
 ## Demo video
 
-https://github.com/user-attachments/assets/818eb1e8-1ef3-45ff-a75f-3e6d60450326
+https://github.com/user-attachments/assets/8b5c816f-39f9-4e28-94b7-072951ba995d
 
 ## Try it
 
