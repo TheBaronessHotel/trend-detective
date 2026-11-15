@@ -54,6 +54,8 @@ GES DISC, which serves GPM and MERRA-2, only hands files to Earthdata accounts t
 
 Variable names are paths inside the file, like `Grid/precipitation` for GPM IMERG. They go in the `variable` query parameter, not the URL path. Each variable gets its own `variable` parameter: Harmony rejects a comma-joined list with "Coverages were not found for the provided variables". AIRS methane asks for two, the profile and the surface pressure.
 
+With `by_granule_id`, ingest lists the granules' CMR concept IDs in date order instead of counting them, still failing past `max_granules`. It then POSTs a multipart form that names them in `granuleId`, with the rectangle but no `time` subset. Each granule comes back whole in time, cut only to the rectangle. That's for collections whose time axis Harmony's subsetter can't read, like NOBM's monthly chlorophyll (`months since 1998-01-01`), where a time subset fails with `Temporal units "months" not supported`. A long list of IDs goes in the form because Harmony answered a GET carrying 24 of them with a server error. Each file still carries its granule's dates, which preprocess can use when the file's own time axis won't decode.
+
 Redis keys:
 
 | Key | Holds |

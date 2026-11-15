@@ -74,14 +74,16 @@ class IngestTask(_message.Message):
     def __init__(self, variable_id: _Optional[str] = ..., bbox: _Optional[_Union[_common_pb2.BBox, _Mapping]] = ..., dates: _Optional[_Union[_common_pb2.DateRange, _Mapping]] = ..., earthdata_token_key: _Optional[str] = ..., harmony_subset: _Optional[_Union[HarmonySubset, _Mapping]] = ..., giovanni_area: _Optional[_Union[GiovanniArea, _Mapping]] = ..., giovanni_point: _Optional[_Union[GiovanniPoint, _Mapping]] = ..., power: _Optional[_Union[Power, _Mapping]] = ..., csv_upload: _Optional[_Union[CsvUpload, _Mapping]] = ..., bundle: _Optional[_Union[Bundle, _Mapping]] = ..., appeears: _Optional[_Union[Appeears, _Mapping]] = ...) -> None: ...
 
 class HarmonySubset(_message.Message):
-    __slots__ = ("collection_id", "variables", "max_granules")
+    __slots__ = ("collection_id", "variables", "max_granules", "by_granule_id")
     COLLECTION_ID_FIELD_NUMBER: _ClassVar[int]
     VARIABLES_FIELD_NUMBER: _ClassVar[int]
     MAX_GRANULES_FIELD_NUMBER: _ClassVar[int]
+    BY_GRANULE_ID_FIELD_NUMBER: _ClassVar[int]
     collection_id: str
     variables: _containers.RepeatedScalarFieldContainer[str]
     max_granules: int
-    def __init__(self, collection_id: _Optional[str] = ..., variables: _Optional[_Iterable[str]] = ..., max_granules: _Optional[int] = ...) -> None: ...
+    by_granule_id: bool
+    def __init__(self, collection_id: _Optional[str] = ..., variables: _Optional[_Iterable[str]] = ..., max_granules: _Optional[int] = ..., by_granule_id: _Optional[bool] = ...) -> None: ...
 
 class GiovanniArea(_message.Message):
     __slots__ = ("data_field_id", "collection_id")
