@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { create } from "@bufbuild/protobuf";
 import { ShuffleResultSchema, TrendTriangleResultSchema } from "@gen/analysis/v1/results_pb";
-import { histogram, labelled, shuffleBins, triangle } from "../src/lib/evidence";
+import { MonthlyTrendSchema } from "@gen/analysis/v1/results_pb";
+import { histogram, labelled, monthBars, shuffleBins, triangle } from "../src/lib/evidence";
 
 describe("histogram", () => {
   test("equal bins from the least to the greatest, the greatest in the last", () => {
@@ -59,5 +60,19 @@ describe("labelled", () => {
     expect([...labelled(11, 2)]).toEqual([0, 2, 4, 6, 8, 10]);
     expect([...labelled(3, 5)]).toEqual([0, 2]);
     expect([...labelled(1, 2)]).toEqual([0]);
+  });
+});
+
+describe("monthBars", () => {
+  const t = (month: number, slope: number, significant = false) => create(MonthlyTrendSchema, { month, slopePerDecade: slope, pValue: significant ? 0.01 : 0.4, significant });
+
+  test("January first, with names and which pass", () => {
+    const bars = monthBars([t(3, 0.3, true), t(1, -0.1), t(2, 0.2), t(4, 0.1), t(5, 0), t(6, 0.5, true)]);
+    expect(bars?.map((b) => b.name)).toEqual(["January", "February", "March", "April", "May", "June"]);
+    expect(bars?.filter((b) => b.passes).map((b) => b.month)).toEqual([3, 6]);
+  });
+
+  test("too few months draw nothing", () => {
+    expect(monthBars([t(1, 0.1), t(2, 0.2)])).toBeUndefined();
   });
 });

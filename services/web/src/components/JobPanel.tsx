@@ -3,8 +3,8 @@ import { type Job, JobState } from "@gen/gateway/v1/gateway_pb";
 import { Stage } from "@gen/gateway/v1/task_pb";
 import type { RawDataset } from "@gen/ingest/v1/ingest_pb";
 import type { Grid, Series } from "@gen/preprocess/v1/data_pb";
-import type { SeriesAnalysis } from "@gen/analysis/v1/results_pb";
-import type { Heatmap } from "../lib/grid";
+import type { GridAnalysis, SeriesAnalysis } from "@gen/analysis/v1/results_pb";
+import type { Heatmap, Method } from "../lib/grid";
 import { errorMessage } from "../api";
 import { describePoint } from "../lib/bbox";
 import { compare, type Day, formatMonth } from "../lib/dates";
@@ -34,6 +34,8 @@ export interface Run {
   heatmap?: Heatmap;
   /** The map grid behind the heatmap, for the month-by-month map. */
   grid?: Grid;
+  /** The per-cell tests, kept so the heatmap can switch between them. */
+  gridAnalysis?: GridAnalysis;
   /** Whether the job asked for the month-by-month map. */
   monthsMap?: boolean;
 }
@@ -50,6 +52,8 @@ interface Props {
   /** A clicked map cell, shown under the region's chart. */
   cell?: CellView;
   onCloseCell?: () => void;
+  /** Switch the trend map between the tests that ran on every cell. */
+  onMethod?: (m: Method) => void;
   stopAfter: Stage;
   /** The variable's name, for the chart's title. */
   seriesTitle: (variableId: string) => string;
@@ -187,6 +191,7 @@ function Results({
   onSaveCsv,
   cell,
   onCloseCell,
+  onMethod,
 }: {
   jobId: string;
   series: Series;
@@ -196,6 +201,7 @@ function Results({
   onSaveCsv: () => Promise<void>;
   cell?: CellView;
   onCloseCell?: () => void;
+  onMethod?: (m: Method) => void;
 }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string>();
@@ -216,7 +222,7 @@ function Results({
     <div className="job-chart">
       <div className={heatmap ? "results-top with-heatmap" : "results-top"}>
         {analysis && <VerdictPanel analysis={analysis} />}
-        {heatmap && <HeatmapLegend heatmap={heatmap} />}
+        {heatmap && <HeatmapLegend heatmap={heatmap} onMethod={onMethod} />}
       </div>
       <SeriesChart
         series={series}
@@ -236,7 +242,7 @@ function Results({
 }
 
 /** The job: each stage as it runs, what went wrong, and what came back. */
-export function JobPanel({ run, cell, onCloseCell, stopAfter, seriesTitle, onSaveCsv, onStop }: Props) {
+export function JobPanel({ run, cell, onCloseCell, onMethod, stopAfter, seriesTitle, onSaveCsv, onStop }: Props) {
   const [stopping, setStopping] = useState(false);
   // Folded down to one line, so the globe gets the room.
   const [folded, setFolded] = useState(false);
@@ -273,6 +279,7 @@ export function JobPanel({ run, cell, onCloseCell, stopAfter, seriesTitle, onSav
               onSaveCsv={onSaveCsv}
               cell={cell}
               onCloseCell={onCloseCell}
+              onMethod={onMethod}
             />
             <details className="job-details">
               <summary>

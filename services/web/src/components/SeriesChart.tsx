@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { timestampMs } from "@bufbuild/protobuf/wkt";
 import { scaleLinear, scaleUtc } from "d3-scale";
 import { area, line } from "d3-shape";
 import { TimeStep } from "@gen/common/v1/common_pb";
@@ -62,10 +63,11 @@ function stepNoun(step: TimeStep, n: number): string {
   return n === 1 ? one : `${one}s`;
 }
 
-function Tip({ p, series, left }: { p: Point; series: Series; left: number }) {
+function Tip({ p, series, left, outlierZ }: { p: Point; series: Series; left: number; outlierZ?: number }) {
   return (
     <div className="chart-tip" style={{ left, width: tipWidth }}>
       <div className="tip-muted">{formatTime(p.time, series.step)}</div>
+      {outlierZ !== undefined && <div>Unusual for this time of year (robust z {formatSigned(Number(outlierZ.toPrecision(2)))})</div>}
       {p.value !== undefined ? (
         <div>
           <strong>{formatValue(p.value)}</strong> {series.units}
@@ -159,6 +161,17 @@ export function SeriesChart({ series, analysis, title, actions }: Props) {
   const showAnomalies = hasAnomalies || trendOn === "anomalies";
   const first = pts[0];
   const last = pts.at(-1);
+  // Analysis's unusual months, by the index of their step, with their scores.
+  const outliers = useMemo(() => {
+    const out = new Map<number, number>();
+    for (const o of analysis?.outliers?.outliers ?? []) {
+      if (!o.time) continue;
+      const p = nearest(pts, timestampMs(o.time));
+      if (p) out.set(p.index, o.robustZ);
+    }
+    return out;
+  }, [analysis, pts]);
+  const shift = analysis?.pettitt?.significant && analysis.pettitt.changeTime ? timestampMs(analysis.pettitt.changeTime) : undefined;
 
   const head = (
     <figcaption className="chart-head">
@@ -317,6 +330,11 @@ export function SeriesChart({ series, analysis, title, actions }: Props) {
 
             {trendOn === "values" && trendBand && <path className="trend-band" d={trendBand} />}
             {trendOn === "values" && trendPath && <path className="trend-line" d={trendPath} />}
+            {!showAnomalies &&
+              [...outliers.keys()].map((i) => {
+                const p = pts[i];
+                return p?.value !== undefined ? <circle key={i} className="outlier" cx={px(p)} cy={y(p.value)} r={5} /> : null;
+              })}
 
             {showAnomalies && (
               <g>
@@ -340,6 +358,19 @@ export function SeriesChart({ series, analysis, title, actions }: Props) {
                 )}
                 {trendOn === "anomalies" && trendBand && <path className="trend-band" d={trendBand} />}
                 {trendOn === "anomalies" && trendPath && <path className="trend-line" d={trendPath} />}
+                {[...outliers.keys()].map((i) => {
+                  const p = pts[i];
+                  return p?.anomaly !== undefined ? <circle key={i} className="outlier" cx={px(p)} cy={ya(p.anomaly)} r={5} /> : null;
+                })}
+              </g>
+            )}
+
+            {shift !== undefined && shift >= first.time && shift <= last.time && (
+              <g pointerEvents="none">
+                <line className="shift" x1={x(shift)} x2={x(shift)} y1={0} y2={innerHeight} />
+                <text className="axis-text" x={x(shift) + (x(shift) > innerWidth - 90 ? -4 : 4)} y={10} textAnchor={x(shift) > innerWidth - 90 ? "end" : "start"}>
+                  likely shift
+                </text>
               </g>
             )}
 
@@ -367,7 +398,7 @@ export function SeriesChart({ series, analysis, title, actions }: Props) {
             />
           </g>
         </svg>
-        {hovered && <Tip p={hovered} series={series} left={tipLeft} />}
+        {hovered && <Tip p={hovered} series={series} left={tipLeft} outlierZ={outliers.get(hovered.index)} />}
       </div>
 
       <ul className="chart-key">
@@ -397,6 +428,22 @@ export function SeriesChart({ series, analysis, title, actions }: Props) {
               <line className="trend-line" x1="1" x2="21" y1="5" y2="5" />
             </svg>
             trend, and the {confidence}% band where it likely lies
+          </li>
+        )}
+        {outliers.size > 0 && (
+          <li>
+            <svg className="key-mark" width="12" height="12" aria-hidden="true">
+              <circle className="outlier" cx="6" cy="6" r="4.5" />
+            </svg>
+            {outliers.size === 1 ? "an unusual month" : `${outliers.size} unusual months`}, far from the same month in other years
+          </li>
+        )}
+        {shift !== undefined && (
+          <li>
+            <svg className="key-mark" width="8" height="12" aria-hidden="true">
+              <line className="shift" x1="4" x2="4" y1="1" y2="11" />
+            </svg>
+            a likely sudden shift, from the Pettitt test
           </li>
         )}
         {summary.missing > 0 && (

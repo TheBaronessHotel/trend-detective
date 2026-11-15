@@ -1,7 +1,7 @@
 // The numbers behind "Why we think so": the shuffled trends as a histogram,
 // and the trend triangle's cells.
 
-import type { ShuffleResult, TrendTriangleResult } from "@gen/analysis/v1/results_pb";
+import type { MonthlyTrend, ShuffleResult, TrendTriangleResult } from "@gen/analysis/v1/results_pb";
 
 export interface Bin {
   x0: number;
@@ -86,4 +86,27 @@ export function labelled(n: number, every: number): Set<number> {
     out.push(last);
   }
   return new Set(out);
+}
+
+export const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+export interface MonthBar {
+  /** 1 to 12. */
+  month: number;
+  name: string;
+  slope: number;
+  p: number;
+  passes: boolean;
+}
+
+/**
+ * One bar per calendar month with a trend, January first. undefined when
+ * fewer than 6 months could be tested, which says too little to draw.
+ */
+export function monthBars(trends: readonly MonthlyTrend[]): MonthBar[] | undefined {
+  const bars = trends
+    .filter((t) => t.month >= 1 && t.month <= 12 && Number.isFinite(t.slopePerDecade))
+    .map((t) => ({ month: t.month, name: MONTH_NAMES[t.month - 1] ?? "", slope: t.slopePerDecade, p: t.pValue, passes: t.significant }))
+    .sort((a, b) => a.month - b.month);
+  return bars.length >= 6 ? bars : undefined;
 }

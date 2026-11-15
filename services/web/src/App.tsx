@@ -15,7 +15,7 @@ import {
   uploadCsv,
 } from "./api";
 import type { Example } from "./lib/examples";
-import { heatmap } from "./lib/grid";
+import { heatmap, type Method } from "./lib/grid";
 import { cellSeries, type MonthFrames, type MonthsKind } from "./lib/months";
 import { formatSigned } from "./lib/series";
 import { CellSizePicker } from "./components/CellSizePicker";
@@ -309,12 +309,18 @@ export function App() {
             ? heatmap(grid.value, gridAnalysis.value)
             : undefined,
         grid: grid.status === "fulfilled" ? grid.value : undefined,
+        gridAnalysis: gridAnalysis.status === "fulfilled" ? gridAnalysis.value : undefined,
         monthsMap: input.outputs.monthsMap,
       });
     } catch (err) {
       if (signal.aborted) return;
       setRun((r) => ({ ...r, phase: "done", loadingSeries: false, error: errorMessage(err) }));
     }
+  }
+
+  // The map's colours from the other test: redraw the heatmap from the same results.
+  function pickMethod(m: Method) {
+    setRun((r) => (r?.grid && r.gridAnalysis ? { ...r, heatmap: heatmap(r.grid, r.gridAnalysis, m) ?? r.heatmap } : r));
   }
 
   const seriesTitle = (id: string) => variables?.find((v) => v.id === id)?.name ?? id;
@@ -399,6 +405,7 @@ export function App() {
           run={run}
           cell={cellView}
           onCloseCell={() => setCell(undefined)}
+          onMethod={pickMethod}
           // A job without tests ends at preprocess; its spec says where.
           stopAfter={run?.job?.spec?.stopAfter || STOP_AFTER}
           seriesTitle={seriesTitle} onSaveCsv={saveCsv} onStop={stopJob} />

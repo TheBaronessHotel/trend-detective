@@ -363,9 +363,11 @@ export function MapView({ box, onBox, heatmap, focus, months, children, onCell }
         if (!f || !h) return;
         const slope = Number(f.properties?.slope);
         const sure = f.properties?.significant === true || f.properties?.significant === "true";
+        const months = Number(f.properties?.months);
+        const count = months >= 0 ? ` · ${months} months with data` : "";
         popup
           .setLngLat(e.lngLat)
-          .setText(`${formatSigned(slope)}${h.units ? ` ${h.units}` : ""} per decade, ${sure ? "passes the test" : "could be chance"}`)
+          .setText(`${formatSigned(slope)}${h.units ? ` ${h.units}` : ""} per decade, ${sure ? "passes the test" : "could be chance"}${count}`)
           .addTo(created);
       });
       created.on("mouseleave", "heat-fill", () => popup.remove());
@@ -431,7 +433,9 @@ export function MapView({ box, onBox, heatmap, focus, months, children, onCell }
     if (focus && b) map.current?.fitBounds([b.west, b.south, b.east, b.north], { padding: 64, maxZoom: 7 });
   }, [focus]);
 
-  // A new heatmap goes on the map, and the view moves to it.
+  // A new heatmap goes on the map, and the view moves to it the first time;
+  // switching the test it's drawn from keeps the view where it is.
+  const hadHeatmap = useRef(false);
   useEffect(() => {
     const m = map.current;
     if (!m) return;
@@ -446,7 +450,8 @@ export function MapView({ box, onBox, heatmap, focus, months, children, onCell }
       if (mv) showHeatmap(m, false);
     });
     const b = latest.current.box;
-    if (heatmap && b) m.fitBounds([b.west, b.south, b.east, b.north], { padding: 48, maxZoom: 7 });
+    if (heatmap && b && !hadHeatmap.current) m.fitBounds([b.west, b.south, b.east, b.north], { padding: 48, maxZoom: 7 });
+    hadHeatmap.current = !!heatmap;
   }, [heatmap]);
 
   // The month-by-month map replaces the heatmap while it's on.

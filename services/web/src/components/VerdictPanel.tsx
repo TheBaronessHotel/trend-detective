@@ -1,6 +1,6 @@
 import type { SeriesAnalysis } from "@gen/analysis/v1/results_pb";
 import { verdict } from "../lib/verdict";
-import { ShuffleChart, TriangleChart } from "./EvidenceCharts";
+import { MonthlyChart, ShuffleChart, TriangleChart } from "./EvidenceCharts";
 
 // Never colour alone: the direction has its own glyph as well.
 const glyphs = { rising: "↗", falling: "↘", flat: "→" } as const;
@@ -23,7 +23,7 @@ export function VerdictPanel({ analysis }: { analysis: SeriesAnalysis }) {
           <li key={l}>{l}</li>
         ))}
       </ul>
-      {(v.more.length > 0 || v.warnings.length > 0 || analysis.shuffle || analysis.trendTriangle) && (
+      {(v.more.length > 0 || v.warnings.length > 0 || analysis.shuffle || analysis.trendTriangle || analysis.monthlyTrends.length > 0) && (
         <details className="verdict-more">
           <summary>Why we think so{v.warnings.length > 0 ? `, and ${v.warnings.length === 1 ? "one caveat" : `${v.warnings.length} caveats`}` : ""}</summary>
           <ul className="verdict-lines">
@@ -33,6 +33,7 @@ export function VerdictPanel({ analysis }: { analysis: SeriesAnalysis }) {
           </ul>
           {analysis.shuffle && <ShuffleChart shuffle={analysis.shuffle} units={analysis.units} />}
           {analysis.trendTriangle && <TriangleChart t={analysis.trendTriangle} alpha={analysis.alpha || 0.05} units={analysis.units} />}
+          {analysis.monthlyTrends.length > 0 && <MonthlyChart trends={analysis.monthlyTrends} units={analysis.units} />}
           {v.warnings.length > 0 && (
             <ul className="verdict-warnings">
               {v.warnings.map((w) => (
