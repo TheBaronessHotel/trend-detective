@@ -372,3 +372,24 @@ func TestNumberFormatting(t *testing.T) {
 		}
 	}
 }
+
+// A significant result on a short record isn't called a trend, as in the app.
+func TestShortRecordIsNotCalledATrend(t *testing.T) {
+	s := upSeries()
+	s.NValid, s.NTotal = 24, 24
+	got := Build(s, nil, rain, span)
+	if !strings.Contains(got, "But 2 years of record is too short to call this a trend") || !strings.Contains(got, "at least 10 years") {
+		t.Fatalf("no short-record sentence:\n%s", got)
+	}
+
+	// Ten years or more, or a result that isn't significant, says nothing more.
+	s.NTotal = 120
+	if strings.Contains(Build(s, nil, rain, span), "too short") {
+		t.Error("a 10-year record was called too short")
+	}
+	s.NTotal = 24
+	s.Regression.Significant = false
+	if strings.Contains(Build(s, nil, rain, span), "too short") {
+		t.Error("a result that isn't significant got the short-record sentence")
+	}
+}

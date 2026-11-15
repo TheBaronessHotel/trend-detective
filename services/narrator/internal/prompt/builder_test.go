@@ -51,6 +51,7 @@ dates.end_year: 2002
 dates.end_month: 3
 dates.end_day: 4
 dates.record_years: 1.16906229 years
+guide.short_record_years: 10
 
 ### Series
 series.variable_id: rain
