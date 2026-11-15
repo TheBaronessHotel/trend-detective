@@ -101,13 +101,18 @@ func run() error {
 	connecthttp.Mount(mux, connectServer, connecthttp.WithReadMaxBytes(maxRequestBytes))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok\n")) })
 
+	handler, err := obs.HTTP(util, mux, "/healthz")
+	if err != nil {
+		return err
+	}
+
 	// h2c, so the gateway can stream over HTTP/2 without TLS.
 	protocols := new(http.Protocols)
 	protocols.SetHTTP1(true)
 	protocols.SetUnencryptedHTTP2(true)
 	srv := &http.Server{
 		Addr:              envx.String("HTTP_ADDR", ":8081"),
-		Handler:           mux,
+		Handler:           handler,
 		Protocols:         protocols,
 		ReadHeaderTimeout: 10 * time.Second,
 		// No WriteTimeout: answers stream for as long as NARRATE_TIMEOUT.

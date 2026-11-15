@@ -2,7 +2,8 @@
 // stderr as JSON, and every record carries trace_id and span_id inside a
 // span, plus job_id and task_id inside a task. Metrics and pprof are served
 // on the admin listener. Spans go to the global OpenTelemetry provider, which
-// drops them until the observability profile (PLAT-5) installs an exporter.
+// exports them over OTLP when OTEL_EXPORTER_OTLP_ENDPOINT is set (the obs
+// compose profile points it at Jaeger) and drops them otherwise.
 package obs
 
 import (
@@ -44,6 +45,12 @@ func Setup(service string) (*observability.Utility, error) {
 	util := observability.NewUtility(log.With("service", service), mgr, oteltracing.DefaultOtelManager(),
 		func(context.Context) error { return log.Close() },
 	)
+	// Registered after the log, so it flushes first: shutdowns run in reverse.
+	shutdownTracer, err := installTracer(service, util.Logger)
+	if err != nil {
+		return nil, err
+	}
+	util.OnShutdown(shutdownTracer)
 
 	profiling.Apply(profiling.Config{Mode: profiling.ModePull})
 	addr := envOr("ADMIN_ADDR", ":9090")

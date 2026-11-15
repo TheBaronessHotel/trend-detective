@@ -23,6 +23,7 @@ import (
 	gatewayv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/gateway/v1"
 	narratorv1 "github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/narrator/v1"
 	"github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/narrator/v1/narratorv1connect"
+	"github.com/TheBaronessHotel/trend-detective/internal/obs"
 	"github.com/TheBaronessHotel/trend-detective/services/gateway/internal/catalog"
 	"github.com/lein3000zzz/the-watchers/pkg/observability/logging"
 )
@@ -91,7 +92,8 @@ func NewClient(baseURL string) (narratorv1connect.NarratorServiceClient, error) 
 		protocols.SetUnencryptedHTTP2(true)
 		tr.Protocols = protocols
 	}
-	httpClient := &http.Client{Transport: tr}
+	// obs.Transport carries the trace on to the narrator.
+	httpClient := &http.Client{Transport: obs.Transport(tr)}
 	return narratorv1connect.NewNarratorServiceClient(connect.NewClient(connecthttp.NewTransport(httpClient, baseURL))), nil
 }
 
