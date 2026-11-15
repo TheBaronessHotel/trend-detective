@@ -34,3 +34,7 @@ test("center and description", () => {
   expect(center(b)).toEqual({ lat: 27.5, lng: -90 });
   expect(describeBox(b)).toBe("93°W to 87°W, 26°N to 29°N");
 });
+
+test("describe rounds edges to two decimals", () => {
+  expect(describeBox({ west: 82.8125, south: 26.25, east: 83.4375, north: 26.75 })).toBe("82.81°E to 83.44°E, 26.25°N to 26.75°N");
+});

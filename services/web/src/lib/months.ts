@@ -3,7 +3,8 @@
 
 import { timestampMs } from "@bufbuild/protobuf/wkt";
 import type { TimeStep } from "@gen/common/v1/common_pb";
-import type { Grid } from "@gen/preprocess/v1/data_pb";
+import { create } from "@bufbuild/protobuf";
+import { type Grid, type Series, SeriesSchema } from "@gen/preprocess/v1/data_pb";
 import type { Feature, FeatureCollection, Polygon } from "geojson";
 import { cellRing } from "./grid";
 
@@ -105,3 +106,36 @@ export const SEQUENTIAL = {
   light: ["#e5f5ee", "#b4e1cc", "#78c7a5", "#3aa57c", "#17805a", "#085a3d"],
   dark: ["#0d2a1f", "#124a36", "#1a7454", "#2ba277", "#6fd0a6", "#c8f0dd"],
 };
+
+/** A cell's rectangle, from the Grid's edges, cut to the job's rectangle like its polygon. */
+export function cellBox(grid: Grid, cell: number): { west: number; south: number; east: number; north: number } | undefined {
+  const r = Math.floor(cell / grid.cols);
+  const c = cell % grid.cols;
+  const ring = cellRing(grid.latEdges[r] ?? 0, grid.latEdges[r + 1] ?? 0, grid.lonEdges[c] ?? 0, grid.lonEdges[c + 1] ?? 0, grid.bbox);
+  if (!ring) return undefined;
+  const [sw, , ne] = ring as [number[], number[], number[]];
+  return { west: sw[0] ?? 0, south: sw[1] ?? 0, east: ne[0] ?? 0, north: ne[1] ?? 0 };
+}
+
+/**
+ * One cell's own series, for the chart: its values and anomalies month by
+ * month, taken from the frames, with the region's units, step and kind of
+ * anomaly. It has no coverage or normals of its own, so the chart leaves
+ * those out.
+ */
+export function cellSeries(region: Series, grid: Grid, f: MonthFrames, cell: number): Series | undefined {
+  const box = cellBox(grid, cell);
+  if (!box || cell < 0 || cell >= f.size) return undefined;
+  const pick = (data: Float32Array | undefined) => f.times.map((_, t) => data?.[t * f.size + cell] ?? Number.NaN);
+  return create(SeriesSchema, {
+    variableId: region.variableId,
+    units: region.units,
+    bbox: box,
+    source: region.source,
+    step: region.step,
+    times: grid.times,
+    values: pick(f.values),
+    anomalies: f.anomalies ? pick(f.anomalies) : [],
+    anomalyKind: region.anomalyKind,
+  });
+}

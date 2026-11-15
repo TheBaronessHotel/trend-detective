@@ -1540,3 +1540,68 @@ p {
 .cell-size + .step {
   margin-top: 1.8rem;
 }
+
+/* ---- one map cell's own chart, under the region's ---- */
+.cell-chart {
+  margin: 1.4rem 0 0;
+  padding: 1rem 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.cell-trend {
+  margin: 0 0 0.6rem;
+  font-size: 0.82rem;
+}
+
+.heat-methods {
+  display: flex;
+  gap: 0.3rem;
+  margin: 0 0 0.5rem;
+}
+
+.heat-methods .action[aria-pressed="true"] {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+/* The trend for each month of the year: blue falling, red rising, pale
+   where the month's test could be chance. */
+.month-bar.up {
+  fill: #b2182b;
+}
+
+.month-bar.down {
+  fill: #2166ac;
+}
+
+.month-bar {
+  opacity: 0.35;
+}
+
+.month-bar.passes {
+  opacity: 1;
+}
+
+.month-bar.on {
+  stroke: var(--fg);
+  stroke-width: 1.5;
+}
+
+.evidence-zero {
+  stroke: var(--fg);
+  opacity: 0.6;
+}
+
+/* Analysis's unusual months, ringed, and its likely shift, dashed. */
+.outlier {
+  fill: none;
+  stroke: var(--fg);
+  stroke-width: 1.5;
+}
+
+.shift {
+  stroke: var(--fg);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  opacity: 0.7;
+}

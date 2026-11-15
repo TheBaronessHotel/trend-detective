@@ -52,7 +52,7 @@ The token is the user's own, if the gateway stored one for the job. Otherwise it
 
 GES DISC, which serves GPM and MERRA-2, only hands files to Earthdata accounts that have approved its "NASA GESDISC DATA ARCHIVE" app once, at https://urs.earthdata.nasa.gov/approve_app?client_id=e2WVk8Pw6weeLUKZYOxvTQ. Until then, Harmony's subsetter gets 403 on every granule, and the adapter reports `UNAUTHENTICATED` with that link.
 
-Variable names are paths inside the file, like `Grid/precipitation` for GPM IMERG. They go in the `variable` query parameter, not the URL path.
+Variable names are paths inside the file, like `Grid/precipitation` for GPM IMERG. They go in the `variable` query parameter, not the URL path. Each variable gets its own `variable` parameter: Harmony rejects a comma-joined list with "Coverages were not found for the provided variables". AIRS methane asks for two, the profile and the surface pressure.
 
 Redis keys:
 

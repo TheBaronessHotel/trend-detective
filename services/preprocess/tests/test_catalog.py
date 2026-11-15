@@ -50,7 +50,16 @@ def synthetic(entry: dict, daily: bool, years: int = 6) -> Decoded:
     else:
         da = xr.DataArray(v, dims=("time",), coords={"time": times.values})
     step = common_pb2.TIME_STEP_DAILY if daily else common_pb2.TIME_STEP_MONTHLY
-    return Decoded(data=canonical.make_dataset(da), units=entry.get("source_units", ""), step=step)
+    column = next((op.column_average for op in ops if op.HasField("column_average")), None)
+    if column is None:
+        return Decoded(data=canonical.make_dataset(da), units=entry.get("source_units", ""), step=step)
+    # A profile on three pressure levels, like AIRS methane, with the surface
+    # pressure helper the step names.
+    levels = xr.DataArray([1000.0, 500.0, 100.0], dims="level")
+    profile = (da * xr.ones_like(levels)).assign_coords(level=levels.values).transpose("time", "level", ...)
+    ds = canonical.make_dataset(profile)
+    ds[canonical.helper_name(column.surface_pressure)] = xr.full_like(da, 1000.0)
+    return Decoded(data=ds, units=entry.get("source_units", ""), step=step)
 
 
 def cases():

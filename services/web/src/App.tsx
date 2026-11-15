@@ -15,12 +15,13 @@ import {
   uploadCsv,
 } from "./api";
 import type { Example } from "./lib/examples";
-import { heatmap } from "./lib/grid";
-import type { MonthFrames, MonthsKind } from "./lib/months";
+import { heatmap, type Method } from "./lib/grid";
+import { cellSeries, type MonthFrames, type MonthsKind } from "./lib/months";
+import { formatSigned } from "./lib/series";
 import { CellSizePicker } from "./components/CellSizePicker";
 import { DatesPicker } from "./components/DatesPicker";
 import { ExamplesBar } from "./components/ExamplesBar";
-import { JobPanel, type Run } from "./components/JobPanel";
+import { type CellView, JobPanel, type Run } from "./components/JobPanel";
 import { MonthsBar } from "./components/MonthsBar";
 import { ALL_OUTPUTS, makesMap, type Outputs, OutputsPicker } from "./components/OutputsPicker";
 import { PlaceFields } from "./components/PlaceFields";
@@ -92,6 +93,7 @@ export function App() {
   const months = useMemo(() => (monthsOn && frames ? { frames, kind, t } : undefined), [monthsOn, frames, kind, t]);
 
   function resetMonths() {
+    setCell(undefined);
     setFrames(undefined);
     setMonthsOn(false);
     setMonthsLoading(false);
@@ -108,32 +110,58 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run]);
 
-  async function openMonths() {
+  /**
+   * Downloads the month-by-month data the first time something needs it: the
+   * time slider, or a clicked cell's chart. undefined if it couldn't.
+   */
+  async function ensureFrames(): Promise<MonthFrames | undefined> {
+    if (frames) return frames;
     const job = run?.job;
     const grid = run?.grid;
-    if (!job || !grid) return;
-    if (frames) {
-      setMonthsOn(true);
-      return;
-    }
+    if (!job || !grid) return undefined;
     // A new job aborts this one's signal, so a late download is dropped.
     const signal = abort.current?.signal;
     setMonthsLoading(true);
     setMonthsError(undefined);
     try {
       const f = await loadGridMonths(job.id, grid, signal);
-      if (signal?.aborted) return;
+      if (signal?.aborted) return undefined;
       if (!f) throw new Error("This job has no month-by-month map.");
       setFrames(f);
       setKind(f.anomalies ? "anomalies" : "values");
       setT(0);
-      setMonthsOn(true);
+      return f;
     } catch (err) {
       if (!signal?.aborted) setMonthsError(`Couldn't load the months. ${errorMessage(err)}`);
+      return undefined;
     } finally {
       if (!signal?.aborted) setMonthsLoading(false);
     }
   }
+
+  async function openMonths() {
+    if (await ensureFrames()) setMonthsOn(true);
+  }
+
+  // A clicked map cell, whose own chart shows under the region's.
+  const [cell, setCell] = useState<number>();
+  function pickCell(c: number) {
+    setCell(c);
+    void ensureFrames();
+  }
+  const cellView = useMemo((): CellView | undefined => {
+    if (cell === undefined || !frames || !run?.series || !run.grid) return undefined;
+    const series = cellSeries(run.series, run.grid, frames, cell);
+    if (!series) return undefined;
+    const tested = run.heatmap?.cells.features.find((f) => f.properties.cell === cell)?.properties;
+    const units = run.heatmap?.units ? ` ${run.heatmap.units}` : "";
+    const trend = tested
+      ? `This cell's trend: ${formatSigned(Number(tested.slope.toPrecision(3)))}${units} per decade, ${tested.significant ? "which passes the test after correcting for testing many cells at once" : "which could be chance"}.`
+      : run.heatmap
+        ? "This cell had too little data for a trend test."
+        : "The trend map wasn't made for this job, so this cell has no trend test.";
+    return { series, trend };
+  }, [cell, frames, run]);
 
   useEffect(() => {
     gateway
@@ -281,12 +309,18 @@ export function App() {
             ? heatmap(grid.value, gridAnalysis.value)
             : undefined,
         grid: grid.status === "fulfilled" ? grid.value : undefined,
+        gridAnalysis: gridAnalysis.status === "fulfilled" ? gridAnalysis.value : undefined,
         monthsMap: input.outputs.monthsMap,
       });
     } catch (err) {
       if (signal.aborted) return;
       setRun((r) => ({ ...r, phase: "done", loadingSeries: false, error: errorMessage(err) }));
     }
+  }
+
+  // The map's colours from the other test: redraw the heatmap from the same results.
+  function pickMethod(m: Method) {
+    setRun((r) => (r?.grid && r.gridAnalysis ? { ...r, heatmap: heatmap(r.grid, r.gridAnalysis, m) ?? r.heatmap } : r));
   }
 
   const seriesTitle = (id: string) => variables?.find((v) => v.id === id)?.name ?? id;
@@ -347,7 +381,7 @@ export function App() {
       </aside>
       <main className="main">
         <Suspense fallback={<div className="map-wrap" />}>
-          <MapView box={box} onBox={setBox} heatmap={run?.heatmap} focus={focus} months={months}>
+          <MapView box={box} onBox={setBox} heatmap={run?.heatmap} focus={focus} months={months} onCell={pickCell}>
             {run?.grid && run.monthsMap && (
               <MonthsBar
                 canClose={!!run.heatmap}
@@ -366,7 +400,12 @@ export function App() {
           </MapView>
         </Suspense>
         {/* Keyed by job, so a new job starts with the panel open. */}
-        <JobPanel key={run?.job?.id ?? "new"} run={run}
+        <JobPanel
+          key={run?.job?.id ?? "new"}
+          run={run}
+          cell={cellView}
+          onCloseCell={() => setCell(undefined)}
+          onMethod={pickMethod}
           // A job without tests ends at preprocess; its spec says where.
           stopAfter={run?.job?.spec?.stopAfter || STOP_AFTER}
           seriesTitle={seriesTitle} onSaveCsv={saveCsv} onStop={stopJob} />

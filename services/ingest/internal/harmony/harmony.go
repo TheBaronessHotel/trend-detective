@@ -453,8 +453,10 @@ func (a *Adapter) granules(ctx context.Context, token string, r *request) (int, 
 
 // submit starts an async HOSS job and returns its ID.
 func (a *Adapter) submit(ctx context.Context, token string, r *request) (string, error) {
+	// One variable parameter per variable. Harmony rejects a comma-joined
+	// list ("Coverages were not found for the provided variables: a,b").
 	q := url.Values{
-		"variable":    {strings.Join(r.variables, ",")},
+		"variable":    r.variables,
 		"subset":      {"lat(" + num(r.bbox.GetSouth()) + ":" + num(r.bbox.GetNorth()) + ")", "lon(" + num(r.bbox.GetWest()) + ":" + num(r.bbox.GetEast()) + ")", `time("` + r.start + `":"` + r.end + `")`},
 		"forceAsync":  {"true"},
 		"skipPreview": {"true"},

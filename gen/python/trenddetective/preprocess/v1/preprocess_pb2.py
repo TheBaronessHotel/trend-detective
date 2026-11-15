@@ -27,7 +27,7 @@ from trenddetective.ingest.v1 import ingest_pb2 as trenddetective_dot_ingest_dot
 from trenddetective.preprocess.v1 import data_pb2 as trenddetective_dot_preprocess_dot_v1_dot_data__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n-trenddetective/preprocess/v1/preprocess.proto\x12\x1ctrenddetective.preprocess.v1\x1a%trenddetective/common/v1/common.proto\x1a%trenddetective/ingest/v1/ingest.proto\x1a\'trenddetective/preprocess/v1/data.proto\"\xfd\x01\n\x0ePreprocessTask\x12\x36\n\x03raw\x18\x01 \x03(\x0b\x32$.trenddetective.ingest.v1.RawDatasetR\x03raw\x12!\n\x0csource_units\x18\x02 \x01(\tR\x0bsourceUnits\x12\x43\n\x07\x66ilters\x18\x03 \x01(\x0b\x32).trenddetective.preprocess.v1.FilterChainR\x07\x66ilters\x12K\n\x0b\x61ggregation\x18\x04 \x01(\x0b\x32).trenddetective.preprocess.v1.AggregationR\x0b\x61ggregation\"G\n\x0b\x46ilterChain\x12\x38\n\x03ops\x18\x01 \x03(\x0b\x32&.trenddetective.preprocess.v1.FilterOpR\x03ops\"\x85\x04\n\x08\x46ilterOp\x12\x42\n\x08qc_range\x18\x01 \x01(\x0b\x32%.trenddetective.preprocess.v1.QcRangeH\x00R\x07qcRange\x12>\n\x06linear\x18\x02 \x01(\x0b\x32$.trenddetective.preprocess.v1.LinearH\x00R\x06linear\x12N\n\x0cmonthly_mean\x18\x03 \x01(\x0b\x32).trenddetective.preprocess.v1.MonthlyMeanH\x00R\x0bmonthlyMean\x12\x41\n\x07\x61nomaly\x18\x04 \x01(\x0b\x32%.trenddetective.preprocess.v1.AnomalyH\x00R\x07\x61nomaly\x12;\n\x05log10\x18\x05 \x01(\x0b\x32#.trenddetective.preprocess.v1.Log10H\x00R\x05log10\x12\x45\n\x07\x63oarsen\x18\x06 \x01(\x0b\x32%.trenddetective.preprocess.v1.CoarsenB\x02\x18\x01H\x00R\x07\x63oarsen\x12X\n\x10gap_fill_display\x18\x07 \x01(\x0b\x32,.trenddetective.preprocess.v1.GapFillDisplayH\x00R\x0egapFillDisplayB\x04\n\x02op\"-\n\x07QcRange\x12\x10\n\x03min\x18\x01 \x01(\x01R\x03min\x12\x10\n\x03max\x18\x02 \x01(\x01R\x03max\"L\n\x06Linear\x12\x14\n\x05scale\x18\x01 \x01(\x01R\x05scale\x12\x16\n\x06offset\x18\x02 \x01(\x01R\x06offset\x12\x14\n\x05units\x18\x03 \x01(\tR\x05units\"3\n\x0bMonthlyMean\x12$\n\x0emin_valid_days\x18\x01 \x01(\x05R\x0cminValidDays\"\xa4\x02\n\x07\x41nomaly\x12=\n\x04kind\x18\x01 \x01(\x0e\x32).trenddetective.preprocess.v1.AnomalyKindR\x04kind\x12?\n\x08\x62\x61seline\x18\x02 \x01(\x0b\x32#.trenddetective.common.v1.YearRangeR\x08\x62\x61seline\x12\x32\n\x15min_baseline_coverage\x18\x03 \x01(\x01R\x13minBaselineCoverage\x12G\n\x06method\x18\x04 \x01(\x0e\x32/.trenddetective.preprocess.v1.ClimatologyMethodR\x06method\x12\x1c\n\tharmonics\x18\x05 \x01(\x05R\tharmonics\"\x07\n\x05Log10\"!\n\x07\x43oarsen\x12\x16\n\x06\x66\x61\x63tor\x18\x01 \x01(\x05R\x06\x66\x61\x63tor\")\n\x0eGapFillDisplay\x12\x17\n\x07max_gap\x18\x01 \x01(\x05R\x06maxGap\"\xb0\x01\n\x0b\x41ggregation\x12\x1f\n\x0bsubregion_n\x18\x01 \x01(\x05R\nsubregionN\x12\x19\n\x08max_grid\x18\x02 \x01(\x05R\x07maxGrid\x12,\n\x12min_valid_fraction\x18\x03 \x01(\x01R\x10minValidFraction\x12&\n\x0c\x62lock_pixels\x18\x04 \x01(\x05H\x00R\x0b\x62lockPixels\x88\x01\x01\x42\x0f\n\r_block_pixels\"\xce\x02\n\x10PreprocessResult\x12\x39\n\x06series\x18\x01 \x01(\x0b\x32!.trenddetective.common.v1.BlobRefR\x06series\x12@\n\nseries_csv\x18\x02 \x01(\x0b\x32!.trenddetective.common.v1.BlobRefR\tseriesCsv\x12\x35\n\x04grid\x18\x03 \x01(\x0b\x32!.trenddetective.common.v1.BlobRefR\x04grid\x12@\n\nvalue_cube\x18\x04 \x01(\x0b\x32!.trenddetective.common.v1.BlobRefR\tvalueCube\x12\x44\n\x0c\x61nomaly_cube\x18\x05 \x01(\x0b\x32!.trenddetective.common.v1.BlobRefR\x0b\x61nomalyCubeB\xa3\x02\n com.trenddetective.preprocess.v1B\x0fPreprocessProtoP\x01Z\\github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/preprocess/v1;preprocessv1\xa2\x02\x03TPX\xaa\x02\x1cTrenddetective.Preprocess.V1\xca\x02\x1cTrenddetective\\Preprocess\\V1\xe2\x02(Trenddetective\\Preprocess\\V1\\GPBMetadata\xea\x02\x1eTrenddetective::Preprocess::V1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n-trenddetective/preprocess/v1/preprocess.proto\x12\x1ctrenddetective.preprocess.v1\x1a%trenddetective/common/v1/common.proto\x1a%trenddetective/ingest/v1/ingest.proto\x1a\'trenddetective/preprocess/v1/data.proto\"\xfd\x01\n\x0ePreprocessTask\x12\x36\n\x03raw\x18\x01 \x03(\x0b\x32$.trenddetective.ingest.v1.RawDatasetR\x03raw\x12!\n\x0csource_units\x18\x02 \x01(\tR\x0bsourceUnits\x12\x43\n\x07\x66ilters\x18\x03 \x01(\x0b\x32).trenddetective.preprocess.v1.FilterChainR\x07\x66ilters\x12K\n\x0b\x61ggregation\x18\x04 \x01(\x0b\x32).trenddetective.preprocess.v1.AggregationR\x0b\x61ggregation\"G\n\x0b\x46ilterChain\x12\x38\n\x03ops\x18\x01 \x03(\x0b\x32&.trenddetective.preprocess.v1.FilterOpR\x03ops\"\xdb\x04\n\x08\x46ilterOp\x12\x42\n\x08qc_range\x18\x01 \x01(\x0b\x32%.trenddetective.preprocess.v1.QcRangeH\x00R\x07qcRange\x12>\n\x06linear\x18\x02 \x01(\x0b\x32$.trenddetective.preprocess.v1.LinearH\x00R\x06linear\x12N\n\x0cmonthly_mean\x18\x03 \x01(\x0b\x32).trenddetective.preprocess.v1.MonthlyMeanH\x00R\x0bmonthlyMean\x12\x41\n\x07\x61nomaly\x18\x04 \x01(\x0b\x32%.trenddetective.preprocess.v1.AnomalyH\x00R\x07\x61nomaly\x12;\n\x05log10\x18\x05 \x01(\x0b\x32#.trenddetective.preprocess.v1.Log10H\x00R\x05log10\x12\x45\n\x07\x63oarsen\x18\x06 \x01(\x0b\x32%.trenddetective.preprocess.v1.CoarsenB\x02\x18\x01H\x00R\x07\x63oarsen\x12X\n\x10gap_fill_display\x18\x07 \x01(\x0b\x32,.trenddetective.preprocess.v1.GapFillDisplayH\x00R\x0egapFillDisplay\x12T\n\x0e\x63olumn_average\x18\x08 \x01(\x0b\x32+.trenddetective.preprocess.v1.ColumnAverageH\x00R\rcolumnAverageB\x04\n\x02op\"-\n\x07QcRange\x12\x10\n\x03min\x18\x01 \x01(\x01R\x03min\x12\x10\n\x03max\x18\x02 \x01(\x01R\x03max\"L\n\x06Linear\x12\x14\n\x05scale\x18\x01 \x01(\x01R\x05scale\x12\x16\n\x06offset\x18\x02 \x01(\x01R\x06offset\x12\x14\n\x05units\x18\x03 \x01(\tR\x05units\"3\n\x0bMonthlyMean\x12$\n\x0emin_valid_days\x18\x01 \x01(\x05R\x0cminValidDays\"\xa4\x02\n\x07\x41nomaly\x12=\n\x04kind\x18\x01 \x01(\x0e\x32).trenddetective.preprocess.v1.AnomalyKindR\x04kind\x12?\n\x08\x62\x61seline\x18\x02 \x01(\x0b\x32#.trenddetective.common.v1.YearRangeR\x08\x62\x61seline\x12\x32\n\x15min_baseline_coverage\x18\x03 \x01(\x01R\x13minBaselineCoverage\x12G\n\x06method\x18\x04 \x01(\x0e\x32/.trenddetective.preprocess.v1.ClimatologyMethodR\x06method\x12\x1c\n\tharmonics\x18\x05 \x01(\x05R\tharmonics\"\x07\n\x05Log10\"!\n\x07\x43oarsen\x12\x16\n\x06\x66\x61\x63tor\x18\x01 \x01(\x05R\x06\x66\x61\x63tor\"]\n\rColumnAverage\x12)\n\x10surface_pressure\x18\x01 \x01(\tR\x0fsurfacePressure\x12!\n\x0cmin_coverage\x18\x02 \x01(\x01R\x0bminCoverage\")\n\x0eGapFillDisplay\x12\x17\n\x07max_gap\x18\x01 \x01(\x05R\x06maxGap\"\xb0\x01\n\x0b\x41ggregation\x12\x1f\n\x0bsubregion_n\x18\x01 \x01(\x05R\nsubregionN\x12\x19\n\x08max_grid\x18\x02 \x01(\x05R\x07maxGrid\x12,\n\x12min_valid_fraction\x18\x03 \x01(\x01R\x10minValidFraction\x12&\n\x0c\x62lock_pixels\x18\x04 \x01(\x05H\x00R\x0b\x62lockPixels\x88\x01\x01\x42\x0f\n\r_block_pixels\"\xce\x02\n\x10PreprocessResult\x12\x39\n\x06series\x18\x01 \x01(\x0b\x32!.trenddetective.common.v1.BlobRefR\x06series\x12@\n\nseries_csv\x18\x02 \x01(\x0b\x32!.trenddetective.common.v1.BlobRefR\tseriesCsv\x12\x35\n\x04grid\x18\x03 \x01(\x0b\x32!.trenddetective.common.v1.BlobRefR\x04grid\x12@\n\nvalue_cube\x18\x04 \x01(\x0b\x32!.trenddetective.common.v1.BlobRefR\tvalueCube\x12\x44\n\x0c\x61nomaly_cube\x18\x05 \x01(\x0b\x32!.trenddetective.common.v1.BlobRefR\x0b\x61nomalyCubeB\xa3\x02\n com.trenddetective.preprocess.v1B\x0fPreprocessProtoP\x01Z\\github.com/TheBaronessHotel/trend-detective/gen/go/trenddetective/preprocess/v1;preprocessv1\xa2\x02\x03TPX\xaa\x02\x1cTrenddetective.Preprocess.V1\xca\x02\x1cTrenddetective\\Preprocess\\V1\xe2\x02(Trenddetective\\Preprocess\\V1\\GPBMetadata\xea\x02\x1eTrenddetective::Preprocess::V1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -42,23 +42,25 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_FILTERCHAIN']._serialized_start=454
   _globals['_FILTERCHAIN']._serialized_end=525
   _globals['_FILTEROP']._serialized_start=528
-  _globals['_FILTEROP']._serialized_end=1045
-  _globals['_QCRANGE']._serialized_start=1047
-  _globals['_QCRANGE']._serialized_end=1092
-  _globals['_LINEAR']._serialized_start=1094
-  _globals['_LINEAR']._serialized_end=1170
-  _globals['_MONTHLYMEAN']._serialized_start=1172
-  _globals['_MONTHLYMEAN']._serialized_end=1223
-  _globals['_ANOMALY']._serialized_start=1226
-  _globals['_ANOMALY']._serialized_end=1518
-  _globals['_LOG10']._serialized_start=1520
-  _globals['_LOG10']._serialized_end=1527
-  _globals['_COARSEN']._serialized_start=1529
-  _globals['_COARSEN']._serialized_end=1562
-  _globals['_GAPFILLDISPLAY']._serialized_start=1564
-  _globals['_GAPFILLDISPLAY']._serialized_end=1605
-  _globals['_AGGREGATION']._serialized_start=1608
-  _globals['_AGGREGATION']._serialized_end=1784
-  _globals['_PREPROCESSRESULT']._serialized_start=1787
-  _globals['_PREPROCESSRESULT']._serialized_end=2121
+  _globals['_FILTEROP']._serialized_end=1131
+  _globals['_QCRANGE']._serialized_start=1133
+  _globals['_QCRANGE']._serialized_end=1178
+  _globals['_LINEAR']._serialized_start=1180
+  _globals['_LINEAR']._serialized_end=1256
+  _globals['_MONTHLYMEAN']._serialized_start=1258
+  _globals['_MONTHLYMEAN']._serialized_end=1309
+  _globals['_ANOMALY']._serialized_start=1312
+  _globals['_ANOMALY']._serialized_end=1604
+  _globals['_LOG10']._serialized_start=1606
+  _globals['_LOG10']._serialized_end=1613
+  _globals['_COARSEN']._serialized_start=1615
+  _globals['_COARSEN']._serialized_end=1648
+  _globals['_COLUMNAVERAGE']._serialized_start=1650
+  _globals['_COLUMNAVERAGE']._serialized_end=1743
+  _globals['_GAPFILLDISPLAY']._serialized_start=1745
+  _globals['_GAPFILLDISPLAY']._serialized_end=1786
+  _globals['_AGGREGATION']._serialized_start=1789
+  _globals['_AGGREGATION']._serialized_end=1965
+  _globals['_PREPROCESSRESULT']._serialized_start=1968
+  _globals['_PREPROCESSRESULT']._serialized_end=2302
 # @@protoc_insertion_point(module_scope)

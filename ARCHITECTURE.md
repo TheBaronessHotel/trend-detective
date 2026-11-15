@@ -298,6 +298,8 @@ One public monorepo, [TheBaronessHotel/trend-detective](https://github.com/TheBa
 | `make smoke-power` | Runs a real job through NASA POWER. No token, but CI skips it |
 | `make smoke-giovanni` | Runs a real point job through Giovanni's time-series API. Needs `EARTHDATA_TOKEN`, so CI skips it |
 | `make smoke-appeears` | Runs a real NDVI job through AppEEARS. Needs `EARTHDATA_USERNAME` and `EARTHDATA_PASSWORD`, so CI skips it |
+| `make smoke-airs` | Runs every AIRS map variable through all stages, methane's column average included. Needs `EARTHDATA_TOKEN`, so CI skips it |
+| `make warm-examples` | Runs the web app's examples (`services/web/src/lib/examples.json`) once, so NASA's data is cached before a demo |
 | `make web-dev` | The web app with hot reload on port 5173, against the running stack's gateway |
 | `make web-check` | The web app's type check, unit tests and production build. CI runs it |
 | `make gen` | Regenerates `gen/` from `proto/` |

@@ -77,7 +77,7 @@ The first run copies `.env.example` to `.env`. Put your Earthdata token in it as
 
 AppEEARS logs in with an Earthdata account rather than the token, so the MODIS variables also need `EARTHDATA_USERNAME` and `EARTHDATA_PASSWORD` in `.env`.
 
-`make up` starts NATS, Redis and SeaweedFS, runs bootstrap to create the JetStream streams and the S3 buckets, and starts ingest, preprocess, analysis, the narrator, the gateway and the web app. Open [http://localhost:3000](http://localhost:3000) and press one of the examples, or pick a variable, draw a rectangle and press Fetch the data. A first run of a long record can take several minutes while NASA prepares the files; the same request again comes from the cache. To try the API with curl, see [services/gateway/README.md](services/gateway/README.md). Other targets:
+`make up` starts NATS, Redis and SeaweedFS, runs bootstrap to create the JetStream streams and the S3 buckets, and starts ingest, preprocess, analysis, the narrator, the gateway and the web app. Run `make warm-examples` once to fetch every example's data from NASA, which can take a while the first time. Then open [http://localhost:3000](http://localhost:3000) and press one of the examples, or pick a variable, draw a rectangle and press Fetch the data. A first run of a long record can take several minutes while NASA prepares the files; the same request again comes from the cache. To try the API with curl, see [services/gateway/README.md](services/gateway/README.md). Other targets:
 
 | Target | What it does |
 |---|---|
@@ -93,6 +93,7 @@ AppEEARS logs in with an Earthdata account rather than the token, so the MODIS v
 | `make smoke-power` | Runs a real job through NASA POWER. Needs no token |
 | `make smoke-giovanni` | Runs a real point job through NASA Giovanni. Needs `EARTHDATA_TOKEN` in `.env` |
 | `make smoke-appeears` | Runs a real NDVI job through NASA AppEEARS. Needs `EARTHDATA_USERNAME` and `EARTHDATA_PASSWORD` in `.env`, and 5 to 15 minutes |
+| `make warm-examples` | With the stack up, runs every "Try an example" job once, so they finish in seconds in the app. The first run waits on NASA, from minutes to an hour for AppEEARS |
 | `make web-dev` | Runs the web app with hot reload on http://localhost:5173, against the running stack. Needs [Bun](https://bun.sh) |
 | `make web-check` | The web app's type check, unit tests and production build |
 

@@ -35,6 +35,7 @@ message FilterOp {
     Log10 log10 = 5;
     Coarsen coarsen = 6 [deprecated = true];
     GapFillDisplay gap_fill_display = 7;
+    ColumnAverage column_average = 8;
   }
 }
 
@@ -84,6 +85,25 @@ message Log10 {}
 // Grid's square blocks (Aggregation.block_pixels) replace it.
 message Coarsen {
   int32 factor = 1;
+}
+
+// Collapse data on pressure levels, like AIRS methane, into one value per
+// pixel: the average over the air column above it, each level weighted by the
+// air it holds. For a mole fraction that's the column-average mole fraction,
+// the way column methane and CO2 are usually reported.
+//
+// Each level's layer runs from halfway to the level below to halfway to the
+// level above. The lowest layer ends at the surface pressure and the top one
+// at 0 hPa, so layers under the ground weigh nothing. A pixel-step whose
+// levels with data hold less than min_coverage of the column's air is
+// missing, as a failed quality check.
+message ColumnAverage {
+  // The surface pressure variable, in hPa: one of the dataset's variables
+  // after the first, for example "ascending/Data_Fields/SurfPres_Forecast_A".
+  // The source lists it after the measurement.
+  string surface_pressure = 1;
+  // Share of the column's air, by pressure, that needs a value. Default 0.9.
+  double min_coverage = 2;
 }
 
 // Fill short gaps by linear interpolation in Series.display_values, for the

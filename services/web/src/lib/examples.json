@@ -1,0 +1,100 @@
+[
+  {
+    "id": "europe-warming",
+    "label": "Europe is warming",
+    "blurb": "Air temperature over western and central Europe, 1981 to 2024, with the map of where it changed.",
+    "variableId": "air-temperature-merra2",
+    "box": {
+      "west": 0,
+      "south": 42,
+      "east": 20,
+      "north": 55
+    },
+    "start": "1981-01",
+    "end": "2024-12"
+  },
+  {
+    "id": "co2",
+    "label": "CO2 keeps rising",
+    "blurb": "Carbon dioxide over eastern China, 2015 to 2021.",
+    "variableId": "co2-oco2",
+    "box": {
+      "west": 110,
+      "south": 30,
+      "east": 120,
+      "north": 40
+    },
+    "start": "2015-01",
+    "end": "2021-12"
+  },
+  {
+    "id": "punjab-greening",
+    "label": "Is Punjab getting greener?",
+    "blurb": "Plant greenness from MODIS over farmland in Punjab, 2001 to 2024.",
+    "variableId": "vegetation-modis",
+    "box": {
+      "west": 75.5,
+      "south": 30,
+      "east": 76.5,
+      "north": 31
+    },
+    "start": "2001-01",
+    "end": "2024-12"
+  },
+  {
+    "id": "no2-china",
+    "label": "Cleaner air in China",
+    "blurb": "NO2 pollution over eastern China, 2012 to 2021.",
+    "variableId": "no2-omi",
+    "box": {
+      "west": 113,
+      "south": 30,
+      "east": 122,
+      "north": 40
+    },
+    "start": "2012-01",
+    "end": "2021-12"
+  },
+  {
+    "id": "groundwater-nw-india",
+    "label": "Groundwater in northwest India",
+    "blurb": "Groundwater storage under Punjab, Haryana and Rajasthan, 2003 to 2023.",
+    "variableId": "groundwater-gldas",
+    "box": {
+      "west": 72,
+      "south": 26,
+      "east": 78,
+      "north": 32
+    },
+    "start": "2003-02",
+    "end": "2023-12"
+  },
+  {
+    "id": "india-mixed",
+    "label": "India: warmer here, cooler there",
+    "blurb": "Air temperature over northern India, 1990 to 2024. The average hardly moves, but the map shows where it rose and where it fell.",
+    "variableId": "air-temperature-merra2",
+    "box": {
+      "west": 70,
+      "south": 20,
+      "east": 88,
+      "north": 32
+    },
+    "start": "1990-01",
+    "end": "2024-12"
+  },
+  {
+    "id": "rain-london",
+    "label": "London rain: no clear trend",
+    "blurb": "Rain at a point in London, 1981 to 2024. Not every record shows a trend.",
+    "variableId": "precipitation-power",
+    "box": {
+      "west": -0.5,
+      "south": 51.3,
+      "east": 0.3,
+      "north": 51.7
+    },
+    "start": "1981-01",
+    "end": "2024-12"
+  }
+]

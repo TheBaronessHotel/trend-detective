@@ -3,13 +3,14 @@ import { type Job, JobState } from "@gen/gateway/v1/gateway_pb";
 import { Stage } from "@gen/gateway/v1/task_pb";
 import type { RawDataset } from "@gen/ingest/v1/ingest_pb";
 import type { Grid, Series } from "@gen/preprocess/v1/data_pb";
-import type { SeriesAnalysis } from "@gen/analysis/v1/results_pb";
-import type { Heatmap } from "../lib/grid";
+import type { GridAnalysis, SeriesAnalysis } from "@gen/analysis/v1/results_pb";
+import type { Heatmap, Method } from "../lib/grid";
 import { errorMessage } from "../api";
 import { describePoint } from "../lib/bbox";
 import { compare, type Day, formatMonth } from "../lib/dates";
 import { type StageView, stageViews } from "../lib/job";
 import { formatLabel, sourceLabel, stepLabel } from "../lib/sources";
+import { CellChart } from "./CellChart";
 import { SeriesChart } from "./SeriesChart";
 import { HeatmapLegend } from "./HeatmapLegend";
 import { NarratePanel } from "./NarratePanel";
@@ -33,12 +34,26 @@ export interface Run {
   heatmap?: Heatmap;
   /** The map grid behind the heatmap, for the month-by-month map. */
   grid?: Grid;
+  /** The per-cell tests, kept so the heatmap can switch between them. */
+  gridAnalysis?: GridAnalysis;
   /** Whether the job asked for the month-by-month map. */
   monthsMap?: boolean;
 }
 
+/** One map cell's own chart, opened by clicking the cell on the globe. */
+export interface CellView {
+  series: Series;
+  /** The cell's trend test from the trend map, in words, when there is one. */
+  trend: string;
+}
+
 interface Props {
   run: Run | undefined;
+  /** A clicked map cell, shown under the region's chart. */
+  cell?: CellView;
+  onCloseCell?: () => void;
+  /** Switch the trend map between the tests that ran on every cell. */
+  onMethod?: (m: Method) => void;
   stopAfter: Stage;
   /** The variable's name, for the chart's title. */
   seriesTitle: (variableId: string) => string;
@@ -174,6 +189,9 @@ function Results({
   heatmap,
   title,
   onSaveCsv,
+  cell,
+  onCloseCell,
+  onMethod,
 }: {
   jobId: string;
   series: Series;
@@ -181,6 +199,9 @@ function Results({
   heatmap: Heatmap | undefined;
   title: string;
   onSaveCsv: () => Promise<void>;
+  cell?: CellView;
+  onCloseCell?: () => void;
+  onMethod?: (m: Method) => void;
 }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string>();
@@ -201,7 +222,7 @@ function Results({
     <div className="job-chart">
       <div className={heatmap ? "results-top with-heatmap" : "results-top"}>
         {analysis && <VerdictPanel analysis={analysis} />}
-        {heatmap && <HeatmapLegend heatmap={heatmap} />}
+        {heatmap && <HeatmapLegend heatmap={heatmap} onMethod={onMethod} />}
       </div>
       <SeriesChart
         series={series}
@@ -214,16 +235,21 @@ function Results({
         }
       />
       {saveError && <Alert>{saveError}</Alert>}
+      {cell && <CellChart cell={cell} title={title} onClose={onCloseCell} />}
       {analysis && <NarratePanel jobId={jobId} />}
     </div>
   );
 }
 
 /** The job: each stage as it runs, what went wrong, and what came back. */
-export function JobPanel({ run, stopAfter, seriesTitle, onSaveCsv, onStop }: Props) {
+export function JobPanel({ run, cell, onCloseCell, onMethod, stopAfter, seriesTitle, onSaveCsv, onStop }: Props) {
   const [stopping, setStopping] = useState(false);
   // Folded down to one line, so the globe gets the room.
   const [folded, setFolded] = useState(false);
+  // A clicked cell opens the panel to show its chart.
+  useEffect(() => {
+    if (cell) setFolded(false);
+  }, [cell]);
   const views = stageViews(run?.job, stopAfter);
   const now = useNow(views.some((v) => v.state === "running"));
   if (!run) return null;
@@ -251,6 +277,9 @@ export function JobPanel({ run, stopAfter, seriesTitle, onSaveCsv, onStop }: Pro
               heatmap={run.heatmap}
               title={seriesTitle(run.series.variableId)}
               onSaveCsv={onSaveCsv}
+              cell={cell}
+              onCloseCell={onCloseCell}
+              onMethod={onMethod}
             />
             <details className="job-details">
               <summary>
