@@ -214,3 +214,54 @@ func keys(m map[string]sdktrace.ReadOnlySpan) []string {
 	}
 	return out
 }
+
+func TestHTTPCountsAPanicAsAFailureAndLeavesInFlight(t *testing.T) {
+	recordSpans(t)
+	reg := prometheus.NewRegistry()
+	util := observability.NewUtility(logging.Noop(), prommetrics.NewManager(reg, reg), oteltracing.DefaultOtelManager())
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /panic", func(http.ResponseWriter, *http.Request) { panic("boom") })
+	h, err := HTTP(util, mux)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Error("the panic didn't reach the caller")
+			}
+		}()
+		h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/panic", nil))
+	}()
+
+	body := scrape(t, util)
+	for _, want := range []string{
+		`watchers_http_operations_total{operation="GET /panic",status="error"} 1`,
+		`watchers_http_operations_in_flight{operation="GET /panic"} 0`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("metrics lack %s", want)
+		}
+	}
+}
+
+func TestHTTPIgnoresInformationalStatus(t *testing.T) {
+	recordSpans(t)
+	reg := prometheus.NewRegistry()
+	util := observability.NewUtility(logging.Noop(), prommetrics.NewManager(reg, reg), oteltracing.DefaultOtelManager())
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /hints", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusEarlyHints)
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	h, err := HTTP(util, mux)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/hints", nil))
+
+	if want := `watchers_http_operations_total{operation="GET /hints",status="error"} 1`; !strings.Contains(scrape(t, util), want) {
+		t.Errorf("metrics lack %s", want)
+	}
+}

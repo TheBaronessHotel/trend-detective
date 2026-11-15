@@ -45,12 +45,10 @@ func Setup(service string) (*observability.Utility, error) {
 	util := observability.NewUtility(log.With("service", service), mgr, oteltracing.DefaultOtelManager(),
 		func(context.Context) error { return log.Close() },
 	)
-	// Registered after the log, so it flushes first: shutdowns run in reverse.
 	shutdownTracer, err := installTracer(service, util.Logger)
 	if err != nil {
 		return nil, err
 	}
-	util.OnShutdown(shutdownTracer)
 
 	profiling.Apply(profiling.Config{Mode: profiling.ModePull})
 	addr := envOr("ADMIN_ADDR", ":9090")
@@ -64,6 +62,10 @@ func Setup(service string) (*observability.Utility, error) {
 		}
 	}()
 	util.OnShutdown(server.Shutdown)
+	// Shutdowns run in reverse, so spans flush first: before the admin
+	// listener drains (a profile scrape can hold it for ~14s) and before the
+	// log closes. Callers shut the util down after their own servers stopped.
+	util.OnShutdown(shutdownTracer)
 	return util, nil
 }
 

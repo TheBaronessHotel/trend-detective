@@ -44,6 +44,10 @@ func HTTP(util *observability.Utility, mux *http.ServeMux, skip ...string) (http
 		_, pattern := mux.Handler(r)
 		op := operation(pattern)
 		done := kit.Start(ctx, op)
+		// Deferred, so a panicking handler still leaves the in-flight gauge
+		// and is counted as a failure; the panic itself carries on.
+		ok := false
+		defer func() { done(ok) }()
 		sw := &statusWriter{ResponseWriter: w}
 		name := op
 		if !strings.Contains(op, " ") {
@@ -62,7 +66,7 @@ func HTTP(util *observability.Utility, mux *http.ServeMux, skip ...string) (http
 			}
 			return nil
 		}, trace.WithSpanKind(trace.SpanKindServer))
-		done(sw.code() < 500)
+		ok = sw.code() < 500
 	}), nil
 }
 
@@ -73,15 +77,15 @@ func operation(pattern string) string {
 	return pattern
 }
 
-// statusWriter remembers the response status. It keeps http.Flusher, which
-// Connect needs for server streams.
+// statusWriter remembers the final response status, skipping informational
+// 1xx ones. It keeps http.Flusher, which Connect needs for server streams.
 type statusWriter struct {
 	http.ResponseWriter
 	status int
 }
 
 func (w *statusWriter) WriteHeader(code int) {
-	if w.status == 0 {
+	if w.status == 0 && code >= 200 {
 		w.status = code
 	}
 	w.ResponseWriter.WriteHeader(code)

@@ -251,7 +251,7 @@ Settings are env vars per service, set in `compose.yaml` and read from `.env`. T
 | `MAX_UPLOAD_MB` | 20. Largest CSV upload. The gateway and ingest both read it |
 | `LOG_LEVEL` | `info`. Go services: trace, debug, info, warn or error |
 | `ADMIN_ADDR` | `:9090`. Go services serve `/metrics` and `/debug/pprof/` here, inside the compose network only |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | empty, so no spans leave the process. `make up-obs` sets `http://jaeger:4318`. Go services export spans over OTLP/HTTP when it is set; the other `OTEL_EXPORTER_OTLP_*` variables work too |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | empty, so no spans leave the process. `make up-obs` sets `http://jaeger:4318`. Go services export spans over OTLP/HTTP when it is set. Compose passes only this one through; a binary run outside compose also reads the other `OTEL_EXPORTER_OTLP_*` HTTP exporter variables (headers, TLS, timeout, `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`) |
 | `BUNDLE_DIR` | `/bundle`. Ingest's bundled datasets, mounted from `services/ingest/bundle` |
 | `INGEST_CONCURRENCY` | 16. Most ingest tasks wait on NASA, so this is well above `HARMONY_CONCURRENCY` |
 | `INGEST_ACK_WAIT` | `2m`. Ingest sends a heartbeat every third of this while a task runs |
