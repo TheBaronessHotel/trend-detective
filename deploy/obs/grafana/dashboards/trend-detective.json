@@ -349,5 +349,18 @@
       ]
     }
   ],
-  "links": []
+  "links": [
+    {
+      "title": "Trend Detective",
+      "type": "dashboards",
+      "tags": [
+        "trend-detective"
+      ],
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": true,
+      "targetBlank": false,
+      "icon": "external link"
+    }
+  ]
 }
