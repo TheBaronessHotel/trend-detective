@@ -28,6 +28,20 @@
     "end": "2021-12"
   },
   {
+    "id": "methane-india",
+    "label": "Methane is rising",
+    "blurb": "Methane, a strong greenhouse gas, over the Ganges plain and Bangladesh, 2003 to 2024, from the AIRS instrument on NASA's Aqua satellite, with the map of where it changed.",
+    "variableId": "methane-airs",
+    "box": {
+      "west": 75,
+      "south": 20,
+      "east": 90,
+      "north": 30
+    },
+    "start": "2003-01",
+    "end": "2024-12"
+  },
+  {
     "id": "punjab-greening",
     "label": "Is Punjab getting greener?",
     "blurb": "Plant greenness from MODIS over farmland in Punjab, 2001 to 2024.",

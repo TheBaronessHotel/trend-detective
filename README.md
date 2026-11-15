@@ -2,7 +2,7 @@
 
 Our entry for NASA Space Apps 2026, [Be An Earth System Trend Detective!](https://www.spaceappschallenge.org/2026/challenges/earth-system-trend-detective/).
 
-Pick one of 34 things to measure, such as air temperature, sea ice, groundwater or NO2, draw a rectangle on the globe and pick the years. Trend Detective fetches the data from NASA, removes the seasonal cycle and tells you, in plain words, whether it's changing, how fast, and how likely that is to be chance. For map variables it also shows where inside the rectangle the change is, and lets you play the months back on the globe.
+Pick one of 40 things to measure, such as air temperature, sea ice, methane, groundwater or NO2, draw a rectangle on the globe and pick the years. Trend Detective fetches the data from NASA, removes the seasonal cycle and tells you, in plain words, whether it's changing, how fast, and how likely that is to be chance. For map variables it also shows where inside the rectangle the change is, and lets you play the months back on the globe.
 
 It's written for high-school students: every number comes with a sentence saying what it means, and the caveats sit next to the result.
 
@@ -15,7 +15,7 @@ It's written for high-school students: every number comes with a sentence saying
 - **Month by month.** A time slider plays the grid back, as measured values or as the difference from normal, so you can watch a trend build up.
 - **Why we think so.** The shuffle test as a histogram, and a triangle of the trend over every stretch of years, to show whether the answer hangs on the years picked. Plus the caveats the tests raised: short records, a sudden shift, odd months.
 - **The chart.** The region's monthly values and anomalies, with the fitted trend and its band, a crosshair, a table view, and a CSV download.
-- **Examples.** One click runs a curated case: Europe warming, CO2 rising, cleaner air over China, groundwater falling in northwest India, farmland greening in Punjab, a mixed picture over India, and London rain with no clear trend.
+- **Examples.** One click runs a curated case: Europe warming, CO2 rising, methane rising over the Ganges plain, cleaner air over China, groundwater falling in northwest India, farmland greening in Punjab, a mixed picture over India, and London rain with no clear trend.
 - **In plain words.** An explanation of the results, written from the numbers without any AI model. Questions about them work with your own Anthropic or OpenAI-compatible key, which stays in the page.
 - **Your own data.** Upload a CSV of dates and values and run the same tests on it.
 
@@ -26,7 +26,9 @@ All from NASA, fetched live when a job runs and cached afterwards.
 | Service | Variables | What we ask it for |
 |---|---|---|
 | [Harmony](https://harmony.earthdata.nasa.gov) | From MERRA-2, back to 1980: air and sea surface temperature, humidity, water vapour, cloud cover, sunlight, wind, sea-level pressure, rain, snowfall, snow cover, sea ice, ozone, carbon monoxide, and haze, dust, smoke and sulfate particles. From GLDAS: soil moisture at the top and in the root zone, soil temperature, evaporation, runoff, snow water and snow depth. Rain and snow from GPM IMERG | The rectangle cut out of each monthly file, for the maps |
-| [Giovanni](https://giovanni.gsfc.nasa.gov) | NO2 (OMI), groundwater (GLDAS), CO2 (OCO-2), ocean chlorophyll (NOBM) | The rectangle's average over time |
+| [Harmony](https://harmony.earthdata.nasa.gov) | From AIRS, the infrared sounder on NASA's Aqua satellite, since 2002: water vapour, air and surface temperature, cloud cover, ozone, and methane as a column average | The rectangle cut out of each monthly file, for the maps |
+| [Harmony](https://harmony.earthdata.nasa.gov) | Ocean chlorophyll from NOBM, 1998 to 2015 | Each month's file by its ID, cut to the rectangle, for the map |
+| [Giovanni](https://giovanni.gsfc.nasa.gov) | NO2 (OMI), groundwater (GLDAS), CO2 (OCO-2), and chlorophyll as a second source | The rectangle's average over time |
 | [POWER](https://power.larc.nasa.gov) | Air temperature, rain and snow | A point's monthly series |
 | [AppEEARS](https://appeears.earthdatacloud.nasa.gov) | Plant greenness (MODIS NDVI), land surface temperature (MODIS) | The rectangle's statistics per image |
 
