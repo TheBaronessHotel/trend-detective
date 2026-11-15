@@ -4,6 +4,9 @@
 # Fields of each entry:
 #   id               stable ID, used in jobs and cache keys
 #   name             shown in the app
+#   topic            the browser's topic, one of Topics in internal/catalog
+#   measurement      the measurement within the topic, also from Topics
+#   product          the data product, like MERRA-2 or MODIS, for search and citing
 #   definition       one or two plain sentences for a high-school student
 #   units            display units, after the filter chain
 #   step             daily, weekly or monthly
@@ -30,6 +33,9 @@
 variables:
   - id: air-temperature-power
     name: Air temperature (one point)
+    topic: Air
+    measurement: Temperature
+    product: POWER
     definition: >-
       How warm the air is 2 meters above the ground, averaged over each month.
       It comes from NASA's POWER project, which combines satellite data with
@@ -70,6 +76,9 @@ variables:
 
   - id: precipitation-gpm
     name: Rain and snow (satellites)
+    topic: Air
+    measurement: Rain and snow
+    product: GPM IMERG
     definition: >-
       How much rain and snow falls, in millimeters per day, averaged over each
       month. It comes from GPM IMERG, which merges measurements from a fleet
@@ -111,6 +120,9 @@ variables:
   # them, so bump them now and then.
   - id: air-temperature-merra2
     name: Air temperature (map)
+    topic: Air
+    measurement: Temperature
+    product: MERRA-2
     definition: >-
       How warm the air is 2 meters above the ground, averaged over each month.
       It comes from MERRA-2, NASA's reanalysis, which blends satellite and
@@ -145,6 +157,9 @@ variables:
 
   - id: soil-moisture-gldas
     name: Soil moisture, top 10 cm (map)
+    topic: Water
+    measurement: Soil moisture
+    product: GLDAS
     definition: >-
       How much water is in the top 10 centimeters of soil, averaged over each
       month. One kilogram per square meter equals a 1 mm layer of water. It
@@ -179,6 +194,9 @@ variables:
 
   - id: snow-gldas
     name: Snow water (map)
+    topic: Snow and ice
+    measurement: Snow
+    product: GLDAS
     definition: >-
       How much water is stored in the snow on the ground, as the depth of
       water you'd get if it all melted, averaged over each month. One kilogram
@@ -215,6 +233,9 @@ variables:
 
   - id: ozone-merra2
     name: Ozone layer (map)
+    topic: Air quality
+    measurement: Gases
+    product: MERRA-2
     definition: >-
       How much ozone is in the air above the ground, averaged over each month.
       Most of it is in the ozone layer, 15 to 35 km up, which blocks harmful
@@ -253,6 +274,9 @@ variables:
 
   - id: aerosol-merra2
     name: Haze from particles (map)
+    topic: Air quality
+    measurement: Particles
+    product: MERRA-2
     definition: >-
       How much sunlight is blocked by tiny particles in the air, such as dust,
       smoke, sea salt and pollution, averaged over each month. Scientists call
@@ -294,6 +318,9 @@ variables:
   # api.giovanni.earthdata.nasa.gov/configured-variables/.
   - id: no2-omi
     name: Air pollution, NO2 (area average)
+    topic: Air quality
+    measurement: Gases
+    product: OMI
     definition: >-
       How much nitrogen dioxide is in the lowest layer of the atmosphere,
       averaged over the rectangle and over each month. Most of it comes from
@@ -329,6 +356,9 @@ variables:
 
   - id: groundwater-gldas
     name: Groundwater (area average)
+    topic: Water
+    measurement: Groundwater
+    product: GLDAS
     definition: >-
       How much water is stored underground, in millimeters of water, averaged
       over the rectangle and over each month. It comes from a NASA land model
@@ -363,6 +393,9 @@ variables:
 
   - id: co2-oco2
     name: Carbon dioxide, CO2 (area average)
+    topic: Air quality
+    measurement: Gases
+    product: OCO-2
     definition: >-
       How much carbon dioxide is in the air, in parts per million: out of every
       million molecules of dry air, from the ground to the top of the
@@ -415,6 +448,9 @@ variables:
 
   - id: chlorophyll-nobm
     name: Ocean chlorophyll (area average)
+    topic: Ocean
+    measurement: Ocean colour
+    product: NOBM
     definition: >-
       How much chlorophyll is in the sea's surface water, averaged over the
       rectangle and over each month. Chlorophyll is the green pigment in
@@ -430,6 +466,8 @@ variables:
     domain: ocean
     default_source: giovanni-area
     sources:
+      # NOBM's monthly files would give a map, but Harmony's subsetter can't
+      # read their time units ("months since"), so it's averages only.
       giovanni-area:
         data_field_id: NOBM_DAY_R2017_tot
         collection_id: C1404080675-GES_DISC
@@ -454,6 +492,9 @@ variables:
 
   - id: precipitation-power
     name: Rain and snow (one point)
+    topic: Air
+    measurement: Rain and snow
+    product: POWER
     definition: >-
       How much rain and snow falls, in millimeters per day, averaged over each
       month. It comes from NASA's POWER project, which combines satellite data
@@ -488,6 +529,9 @@ variables:
   # It logs in with EARTHDATA_USERNAME and EARTHDATA_PASSWORD.
   - id: vegetation-modis
     name: Plant greenness, NDVI (area average)
+    topic: Land and plants
+    measurement: Plants
+    product: MODIS
     definition: >-
       How green and dense the plants are, from bare ground near 0 to thick
       forest near 0.9, averaged over the rectangle for each month. It comes
@@ -519,6 +563,9 @@ variables:
 
   - id: land-surface-temperature-modis
     name: Ground temperature, daytime (area average)
+    topic: Land and plants
+    measurement: Land temperature
+    product: MODIS
     definition: >-
       How hot the ground itself gets in the daytime, around half past ten in
       the morning when the Terra satellite passes over, averaged over the
@@ -551,8 +598,712 @@ variables:
       irrigation and plants cool it.
     dataset_url: https://lpdaac.usgs.gov/products/mod11a2v061/
 
+  - id: sea-surface-temperature-merra2
+    name: Sea surface temperature (map)
+    topic: Ocean
+    measurement: Sea temperature
+    product: MERRA-2
+    definition: >-
+      How warm the very top of the sea is, averaged over each month. Over land
+      the same number is the temperature of the ground's surface. It comes
+      from MERRA-2, NASA's reanalysis, which takes its sea temperatures from
+      satellite and ship measurements.
+    units: °C
+    step: monthly
+    available: { start: 1980-01-01, end: 2026-09-30 }
+    grid: true
+    pixel_size: { lat: 0.5, lon: 0.625 }
+    domain: ocean
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1276812859-GES_DISC
+        variables: [TS]
+    source_units: K
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 150, max: 350 }
+        - linear: { scale: 1, offset: -273.15, units: °C }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      MERRA-2's surface skin temperature (TS). Over the ocean it follows the
+      sea surface temperature MERRA-2 is given from satellite and in-situ
+      analyses; over land it's the ground's skin, which swings more than the
+      air. Sea ice areas read near freezing. A rectangle that mixes land and
+      sea averages both.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/M2TMNXSLV_5.12.4/summary
+
+  - id: humidity-merra2
+    name: Humidity near the ground (map)
+    topic: Air
+    measurement: Humidity
+    product: MERRA-2
+    definition: >-
+      How much water vapour the air 2 meters above the ground holds, in grams
+      of water per kilogram of air, averaged over each month. Warmer air can
+      hold more, so humidity often rises where it warms. It comes from
+      MERRA-2, NASA's reanalysis.
+    units: g/kg
+    step: monthly
+    available: { start: 1980-01-01, end: 2026-09-30 }
+    grid: true
+    pixel_size: { lat: 0.5, lon: 0.625 }
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1276812859-GES_DISC
+        variables: [QV2M]
+    source_units: kg/kg
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 0.05 }
+        - linear: { scale: 1000, offset: 0, units: g/kg }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      MERRA-2 specific humidity at 2 m (QV2M). It's a mass ratio, so it doesn't
+      depend on temperature the way relative humidity does. Changes in the
+      satellites MERRA-2 took in can add small steps.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/M2TMNXSLV_5.12.4/summary
+
+  - id: water-vapour-merra2
+    name: Water vapour in the air (map)
+    topic: Air
+    measurement: Humidity
+    product: MERRA-2
+    definition: >-
+      All the water vapour in the air above a place, from the ground to the
+      top of the sky, shown as the millimeters of rain it would make if it all
+      fell at once. Averaged over each month. Water vapour is the strongest
+      natural greenhouse gas. It comes from MERRA-2, NASA's reanalysis.
+    units: mm
+    step: monthly
+    available: { start: 1980-01-01, end: 2026-09-30 }
+    grid: true
+    pixel_size: { lat: 0.5, lon: 0.625 }
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1276812859-GES_DISC
+        variables: [TQV]
+    source_units: kg/m²
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 100 }
+        - linear: { scale: 1, offset: 0, units: mm }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      MERRA-2 total precipitable water vapour (TQV), in kg/m², which equals mm
+      of liquid water. It grows about 7% for each degree of warming. Changes in
+      the satellites MERRA-2 took in can add small steps.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/M2TMNXSLV_5.12.4/summary
+
+  - id: clouds-merra2
+    name: Cloud cover (map)
+    topic: Air
+    measurement: Clouds
+    product: MERRA-2
+    definition: >-
+      How much of the sky is covered by cloud, from 0% for clear sky to 100%
+      for overcast, averaged over each month. It comes from MERRA-2, NASA's
+      reanalysis.
+    units: "%"
+    step: monthly
+    available: { start: 1980-01-01, end: 2026-09-30 }
+    grid: true
+    pixel_size: { lat: 0.5, lon: 0.625 }
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1276812858-GES_DISC
+        variables: [CLDTOT]
+    source_units: fraction
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 1 }
+        - linear: { scale: 100, offset: 0, units: "%" }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      MERRA-2 total cloud area fraction (CLDTOT), from the model rather than
+      directly observed, so trends in it are less certain than in temperature.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/M2TMNXRAD_5.12.4/summary
+
+  - id: sunlight-merra2
+    name: Sunlight reaching the ground (map)
+    topic: Air
+    measurement: Sunlight
+    product: MERRA-2
+    definition: >-
+      How much energy from the sun reaches the ground, in watts per square
+      meter, averaged over day and night for each month. Clouds and haze cut
+      it. It comes from MERRA-2, NASA's reanalysis.
+    units: W/m²
+    step: monthly
+    available: { start: 1980-01-01, end: 2026-09-30 }
+    grid: true
+    pixel_size: { lat: 0.5, lon: 0.625 }
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1276812858-GES_DISC
+        variables: [SWGDN]
+    source_units: W/m²
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 600 }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      MERRA-2 surface incoming shortwave flux (SWGDN). Scientists call long
+      declines "dimming" and recoveries "brightening", often from changes in
+      air pollution. Model clouds make it less certain than temperature.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/M2TMNXRAD_5.12.4/summary
+
+  - id: wind-merra2
+    name: Wind speed near the ground (map)
+    topic: Air
+    measurement: Wind and pressure
+    product: MERRA-2
+    definition: >-
+      How fast the wind blows near the ground, in meters per second, averaged
+      over each month. It comes from MERRA-2, NASA's reanalysis.
+    units: m/s
+    step: monthly
+    available: { start: 1980-01-01, end: 2026-09-30 }
+    grid: true
+    pixel_size: { lat: 0.5, lon: 0.625 }
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1276812868-GES_DISC
+        variables: [SPEED]
+    source_units: m/s
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 60 }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      MERRA-2 surface wind speed (SPEED), the monthly mean of the speed, not
+      of the wind vector. Reanalysis winds over land are less certain than
+      over the ocean.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/M2TMNXFLX_5.12.4/summary
+
+  - id: pressure-merra2
+    name: Air pressure at sea level (map)
+    topic: Air
+    measurement: Wind and pressure
+    product: MERRA-2
+    definition: >-
+      The weight of the air above a place, as if the place were at sea level,
+      in hectopascals, averaged over each month. High pressure usually brings
+      calm, dry weather and low pressure storms. It comes from MERRA-2, NASA's
+      reanalysis.
+    units: hPa
+    step: monthly
+    available: { start: 1980-01-01, end: 2026-09-30 }
+    grid: true
+    pixel_size: { lat: 0.5, lon: 0.625 }
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1276812859-GES_DISC
+        variables: [SLP]
+    source_units: Pa
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 85000, max: 110000 }
+        - linear: { scale: 0.01, offset: 0, units: hPa }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      MERRA-2 sea level pressure (SLP). Over high mountains it's extrapolated
+      to sea level, so values there are less meaningful.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/M2TMNXSLV_5.12.4/summary
+
+  - id: precipitation-merra2
+    name: Rain and snow since 1980 (map)
+    topic: Air
+    measurement: Rain and snow
+    product: MERRA-2
+    definition: >-
+      How much rain and snow falls, in millimeters per day, averaged over each
+      month, back to 1980. It comes from MERRA-2, NASA's reanalysis, corrected
+      with rain gauge and satellite measurements. For the satellites' own
+      view since 1998, pick "Rain and snow (satellites)".
+    units: mm/day
+    step: monthly
+    available: { start: 1980-01-01, end: 2026-09-30 }
+    grid: true
+    pixel_size: { lat: 0.5, lon: 0.625 }
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1276812868-GES_DISC
+        variables: [PRECTOTCORR]
+    source_units: kg/m²/s
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 0.01 }
+        - linear: { scale: 86400, offset: 0, units: mm/day }
+        - anomaly: { kind: ANOMALY_KIND_PERCENT }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      MERRA-2 bias-corrected total precipitation (PRECTOTCORR), corrected
+      toward gauge and satellite analyses. Rain varies a lot from year to
+      year, so trends need long records.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/M2TMNXFLX_5.12.4/summary
+
+  - id: snowfall-merra2
+    name: Snowfall (map)
+    topic: Snow and ice
+    measurement: Snow
+    product: MERRA-2
+    definition: >-
+      How much snow falls, as millimeters of water per day once melted,
+      averaged over each month. It comes from MERRA-2, NASA's reanalysis.
+    units: mm/day
+    step: monthly
+    available: { start: 1980-01-01, end: 2026-09-30 }
+    grid: true
+    pixel_size: { lat: 0.5, lon: 0.625 }
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1276812868-GES_DISC
+        variables: [PRECSNO]
+    source_units: kg/m²/s
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 0.01 }
+        - linear: { scale: 86400, offset: 0, units: mm/day }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      MERRA-2 snowfall (PRECSNO), in water equivalent. Months without snow
+      are zero, so in warm places the series is mostly zeros.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/M2TMNXFLX_5.12.4/summary
+
+  - id: carbon-monoxide-merra2
+    name: Carbon monoxide (map)
+    topic: Air quality
+    measurement: Gases
+    product: MERRA-2
+    definition: >-
+      How much carbon monoxide is in the air above a place, in grams per
+      square meter, averaged over each month. It comes mostly from fires and
+      from burning fuel. It comes from MERRA-2, NASA's reanalysis.
+    units: g/m²
+    step: monthly
+    available: { start: 1980-01-01, end: 2026-09-30 }
+    grid: true
+    pixel_size: { lat: 0.5, lon: 0.625 }
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1276812852-GES_DISC
+        variables: [COCL]
+    source_units: kg/m²
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 0.1 }
+        - linear: { scale: 1000, offset: 0, units: g/m² }
+        - anomaly: { kind: ANOMALY_KIND_PERCENT }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      MERRA-2 CO column burden (COCL). MERRA-2 models CO from emission
+      inventories rather than taking in CO measurements, so it shows the
+      model's view; fire years stand out.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/M2TMNXCHM_5.12.4/summary
+
+  - id: dust-merra2
+    name: Dust in the air (map)
+    topic: Air quality
+    measurement: Particles
+    product: MERRA-2
+    definition: >-
+      How much sunlight is blocked by desert dust in the air, averaged over
+      each month. Scientists call it dust optical depth. Below 0.1 is little
+      dust, and above 0.5 is a dusty sky. It comes from MERRA-2, NASA's
+      reanalysis.
+    units: AOD
+    step: monthly
+    available: { start: 1980-01-01, end: 2026-09-30 }
+    grid: true
+    pixel_size: { lat: 0.5, lon: 0.625 }
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1276812866-GES_DISC
+        variables: [DUEXTTAU]
+    source_units: AOD
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 10 }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      MERRA-2 dust extinction optical thickness at 550 nm (DUEXTTAU). MERRA-2
+      takes in satellite aerosol measurements only from 2000 on, so earlier
+      years lean more on the model.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/M2TMNXAER_5.12.4/summary
+
+  - id: smoke-merra2
+    name: Smoke from fires (map)
+    topic: Air quality
+    measurement: Particles
+    product: MERRA-2
+    definition: >-
+      How much sunlight is blocked by smoke particles from fires and burning,
+      averaged over each month. Scientists call these organic carbon aerosols.
+      Big fire seasons show as spikes. It comes from MERRA-2, NASA's
+      reanalysis.
+    units: AOD
+    step: monthly
+    available: { start: 1980-01-01, end: 2026-09-30 }
+    grid: true
+    pixel_size: { lat: 0.5, lon: 0.625 }
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1276812866-GES_DISC
+        variables: [OCEXTTAU]
+    source_units: AOD
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 10 }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      MERRA-2 organic carbon extinction optical thickness at 550 nm
+      (OCEXTTAU), mostly from biomass burning. Fire emissions in MERRA-2 come
+      from satellite fire detections since 2000, so earlier years are less
+      certain.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/M2TMNXAER_5.12.4/summary
+
+  - id: sulfate-merra2
+    name: Sulfate pollution (map)
+    topic: Air quality
+    measurement: Particles
+    product: MERRA-2
+    definition: >-
+      How much sunlight is blocked by sulfate particles, which come mostly
+      from burning coal and oil and from volcanoes, averaged over each month.
+      Cleaner power plants make it fall. It comes from MERRA-2, NASA's
+      reanalysis.
+    units: AOD
+    step: monthly
+    available: { start: 1980-01-01, end: 2026-09-30 }
+    grid: true
+    pixel_size: { lat: 0.5, lon: 0.625 }
+    domain: global
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1276812866-GES_DISC
+        variables: [SUEXTTAU]
+    source_units: AOD
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 10 }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      MERRA-2 sulfate extinction optical thickness at 550 nm (SUEXTTAU). Large
+      volcanic eruptions, like Pinatubo in 1991, show as big peaks.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/M2TMNXAER_5.12.4/summary
+
+  - id: evaporation-gldas
+    name: Water evaporating from land (map)
+    topic: Water
+    measurement: Evaporation
+    product: GLDAS
+    definition: >-
+      How much water goes from the land into the air, from soil, lakes and
+      plants together, in millimeters per day, averaged over each month. It
+      comes from GLDAS, a NASA land model driven by satellite and ground
+      measurements.
+    units: mm/day
+    step: monthly
+    available: { start: 2000-01-01, end: 2026-07-31 }
+    grid: true
+    pixel_size: { lat: 0.25, lon: 0.25 }
+    domain: land
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1342986036-GES_DISC
+        variables: [Evap_tavg]
+    source_units: kg/m²/s
+    aggregation: { block_pixels: 2 }
+    filters:
+      ops:
+        - qc_range: { min: -0.001, max: 0.001 }
+        - linear: { scale: 86400, offset: 0, units: mm/day }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      GLDAS Noah evapotranspiration (Evap_tavg). It's modelled, not measured,
+      and limited by both water and energy: it can fall in a drought even as
+      it warms.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/GLDAS_NOAH025_M_2.1/summary
+
+  - id: runoff-gldas
+    name: Rain running off the land (map)
+    topic: Water
+    measurement: Runoff
+    product: GLDAS
+    definition: >-
+      How much rain and meltwater runs off the ground's surface instead of
+      soaking in, toward streams and rivers, in millimeters per day, averaged
+      over each month. It comes from GLDAS, a NASA land model.
+    units: mm/day
+    step: monthly
+    available: { start: 2000-01-01, end: 2026-07-31 }
+    grid: true
+    pixel_size: { lat: 0.25, lon: 0.25 }
+    domain: land
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1342986036-GES_DISC
+        variables: [Qs_acc]
+    source_units: kg/m² per 3 hours
+    aggregation: { block_pixels: 2 }
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 100 }
+        # GLDAS monthly accumulations are means of 3-hour totals: 8 a day.
+        - linear: { scale: 8, offset: 0, units: mm/day }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      GLDAS Noah storm surface runoff (Qs_acc). Modelled, and very uneven:
+      most months are near zero and a few wet months dominate, so trends
+      need long records.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/GLDAS_NOAH025_M_2.1/summary
+
+  - id: root-zone-moisture-gldas
+    name: Soil moisture, root zone (map)
+    topic: Water
+    measurement: Soil moisture
+    product: GLDAS
+    definition: >-
+      How much water is in the soil where plant roots reach, down to about one
+      or two meters, averaged over each month. One kilogram per square meter
+      equals a 1 mm layer of water. It changes more slowly than the top layer.
+      It comes from GLDAS, a NASA land model.
+    units: kg/m²
+    step: monthly
+    available: { start: 2000-01-01, end: 2026-07-31 }
+    grid: true
+    pixel_size: { lat: 0.25, lon: 0.25 }
+    domain: land
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1342986036-GES_DISC
+        variables: [RootMoist_inst]
+    source_units: kg/m²
+    aggregation: { block_pixels: 2 }
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 2000 }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      GLDAS Noah root zone soil moisture (RootMoist_inst). The root zone depth
+      depends on the vegetation type, so values compare best within one place.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/GLDAS_NOAH025_M_2.1/summary
+
+  - id: soil-temperature-gldas
+    name: Soil temperature, top 10 cm (map)
+    topic: Land and plants
+    measurement: Land temperature
+    product: GLDAS
+    definition: >-
+      How warm the top 10 centimeters of soil are, averaged over each month.
+      It comes from GLDAS, a NASA land model driven by satellite and ground
+      measurements.
+    units: °C
+    step: monthly
+    available: { start: 2000-01-01, end: 2026-07-31 }
+    grid: true
+    pixel_size: { lat: 0.25, lon: 0.25 }
+    domain: land
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1342986036-GES_DISC
+        variables: [SoilTMP0_10cm_inst]
+    source_units: K
+    aggregation: { block_pixels: 2 }
+    filters:
+      ops:
+        - qc_range: { min: 200, max: 350 }
+        - linear: { scale: 1, offset: -273.15, units: °C }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      GLDAS Noah soil temperature 0-10 cm (SoilTMP0_10cm_inst), an
+      instantaneous value at the end of each 3 hours, averaged over the month.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/GLDAS_NOAH025_M_2.1/summary
+
+  - id: snow-depth-gldas
+    name: Snow depth (map)
+    topic: Snow and ice
+    measurement: Snow
+    product: GLDAS
+    definition: >-
+      How deep the snow on the ground is, in centimeters, averaged over each
+      month. It comes from GLDAS, a NASA land model driven by satellite and
+      ground measurements.
+    units: cm
+    step: monthly
+    available: { start: 2000-01-01, end: 2026-07-31 }
+    grid: true
+    pixel_size: { lat: 0.25, lon: 0.25 }
+    domain: land
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1342986036-GES_DISC
+        variables: [SnowDepth_inst]
+    source_units: m
+    aggregation: { block_pixels: 2 }
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 50 }
+        - linear: { scale: 100, offset: 0, units: cm }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      GLDAS Noah snow depth (SnowDepth_inst). Snow-free months are zero, so
+      warm places have mostly zeros; glaciers and ice sheets aren't modelled
+      well.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/GLDAS_NOAH025_M_2.1/summary
+
+  - id: snow-cover-merra2
+    name: Snow cover (map)
+    topic: Snow and ice
+    measurement: Snow
+    product: MERRA-2
+    definition: >-
+      How much of the ground is covered by snow, from 0% to 100%, averaged
+      over each month. It comes from MERRA-2, NASA's reanalysis, back to 1980.
+    units: "%"
+    step: monthly
+    available: { start: 1980-01-01, end: 2026-09-30 }
+    grid: true
+    pixel_size: { lat: 0.5, lon: 0.625 }
+    domain: land
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1276812856-GES_DISC
+        variables: [FRSNO]
+    source_units: fraction
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 1 }
+        - linear: { scale: 100, offset: 0, units: "%" }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      MERRA-2 fractional snow-covered area (FRSNO), from its land model.
+      Spring months show trends best, as snow melts earlier in a warmer
+      climate. Ocean pixels are empty.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/M2TMNXLND_5.12.4/summary
+
+  - id: sea-ice-merra2
+    name: Sea ice cover (map)
+    topic: Snow and ice
+    measurement: Sea ice
+    product: MERRA-2
+    definition: >-
+      How much of the sea's surface is frozen, from 0% to 100%, averaged over
+      each month. Arctic sea ice is smallest each September. It comes from
+      MERRA-2, NASA's reanalysis, which takes its sea ice from satellite
+      measurements.
+    units: "%"
+    step: monthly
+    available: { start: 1980-01-01, end: 2026-09-30 }
+    grid: true
+    pixel_size: { lat: 0.5, lon: 0.625 }
+    domain: ocean
+    default_source: harmony-subset
+    sources:
+      harmony-subset:
+        collection_id: C1276812868-GES_DISC
+        variables: [FRSEAICE]
+    source_units: fraction
+    aggregation: { block_pixels: 1 }
+    filters:
+      ops:
+        - qc_range: { min: 0, max: 1 }
+        - linear: { scale: 100, offset: 0, units: "%" }
+        - anomaly: { kind: ANOMALY_KIND_ABSOLUTE }
+        - gap_fill_display: { max_gap: 2 }
+    tests: *grid-tests
+    llm_hints: >-
+      MERRA-2 sea ice fraction (FRSEAICE), from the satellite sea ice
+      analyses MERRA-2 is given. The clearest trends are in the Arctic in
+      late summer. Land pixels read zero, so a rectangle should stay over
+      sea.
+    dataset_url: https://disc.gsfc.nasa.gov/datasets/M2TMNXFLX_5.12.4/summary
+
   - id: user-csv
     name: Your own data (CSV upload)
+    topic: Your data
+    measurement: Upload
+    product: Your CSV
     definition: >-
       A time series you upload yourself, for example readings from a school
       weather station. The file needs two columns: the date, written like

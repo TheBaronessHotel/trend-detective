@@ -448,6 +448,12 @@ export function MapView({ box, onBox, heatmap, focus, months, children }: Props)
     });
   }, [frames, kind]);
 
+  // New months, as when a job made no trend map, move the view to them too.
+  useEffect(() => {
+    const b = latest.current.box;
+    if (frames && b) map.current?.fitBounds([b.west, b.south, b.east, b.north], { padding: 48, maxZoom: 7 });
+  }, [frames]);
+
   useEffect(() => {
     const m = map.current;
     if (m && months && m.getSource(monthsSource)) paintMonth(m, months);

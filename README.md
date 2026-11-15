@@ -2,12 +2,14 @@
 
 Our entry for NASA Space Apps 2026, [Be An Earth System Trend Detective!](https://www.spaceappschallenge.org/2026/challenges/earth-system-trend-detective/).
 
-Pick something to measure, such as air temperature, groundwater or NO2, draw a rectangle on the globe and pick the years. Trend Detective fetches the data from NASA, removes the seasonal cycle and tells you, in plain words, whether it's changing, how fast, and how likely that is to be chance. For map variables it also shows where inside the rectangle the change is, and lets you play the months back on the globe.
+Pick one of 34 things to measure, such as air temperature, sea ice, groundwater or NO2, draw a rectangle on the globe and pick the years. Trend Detective fetches the data from NASA, removes the seasonal cycle and tells you, in plain words, whether it's changing, how fast, and how likely that is to be chance. For map variables it also shows where inside the rectangle the change is, and lets you play the months back on the globe.
 
 It's written for high-school students: every number comes with a sentence saying what it means, and the caveats sit next to the result.
 
 ## What it does
 
+- **A variable browser.** Like Giovanni's: search, topics (air, air quality, water, land and plants, ocean, snow and ice) and measurements, and a filter for the ones with a map.
+- **Choose what to make.** The region's chart always comes; the trend tests, the trend map and the month-by-month map are each optional, so a quick look at the map skips the tests.
 - **One answer up top.** "Rising, and unlikely to be chance", "Falling…" or "No clear trend yet", with the rate per decade, the range it likely falls in, and how often chance alone would give a trend this strong.
 - **Where it's changing.** For map variables, a heatmap on the globe colours each cell by its own trend. Cells that still pass after correcting for testing hundreds of cells at once are outlined.
 - **Month by month.** A time slider plays the grid back, as measured values or as the difference from normal, so you can watch a trend build up.
@@ -23,7 +25,7 @@ All from NASA, fetched live when a job runs and cached afterwards.
 
 | Service | Variables | What we ask it for |
 |---|---|---|
-| [Harmony](https://harmony.earthdata.nasa.gov) | Air temperature, ozone and haze (MERRA-2), soil moisture and snow (GLDAS), rain and snow (GPM IMERG) | The rectangle cut out of each monthly file, for the maps |
+| [Harmony](https://harmony.earthdata.nasa.gov) | From MERRA-2, back to 1980: air and sea surface temperature, humidity, water vapour, cloud cover, sunlight, wind, sea-level pressure, rain, snowfall, snow cover, sea ice, ozone, carbon monoxide, and haze, dust, smoke and sulfate particles. From GLDAS: soil moisture at the top and in the root zone, soil temperature, evaporation, runoff, snow water and snow depth. Rain and snow from GPM IMERG | The rectangle cut out of each monthly file, for the maps |
 | [Giovanni](https://giovanni.gsfc.nasa.gov) | NO2 (OMI), groundwater (GLDAS), CO2 (OCO-2), ocean chlorophyll (NOBM) | The rectangle's average over time |
 | [POWER](https://power.larc.nasa.gov) | Air temperature, rain and snow | A point's monthly series |
 | [AppEEARS](https://appeears.earthdatacloud.nasa.gov) | Plant greenness (MODIS NDVI), land surface temperature (MODIS) | The rectangle's statistics per image |

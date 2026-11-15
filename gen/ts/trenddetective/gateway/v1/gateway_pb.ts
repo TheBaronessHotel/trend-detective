@@ -26,7 +26,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file trenddetective/gateway/v1/gateway.proto.
  */
 export const file_trenddetective_gateway_v1_gateway: GenFile = /*@__PURE__*/
-  fileDesc("Cid0cmVuZGRldGVjdGl2ZS9nYXRld2F5L3YxL2dhdGV3YXkucHJvdG8SGXRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEiFgoUTGlzdFZhcmlhYmxlc1JlcXVlc3QiTwoVTGlzdFZhcmlhYmxlc1Jlc3BvbnNlEjYKCXZhcmlhYmxlcxgBIAMoCzIjLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuVmFyaWFibGUiwAMKCFZhcmlhYmxlEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEgoKZGVmaW5pdGlvbhgDIAEoCRINCgV1bml0cxgEIAEoCRIwCgRzdGVwGAUgASgOMiIudHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLlRpbWVTdGVwEjYKCWF2YWlsYWJsZRgGIAEoCzIjLnRyZW5kZGV0ZWN0aXZlLmNvbW1vbi52MS5EYXRlUmFuZ2USDAoEZ3JpZBgHIAEoCBIxCgZkb21haW4YCCABKA4yIS50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkRvbWFpbhI4Cg5kZWZhdWx0X3NvdXJjZRgJIAEoDjIgLnRyZW5kZGV0ZWN0aXZlLmluZ2VzdC52MS5Tb3VyY2USMQoHc291cmNlcxgKIAMoDjIgLnRyZW5kZGV0ZWN0aXZlLmluZ2VzdC52MS5Tb3VyY2USEwoLZGF0YXNldF91cmwYCyABKAkSFQoNcGl4ZWxfbGF0X2RlZxgMIAEoARIVCg1waXhlbF9sb25fZGVnGA0gASgBEhwKFGRlZmF1bHRfYmxvY2tfcGl4ZWxzGA4gASgFIkQKEENyZWF0ZUpvYlJlcXVlc3QSMAoEc3BlYxgBIAEoCzIiLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuSm9iU3BlYyJAChFDcmVhdGVKb2JSZXNwb25zZRIrCgNqb2IYASABKAsyHi50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkpvYiLMAwoHSm9iU3BlYxITCgt2YXJpYWJsZV9pZBgBIAEoCRIsCgRiYm94GAIgASgLMh4udHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLkJCb3gSMgoFZGF0ZXMYAyABKAsyIy50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuRGF0ZVJhbmdlEjAKBnNvdXJjZRgEIAEoDjIgLnRyZW5kZGV0ZWN0aXZlLmluZ2VzdC52MS5Tb3VyY2USNAoKc3RvcF9hZnRlchgFIAEoDjIgLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuU3RhZ2USMQoGdXBsb2FkGAYgASgLMiEudHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLkJsb2JSZWYSOgoHZmlsdGVycxgHIAEoCzIpLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEuRmlsdGVyQ2hhaW4SPgoLYWdncmVnYXRpb24YCCABKAsyKS50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLkFnZ3JlZ2F0aW9uEjMKBXRlc3RzGAkgASgLMiQudHJlbmRkZXRlY3RpdmUuYW5hbHlzaXMudjEuVGVzdFBsYW4iiQMKA0pvYhIKCgJpZBgBIAEoCRIyCgVzdGF0ZRgCIAEoDjIjLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuSm9iU3RhdGUSMAoEc3BlYxgDIAEoCzIiLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuSm9iU3BlYxI0CgV0YXNrcxgEIAMoCzIlLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuVGFza1N0YXR1cxITCgt0YXNrc190b3RhbBgFIAEoBRIXCg90YXNrc19zdWNjZWVkZWQYBiABKAUSFAoMdGFza3NfZmFpbGVkGAcgASgFEjYKB3Jlc3VsdHMYCCABKAsyJS50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkpvYlJlc3VsdHMSLgoKY3JlYXRlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAi4wIKClRhc2tTdGF0dXMSMQoEbWV0YRgBIAEoCzIjLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuVGFza01ldGESMwoFc3RhdGUYAiABKA4yJC50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLlRhc2tTdGF0ZRIQCghhdHRlbXB0cxgDIAEoBRIRCgljYWNoZV9oaXQYBCABKAgSMwoFZXJyb3IYBSABKAsyJC50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLlRhc2tFcnJvchIuCgpzdGFydGVkX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIvCgtmaW5pc2hlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFAoHcGVyY2VudBgIIAEoBUgAiAEBEhAKCGFjdGl2aXR5GAkgASgJQgoKCF9wZXJjZW50IsEBCgpKb2JSZXN1bHRzEjEKA3JhdxgBIAMoCzIkLnRyZW5kZGV0ZWN0aXZlLmluZ2VzdC52MS5SYXdEYXRhc2V0EkIKCnByZXByb2Nlc3MYAiABKAsyLi50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLlByZXByb2Nlc3NSZXN1bHQSPAoIYW5hbHlzaXMYAyABKAsyKi50cmVuZGRldGVjdGl2ZS5hbmFseXNpcy52MS5BbmFseXNpc1Jlc3VsdCIfCg1HZXRKb2JSZXF1ZXN0Eg4KBmpvYl9pZBgBIAEoCSI9Cg5HZXRKb2JSZXNwb25zZRIrCgNqb2IYASABKAsyHi50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkpvYiIiChBDYW5jZWxKb2JSZXF1ZXN0Eg4KBmpvYl9pZBgBIAEoCSJAChFDYW5jZWxKb2JSZXNwb25zZRIrCgNqb2IYASABKAsyHi50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkpvYiIhCg9XYXRjaEpvYlJlcXVlc3QSDgoGam9iX2lkGAEgASgJIj8KEFdhdGNoSm9iUmVzcG9uc2USKwoDam9iGAEgASgLMh4udHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5Kb2IiXAoTR2V0UmVzdWx0VVJMUmVxdWVzdBIOCgZqb2JfaWQYASABKAkSNQoIYXJ0aWZhY3QYAiABKA4yIy50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkFydGlmYWN0InwKFEdldFJlc3VsdFVSTFJlc3BvbnNlEgsKA3VybBgBIAEoCRIQCghkYXRhX3VybBgCIAEoCRIuCgpleHBpcmVzX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIVCg1hbm9tYWxpZXNfdXJsGAQgASgJIj4KFkNyZWF0ZVVwbG9hZFVSTFJlcXVlc3QSEAoIZmlsZW5hbWUYASABKAkSEgoKc2l6ZV9ieXRlcxgCIAEoAyKJAQoXQ3JlYXRlVXBsb2FkVVJMUmVzcG9uc2USCwoDdXJsGAEgASgJEjEKBnVwbG9hZBgCIAEoCzIhLnRyZW5kZGV0ZWN0aXZlLmNvbW1vbi52MS5CbG9iUmVmEi4KCmV4cGlyZXNfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIqABCg5OYXJyYXRlUmVxdWVzdBIOCgZqb2JfaWQYASABKAkSEAoIcXVlc3Rpb24YAiABKAkSOAoHaGlzdG9yeRgDIAMoCzInLnRyZW5kZGV0ZWN0aXZlLm5hcnJhdG9yLnYxLkNoYXRNZXNzYWdlEjIKA2xsbRgEIAEoCzIlLnRyZW5kZGV0ZWN0aXZlLm5hcnJhdG9yLnYxLkxsbUNvbmZpZyJKCg9OYXJyYXRlUmVzcG9uc2USNwoFZXZlbnQYASABKAsyKC50cmVuZGRldGVjdGl2ZS5uYXJyYXRvci52MS5OYXJyYXRlRXZlbnQiEQoPR2V0UXVvdGFSZXF1ZXN0In0KEEdldFF1b3RhUmVzcG9uc2USHgoWZ2lvdmFubmlfdXNlZF9mcmFjdGlvbhgBIAEoARIXCg9naW92YW5uaV9jdXRvZmYYAiABKAESGQoRaGFybW9ueV9pbl9mbGlnaHQYAyABKAUSFQoNaGFybW9ueV9saW1pdBgEIAEoBSpWCgZEb21haW4SFgoSRE9NQUlOX1VOU1BFQ0lGSUVEEAASDwoLRE9NQUlOX0xBTkQQARIQCgxET01BSU5fT0NFQU4QAhIRCg1ET01BSU5fR0xPQkFMEAMqmgEKCEpvYlN0YXRlEhkKFUpPQl9TVEFURV9VTlNQRUNJRklFRBAAEhUKEUpPQl9TVEFURV9QRU5ESU5HEAESFQoRSk9CX1NUQVRFX1JVTk5JTkcQAhIXChNKT0JfU1RBVEVfU1VDQ0VFREVEEAMSFAoQSk9CX1NUQVRFX0ZBSUxFRBAEEhYKEkpPQl9TVEFURV9DQU5DRUxFRBAFKqABCglUYXNrU3RhdGUSGgoWVEFTS19TVEFURV9VTlNQRUNJRklFRBAAEhUKEVRBU0tfU1RBVEVfUVVFVUVEEAESFgoSVEFTS19TVEFURV9SVU5OSU5HEAISGAoUVEFTS19TVEFURV9TVUNDRUVERUQQAxIVChFUQVNLX1NUQVRFX0ZBSUxFRBAEEhcKE1RBU0tfU1RBVEVfQ0FOQ0VMRUQQBSrTAQoIQXJ0aWZhY3QSGAoUQVJUSUZBQ1RfVU5TUEVDSUZJRUQQABITCg9BUlRJRkFDVF9TRVJJRVMQARIXChNBUlRJRkFDVF9TRVJJRVNfQ1NWEAISFwoTQVJUSUZBQ1RfVkFMVUVfQ1VCRRADEhkKFUFSVElGQUNUX0FOT01BTFlfQ1VCRRAEEhwKGEFSVElGQUNUX1NFUklFU19BTkFMWVNJUxAFEhoKFkFSVElGQUNUX0dSSURfQU5BTFlTSVMQBhIRCg1BUlRJRkFDVF9HUklEEAcyzgcKDkdhdGV3YXlTZXJ2aWNlEnIKDUxpc3RWYXJpYWJsZXMSLy50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkxpc3RWYXJpYWJsZXNSZXF1ZXN0GjAudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5MaXN0VmFyaWFibGVzUmVzcG9uc2USZgoJQ3JlYXRlSm9iEisudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5DcmVhdGVKb2JSZXF1ZXN0GiwudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5DcmVhdGVKb2JSZXNwb25zZRJdCgZHZXRKb2ISKC50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkdldEpvYlJlcXVlc3QaKS50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkdldEpvYlJlc3BvbnNlEmUKCFdhdGNoSm9iEioudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5XYXRjaEpvYlJlcXVlc3QaKy50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLldhdGNoSm9iUmVzcG9uc2UwARJmCglDYW5jZWxKb2ISKy50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkNhbmNlbEpvYlJlcXVlc3QaLC50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkNhbmNlbEpvYlJlc3BvbnNlEm8KDEdldFJlc3VsdFVSTBIuLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuR2V0UmVzdWx0VVJMUmVxdWVzdBovLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuR2V0UmVzdWx0VVJMUmVzcG9uc2USeAoPQ3JlYXRlVXBsb2FkVVJMEjEudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5DcmVhdGVVcGxvYWRVUkxSZXF1ZXN0GjIudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5DcmVhdGVVcGxvYWRVUkxSZXNwb25zZRJiCgdOYXJyYXRlEikudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5OYXJyYXRlUmVxdWVzdBoqLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuTmFycmF0ZVJlc3BvbnNlMAESYwoIR2V0UXVvdGESKi50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkdldFF1b3RhUmVxdWVzdBorLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuR2V0UXVvdGFSZXNwb25zZUKLAgodY29tLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjFCDEdhdGV3YXlQcm90b1ABWlZnaXRodWIuY29tL1RoZUJhcm9uZXNzSG90ZWwvdHJlbmQtZGV0ZWN0aXZlL2dlbi9nby90cmVuZGRldGVjdGl2ZS9nYXRld2F5L3YxO2dhdGV3YXl2MaICA1RHWKoCGVRyZW5kZGV0ZWN0aXZlLkdhdGV3YXkuVjHKAhlUcmVuZGRldGVjdGl2ZVxHYXRld2F5XFYx4gIlVHJlbmRkZXRlY3RpdmVcR2F0ZXdheVxWMVxHUEJNZXRhZGF0YeoCG1RyZW5kZGV0ZWN0aXZlOjpHYXRld2F5OjpWMWIGcHJvdG8z", [file_google_protobuf_timestamp, file_trenddetective_analysis_v1_analysis, file_trenddetective_common_v1_common, file_trenddetective_gateway_v1_task, file_trenddetective_ingest_v1_ingest, file_trenddetective_narrator_v1_narrator, file_trenddetective_preprocess_v1_preprocess]);
+  fileDesc("Cid0cmVuZGRldGVjdGl2ZS9nYXRld2F5L3YxL2dhdGV3YXkucHJvdG8SGXRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEiFgoUTGlzdFZhcmlhYmxlc1JlcXVlc3QigQEKFUxpc3RWYXJpYWJsZXNSZXNwb25zZRI2Cgl2YXJpYWJsZXMYASADKAsyIy50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLlZhcmlhYmxlEjAKBnRvcGljcxgCIAMoCzIgLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuVG9waWMiKwoFVG9waWMSDAoEbmFtZRgBIAEoCRIUCgxtZWFzdXJlbWVudHMYAiADKAki9QMKCFZhcmlhYmxlEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEgoKZGVmaW5pdGlvbhgDIAEoCRINCgV1bml0cxgEIAEoCRIwCgRzdGVwGAUgASgOMiIudHJlbmRkZXRlY3RpdmUuY29tbW9uLnYxLlRpbWVTdGVwEjYKCWF2YWlsYWJsZRgGIAEoCzIjLnRyZW5kZGV0ZWN0aXZlLmNvbW1vbi52MS5EYXRlUmFuZ2USDAoEZ3JpZBgHIAEoCBIxCgZkb21haW4YCCABKA4yIS50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkRvbWFpbhI4Cg5kZWZhdWx0X3NvdXJjZRgJIAEoDjIgLnRyZW5kZGV0ZWN0aXZlLmluZ2VzdC52MS5Tb3VyY2USMQoHc291cmNlcxgKIAMoDjIgLnRyZW5kZGV0ZWN0aXZlLmluZ2VzdC52MS5Tb3VyY2USEwoLZGF0YXNldF91cmwYCyABKAkSFQoNcGl4ZWxfbGF0X2RlZxgMIAEoARIVCg1waXhlbF9sb25fZGVnGA0gASgBEhwKFGRlZmF1bHRfYmxvY2tfcGl4ZWxzGA4gASgFEg0KBXRvcGljGA8gASgJEhMKC21lYXN1cmVtZW50GBAgASgJEg8KB3Byb2R1Y3QYESABKAkiRAoQQ3JlYXRlSm9iUmVxdWVzdBIwCgRzcGVjGAEgASgLMiIudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5Kb2JTcGVjIkAKEUNyZWF0ZUpvYlJlc3BvbnNlEisKA2pvYhgBIAEoCzIeLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuSm9iIoAECgdKb2JTcGVjEhMKC3ZhcmlhYmxlX2lkGAEgASgJEiwKBGJib3gYAiABKAsyHi50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuQkJveBIyCgVkYXRlcxgDIAEoCzIjLnRyZW5kZGV0ZWN0aXZlLmNvbW1vbi52MS5EYXRlUmFuZ2USMAoGc291cmNlGAQgASgOMiAudHJlbmRkZXRlY3RpdmUuaW5nZXN0LnYxLlNvdXJjZRI0CgpzdG9wX2FmdGVyGAUgASgOMiAudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5TdGFnZRIxCgZ1cGxvYWQYBiABKAsyIS50cmVuZGRldGVjdGl2ZS5jb21tb24udjEuQmxvYlJlZhI6CgdmaWx0ZXJzGAcgASgLMikudHJlbmRkZXRlY3RpdmUucHJlcHJvY2Vzcy52MS5GaWx0ZXJDaGFpbhI+CgthZ2dyZWdhdGlvbhgIIAEoCzIpLnRyZW5kZGV0ZWN0aXZlLnByZXByb2Nlc3MudjEuQWdncmVnYXRpb24SMwoFdGVzdHMYCSABKAsyJC50cmVuZGRldGVjdGl2ZS5hbmFseXNpcy52MS5UZXN0UGxhbhIZChFza2lwX3Nlcmllc190ZXN0cxgKIAEoCBIXCg9za2lwX2dyaWRfdGVzdHMYCyABKAgiiQMKA0pvYhIKCgJpZBgBIAEoCRIyCgVzdGF0ZRgCIAEoDjIjLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuSm9iU3RhdGUSMAoEc3BlYxgDIAEoCzIiLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuSm9iU3BlYxI0CgV0YXNrcxgEIAMoCzIlLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuVGFza1N0YXR1cxITCgt0YXNrc190b3RhbBgFIAEoBRIXCg90YXNrc19zdWNjZWVkZWQYBiABKAUSFAoMdGFza3NfZmFpbGVkGAcgASgFEjYKB3Jlc3VsdHMYCCABKAsyJS50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkpvYlJlc3VsdHMSLgoKY3JlYXRlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAi4wIKClRhc2tTdGF0dXMSMQoEbWV0YRgBIAEoCzIjLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuVGFza01ldGESMwoFc3RhdGUYAiABKA4yJC50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLlRhc2tTdGF0ZRIQCghhdHRlbXB0cxgDIAEoBRIRCgljYWNoZV9oaXQYBCABKAgSMwoFZXJyb3IYBSABKAsyJC50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLlRhc2tFcnJvchIuCgpzdGFydGVkX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIvCgtmaW5pc2hlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFAoHcGVyY2VudBgIIAEoBUgAiAEBEhAKCGFjdGl2aXR5GAkgASgJQgoKCF9wZXJjZW50IsEBCgpKb2JSZXN1bHRzEjEKA3JhdxgBIAMoCzIkLnRyZW5kZGV0ZWN0aXZlLmluZ2VzdC52MS5SYXdEYXRhc2V0EkIKCnByZXByb2Nlc3MYAiABKAsyLi50cmVuZGRldGVjdGl2ZS5wcmVwcm9jZXNzLnYxLlByZXByb2Nlc3NSZXN1bHQSPAoIYW5hbHlzaXMYAyABKAsyKi50cmVuZGRldGVjdGl2ZS5hbmFseXNpcy52MS5BbmFseXNpc1Jlc3VsdCIfCg1HZXRKb2JSZXF1ZXN0Eg4KBmpvYl9pZBgBIAEoCSI9Cg5HZXRKb2JSZXNwb25zZRIrCgNqb2IYASABKAsyHi50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkpvYiIiChBDYW5jZWxKb2JSZXF1ZXN0Eg4KBmpvYl9pZBgBIAEoCSJAChFDYW5jZWxKb2JSZXNwb25zZRIrCgNqb2IYASABKAsyHi50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkpvYiIhCg9XYXRjaEpvYlJlcXVlc3QSDgoGam9iX2lkGAEgASgJIj8KEFdhdGNoSm9iUmVzcG9uc2USKwoDam9iGAEgASgLMh4udHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5Kb2IiXAoTR2V0UmVzdWx0VVJMUmVxdWVzdBIOCgZqb2JfaWQYASABKAkSNQoIYXJ0aWZhY3QYAiABKA4yIy50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkFydGlmYWN0InwKFEdldFJlc3VsdFVSTFJlc3BvbnNlEgsKA3VybBgBIAEoCRIQCghkYXRhX3VybBgCIAEoCRIuCgpleHBpcmVzX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIVCg1hbm9tYWxpZXNfdXJsGAQgASgJIj4KFkNyZWF0ZVVwbG9hZFVSTFJlcXVlc3QSEAoIZmlsZW5hbWUYASABKAkSEgoKc2l6ZV9ieXRlcxgCIAEoAyKJAQoXQ3JlYXRlVXBsb2FkVVJMUmVzcG9uc2USCwoDdXJsGAEgASgJEjEKBnVwbG9hZBgCIAEoCzIhLnRyZW5kZGV0ZWN0aXZlLmNvbW1vbi52MS5CbG9iUmVmEi4KCmV4cGlyZXNfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIqABCg5OYXJyYXRlUmVxdWVzdBIOCgZqb2JfaWQYASABKAkSEAoIcXVlc3Rpb24YAiABKAkSOAoHaGlzdG9yeRgDIAMoCzInLnRyZW5kZGV0ZWN0aXZlLm5hcnJhdG9yLnYxLkNoYXRNZXNzYWdlEjIKA2xsbRgEIAEoCzIlLnRyZW5kZGV0ZWN0aXZlLm5hcnJhdG9yLnYxLkxsbUNvbmZpZyJKCg9OYXJyYXRlUmVzcG9uc2USNwoFZXZlbnQYASABKAsyKC50cmVuZGRldGVjdGl2ZS5uYXJyYXRvci52MS5OYXJyYXRlRXZlbnQiEQoPR2V0UXVvdGFSZXF1ZXN0In0KEEdldFF1b3RhUmVzcG9uc2USHgoWZ2lvdmFubmlfdXNlZF9mcmFjdGlvbhgBIAEoARIXCg9naW92YW5uaV9jdXRvZmYYAiABKAESGQoRaGFybW9ueV9pbl9mbGlnaHQYAyABKAUSFQoNaGFybW9ueV9saW1pdBgEIAEoBSpWCgZEb21haW4SFgoSRE9NQUlOX1VOU1BFQ0lGSUVEEAASDwoLRE9NQUlOX0xBTkQQARIQCgxET01BSU5fT0NFQU4QAhIRCg1ET01BSU5fR0xPQkFMEAMqmgEKCEpvYlN0YXRlEhkKFUpPQl9TVEFURV9VTlNQRUNJRklFRBAAEhUKEUpPQl9TVEFURV9QRU5ESU5HEAESFQoRSk9CX1NUQVRFX1JVTk5JTkcQAhIXChNKT0JfU1RBVEVfU1VDQ0VFREVEEAMSFAoQSk9CX1NUQVRFX0ZBSUxFRBAEEhYKEkpPQl9TVEFURV9DQU5DRUxFRBAFKqABCglUYXNrU3RhdGUSGgoWVEFTS19TVEFURV9VTlNQRUNJRklFRBAAEhUKEVRBU0tfU1RBVEVfUVVFVUVEEAESFgoSVEFTS19TVEFURV9SVU5OSU5HEAISGAoUVEFTS19TVEFURV9TVUNDRUVERUQQAxIVChFUQVNLX1NUQVRFX0ZBSUxFRBAEEhcKE1RBU0tfU1RBVEVfQ0FOQ0VMRUQQBSrTAQoIQXJ0aWZhY3QSGAoUQVJUSUZBQ1RfVU5TUEVDSUZJRUQQABITCg9BUlRJRkFDVF9TRVJJRVMQARIXChNBUlRJRkFDVF9TRVJJRVNfQ1NWEAISFwoTQVJUSUZBQ1RfVkFMVUVfQ1VCRRADEhkKFUFSVElGQUNUX0FOT01BTFlfQ1VCRRAEEhwKGEFSVElGQUNUX1NFUklFU19BTkFMWVNJUxAFEhoKFkFSVElGQUNUX0dSSURfQU5BTFlTSVMQBhIRCg1BUlRJRkFDVF9HUklEEAcyzgcKDkdhdGV3YXlTZXJ2aWNlEnIKDUxpc3RWYXJpYWJsZXMSLy50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkxpc3RWYXJpYWJsZXNSZXF1ZXN0GjAudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5MaXN0VmFyaWFibGVzUmVzcG9uc2USZgoJQ3JlYXRlSm9iEisudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5DcmVhdGVKb2JSZXF1ZXN0GiwudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5DcmVhdGVKb2JSZXNwb25zZRJdCgZHZXRKb2ISKC50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkdldEpvYlJlcXVlc3QaKS50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkdldEpvYlJlc3BvbnNlEmUKCFdhdGNoSm9iEioudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5XYXRjaEpvYlJlcXVlc3QaKy50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLldhdGNoSm9iUmVzcG9uc2UwARJmCglDYW5jZWxKb2ISKy50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkNhbmNlbEpvYlJlcXVlc3QaLC50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkNhbmNlbEpvYlJlc3BvbnNlEm8KDEdldFJlc3VsdFVSTBIuLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuR2V0UmVzdWx0VVJMUmVxdWVzdBovLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuR2V0UmVzdWx0VVJMUmVzcG9uc2USeAoPQ3JlYXRlVXBsb2FkVVJMEjEudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5DcmVhdGVVcGxvYWRVUkxSZXF1ZXN0GjIudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5DcmVhdGVVcGxvYWRVUkxSZXNwb25zZRJiCgdOYXJyYXRlEikudHJlbmRkZXRlY3RpdmUuZ2F0ZXdheS52MS5OYXJyYXRlUmVxdWVzdBoqLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuTmFycmF0ZVJlc3BvbnNlMAESYwoIR2V0UXVvdGESKi50cmVuZGRldGVjdGl2ZS5nYXRld2F5LnYxLkdldFF1b3RhUmVxdWVzdBorLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjEuR2V0UXVvdGFSZXNwb25zZUKLAgodY29tLnRyZW5kZGV0ZWN0aXZlLmdhdGV3YXkudjFCDEdhdGV3YXlQcm90b1ABWlZnaXRodWIuY29tL1RoZUJhcm9uZXNzSG90ZWwvdHJlbmQtZGV0ZWN0aXZlL2dlbi9nby90cmVuZGRldGVjdGl2ZS9nYXRld2F5L3YxO2dhdGV3YXl2MaICA1RHWKoCGVRyZW5kZGV0ZWN0aXZlLkdhdGV3YXkuVjHKAhlUcmVuZGRldGVjdGl2ZVxHYXRld2F5XFYx4gIlVHJlbmRkZXRlY3RpdmVcR2F0ZXdheVxWMVxHUEJNZXRhZGF0YeoCG1RyZW5kZGV0ZWN0aXZlOjpHYXRld2F5OjpWMWIGcHJvdG8z", [file_google_protobuf_timestamp, file_trenddetective_analysis_v1_analysis, file_trenddetective_common_v1_common, file_trenddetective_gateway_v1_task, file_trenddetective_ingest_v1_ingest, file_trenddetective_narrator_v1_narrator, file_trenddetective_preprocess_v1_preprocess]);
 
 /**
  * @generated from message trenddetective.gateway.v1.ListVariablesRequest
@@ -49,6 +49,14 @@ export type ListVariablesResponse = Message<"trenddetective.gateway.v1.ListVaria
    * @generated from field: repeated trenddetective.gateway.v1.Variable variables = 1;
    */
   variables: Variable[];
+
+  /**
+   * The browser's topics in order, each with its measurements in order.
+   * Every variable's topic and measurement is one of these.
+   *
+   * @generated from field: repeated trenddetective.gateway.v1.Topic topics = 2;
+   */
+  topics: Topic[];
 };
 
 /**
@@ -57,6 +65,34 @@ export type ListVariablesResponse = Message<"trenddetective.gateway.v1.ListVaria
  */
 export const ListVariablesResponseSchema: GenMessage<ListVariablesResponse> = /*@__PURE__*/
   messageDesc(file_trenddetective_gateway_v1_gateway, 1);
+
+/**
+ * A topic in the variable browser, like one of Giovanni's disciplines.
+ *
+ * @generated from message trenddetective.gateway.v1.Topic
+ */
+export type Topic = Message<"trenddetective.gateway.v1.Topic"> & {
+  /**
+   * For example "Air".
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * For example "Temperature" and "Humidity".
+   *
+   * @generated from field: repeated string measurements = 2;
+   */
+  measurements: string[];
+};
+
+/**
+ * Describes the message trenddetective.gateway.v1.Topic.
+ * Use `create(TopicSchema)` to create a new message.
+ */
+export const TopicSchema: GenMessage<Topic> = /*@__PURE__*/
+  messageDesc(file_trenddetective_gateway_v1_gateway, 2);
 
 /**
  * A catalog entry, as the browser sees it.
@@ -155,6 +191,28 @@ export type Variable = Message<"trenddetective.gateway.v1.Variable"> & {
    * @generated from field: int32 default_block_pixels = 14;
    */
   defaultBlockPixels: number;
+
+  /**
+   * Where the variable sits in the browser, like Giovanni's disciplines and
+   * measurements: a topic, for example "Air", and within it a measurement,
+   * for example "Temperature". The catalog checks both against a fixed list.
+   *
+   * @generated from field: string topic = 15;
+   */
+  topic: string;
+
+  /**
+   * @generated from field: string measurement = 16;
+   */
+  measurement: string;
+
+  /**
+   * The data product, for example "MERRA-2" or "MODIS", for searching and
+   * for saying where the numbers come from.
+   *
+   * @generated from field: string product = 17;
+   */
+  product: string;
 };
 
 /**
@@ -162,7 +220,7 @@ export type Variable = Message<"trenddetective.gateway.v1.Variable"> & {
  * Use `create(VariableSchema)` to create a new message.
  */
 export const VariableSchema: GenMessage<Variable> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 2);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 3);
 
 /**
  * @generated from message trenddetective.gateway.v1.CreateJobRequest
@@ -179,7 +237,7 @@ export type CreateJobRequest = Message<"trenddetective.gateway.v1.CreateJobReque
  * Use `create(CreateJobRequestSchema)` to create a new message.
  */
 export const CreateJobRequestSchema: GenMessage<CreateJobRequest> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 3);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 4);
 
 /**
  * @generated from message trenddetective.gateway.v1.CreateJobResponse
@@ -196,7 +254,7 @@ export type CreateJobResponse = Message<"trenddetective.gateway.v1.CreateJobResp
  * Use `create(CreateJobResponseSchema)` to create a new message.
  */
 export const CreateJobResponseSchema: GenMessage<CreateJobResponse> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 4);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 5);
 
 /**
  * What a job runs. In CreateJob, only variable_id, bbox and dates are
@@ -262,6 +320,23 @@ export type JobSpec = Message<"trenddetective.gateway.v1.JobSpec"> & {
    * @generated from field: trenddetective.analysis.v1.TestPlan tests = 9;
    */
   tests?: TestPlan | undefined;
+
+  /**
+   * Leave the region's trend tests (TestPlan.series) out of the plan. The
+   * region's chart is still made.
+   *
+   * @generated from field: bool skip_series_tests = 10;
+   */
+  skipSeriesTests: boolean;
+
+  /**
+   * Leave the per-cell tests behind the trend map (TestPlan.grid) out. The
+   * month-by-month map still works from preprocess's Grid. With both
+   * skipped, the job stops after preprocess.
+   *
+   * @generated from field: bool skip_grid_tests = 11;
+   */
+  skipGridTests: boolean;
 };
 
 /**
@@ -269,7 +344,7 @@ export type JobSpec = Message<"trenddetective.gateway.v1.JobSpec"> & {
  * Use `create(JobSpecSchema)` to create a new message.
  */
 export const JobSpecSchema: GenMessage<JobSpec> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 5);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 6);
 
 /**
  * A job and everything known about it. The gateway is the only writer.
@@ -335,7 +410,7 @@ export type Job = Message<"trenddetective.gateway.v1.Job"> & {
  * Use `create(JobSchema)` to create a new message.
  */
 export const JobSchema: GenMessage<Job> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 6);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 7);
 
 /**
  * One task of a job.
@@ -404,7 +479,7 @@ export type TaskStatus = Message<"trenddetective.gateway.v1.TaskStatus"> & {
  * Use `create(TaskStatusSchema)` to create a new message.
  */
 export const TaskStatusSchema: GenMessage<TaskStatus> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 7);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 8);
 
 /**
  * What a job has produced.
@@ -433,7 +508,7 @@ export type JobResults = Message<"trenddetective.gateway.v1.JobResults"> & {
  * Use `create(JobResultsSchema)` to create a new message.
  */
 export const JobResultsSchema: GenMessage<JobResults> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 8);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 9);
 
 /**
  * @generated from message trenddetective.gateway.v1.GetJobRequest
@@ -450,7 +525,7 @@ export type GetJobRequest = Message<"trenddetective.gateway.v1.GetJobRequest"> &
  * Use `create(GetJobRequestSchema)` to create a new message.
  */
 export const GetJobRequestSchema: GenMessage<GetJobRequest> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 9);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 10);
 
 /**
  * @generated from message trenddetective.gateway.v1.GetJobResponse
@@ -467,7 +542,7 @@ export type GetJobResponse = Message<"trenddetective.gateway.v1.GetJobResponse">
  * Use `create(GetJobResponseSchema)` to create a new message.
  */
 export const GetJobResponseSchema: GenMessage<GetJobResponse> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 10);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 11);
 
 /**
  * @generated from message trenddetective.gateway.v1.CancelJobRequest
@@ -484,7 +559,7 @@ export type CancelJobRequest = Message<"trenddetective.gateway.v1.CancelJobReque
  * Use `create(CancelJobRequestSchema)` to create a new message.
  */
 export const CancelJobRequestSchema: GenMessage<CancelJobRequest> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 11);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 12);
 
 /**
  * @generated from message trenddetective.gateway.v1.CancelJobResponse
@@ -501,7 +576,7 @@ export type CancelJobResponse = Message<"trenddetective.gateway.v1.CancelJobResp
  * Use `create(CancelJobResponseSchema)` to create a new message.
  */
 export const CancelJobResponseSchema: GenMessage<CancelJobResponse> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 12);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 13);
 
 /**
  * @generated from message trenddetective.gateway.v1.WatchJobRequest
@@ -518,7 +593,7 @@ export type WatchJobRequest = Message<"trenddetective.gateway.v1.WatchJobRequest
  * Use `create(WatchJobRequestSchema)` to create a new message.
  */
 export const WatchJobRequestSchema: GenMessage<WatchJobRequest> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 13);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 14);
 
 /**
  * @generated from message trenddetective.gateway.v1.WatchJobResponse
@@ -535,7 +610,7 @@ export type WatchJobResponse = Message<"trenddetective.gateway.v1.WatchJobRespon
  * Use `create(WatchJobResponseSchema)` to create a new message.
  */
 export const WatchJobResponseSchema: GenMessage<WatchJobResponse> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 14);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 15);
 
 /**
  * @generated from message trenddetective.gateway.v1.GetResultURLRequest
@@ -557,7 +632,7 @@ export type GetResultURLRequest = Message<"trenddetective.gateway.v1.GetResultUR
  * Use `create(GetResultURLRequestSchema)` to create a new message.
  */
 export const GetResultURLRequestSchema: GenMessage<GetResultURLRequest> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 15);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 16);
 
 /**
  * @generated from message trenddetective.gateway.v1.GetResultURLResponse
@@ -595,7 +670,7 @@ export type GetResultURLResponse = Message<"trenddetective.gateway.v1.GetResultU
  * Use `create(GetResultURLResponseSchema)` to create a new message.
  */
 export const GetResultURLResponseSchema: GenMessage<GetResultURLResponse> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 16);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 17);
 
 /**
  * @generated from message trenddetective.gateway.v1.CreateUploadURLRequest
@@ -617,7 +692,7 @@ export type CreateUploadURLRequest = Message<"trenddetective.gateway.v1.CreateUp
  * Use `create(CreateUploadURLRequestSchema)` to create a new message.
  */
 export const CreateUploadURLRequestSchema: GenMessage<CreateUploadURLRequest> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 17);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 18);
 
 /**
  * @generated from message trenddetective.gateway.v1.CreateUploadURLResponse
@@ -648,7 +723,7 @@ export type CreateUploadURLResponse = Message<"trenddetective.gateway.v1.CreateU
  * Use `create(CreateUploadURLResponseSchema)` to create a new message.
  */
 export const CreateUploadURLResponseSchema: GenMessage<CreateUploadURLResponse> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 18);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 19);
 
 /**
  * @generated from message trenddetective.gateway.v1.NarrateRequest
@@ -684,7 +759,7 @@ export type NarrateRequest = Message<"trenddetective.gateway.v1.NarrateRequest">
  * Use `create(NarrateRequestSchema)` to create a new message.
  */
 export const NarrateRequestSchema: GenMessage<NarrateRequest> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 19);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 20);
 
 /**
  * @generated from message trenddetective.gateway.v1.NarrateResponse
@@ -701,7 +776,7 @@ export type NarrateResponse = Message<"trenddetective.gateway.v1.NarrateResponse
  * Use `create(NarrateResponseSchema)` to create a new message.
  */
 export const NarrateResponseSchema: GenMessage<NarrateResponse> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 20);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 21);
 
 /**
  * @generated from message trenddetective.gateway.v1.GetQuotaRequest
@@ -714,7 +789,7 @@ export type GetQuotaRequest = Message<"trenddetective.gateway.v1.GetQuotaRequest
  * Use `create(GetQuotaRequestSchema)` to create a new message.
  */
 export const GetQuotaRequestSchema: GenMessage<GetQuotaRequest> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 21);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 22);
 
 /**
  * @generated from message trenddetective.gateway.v1.GetQuotaResponse
@@ -755,7 +830,7 @@ export type GetQuotaResponse = Message<"trenddetective.gateway.v1.GetQuotaRespon
  * Use `create(GetQuotaResponseSchema)` to create a new message.
  */
 export const GetQuotaResponseSchema: GenMessage<GetQuotaResponse> = /*@__PURE__*/
-  messageDesc(file_trenddetective_gateway_v1_gateway, 22);
+  messageDesc(file_trenddetective_gateway_v1_gateway, 23);
 
 /**
  * Where a variable has data.

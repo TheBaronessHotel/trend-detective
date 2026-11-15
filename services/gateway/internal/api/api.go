@@ -69,7 +69,7 @@ func (s *Server) GetQuota(ctx context.Context, _ *gatewayv1.GetQuotaRequest) (*g
 
 // ListVariables implements GatewayService.
 func (s *Server) ListVariables(context.Context, *gatewayv1.ListVariablesRequest) (*gatewayv1.ListVariablesResponse, error) {
-	return &gatewayv1.ListVariablesResponse{Variables: s.cat.Variables()}, nil
+	return &gatewayv1.ListVariablesResponse{Variables: s.cat.Variables(), Topics: s.cat.TopicsInUse()}, nil
 }
 
 // CreateJob implements GatewayService.

@@ -25,6 +25,8 @@ interface Props {
   on: boolean;
   kind: MonthsKind;
   t: number;
+  /** False when there's no trend map to go back to. */
+  canClose: boolean;
   onOpen: () => void;
   onClose: () => void;
   onKind: (k: MonthsKind) => void;
@@ -36,7 +38,7 @@ interface Props {
  * play, pause and a slider through the months, a choice of measured values or
  * the difference from normal, and the colour key.
  */
-export function MonthsBar({ frames, loading, error, on, kind, t, onOpen, onClose, onKind, onT }: Props) {
+export function MonthsBar({ frames, loading, error, on, kind, t, canClose, onOpen, onClose, onKind, onT }: Props) {
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const dark = useDarkTheme();
@@ -116,16 +118,18 @@ export function MonthsBar({ frames, loading, error, on, kind, t, onOpen, onClose
             ))}
           </select>
         </label>
-        <button
-          type="button"
-          className="action small"
-          onClick={() => {
-            setPlaying(false);
-            onClose();
-          }}
-        >
-          Show the trend
-        </button>
+        {canClose && (
+          <button
+            type="button"
+            className="action small"
+            onClick={() => {
+              setPlaying(false);
+              onClose();
+            }}
+          >
+            Show the trend
+          </button>
+        )}
       </div>
       <div className="months-key" aria-hidden="true">
         <span className="months-ramp" style={{ background: `linear-gradient(to right, ${ramp.join(", ")})` }} />

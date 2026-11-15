@@ -306,8 +306,11 @@ func (*ListVariablesRequest) Descriptor() ([]byte, []int) {
 }
 
 type ListVariablesResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Variables     []*Variable            `protobuf:"bytes,1,rep,name=variables,proto3" json:"variables,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Variables []*Variable            `protobuf:"bytes,1,rep,name=variables,proto3" json:"variables,omitempty"`
+	// The browser's topics in order, each with its measurements in order.
+	// Every variable's topic and measurement is one of these.
+	Topics        []*Topic `protobuf:"bytes,2,rep,name=topics,proto3" json:"topics,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -349,6 +352,68 @@ func (x *ListVariablesResponse) GetVariables() []*Variable {
 	return nil
 }
 
+func (x *ListVariablesResponse) GetTopics() []*Topic {
+	if x != nil {
+		return x.Topics
+	}
+	return nil
+}
+
+// A topic in the variable browser, like one of Giovanni's disciplines.
+type Topic struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// For example "Air".
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// For example "Temperature" and "Humidity".
+	Measurements  []string `protobuf:"bytes,2,rep,name=measurements,proto3" json:"measurements,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Topic) Reset() {
+	*x = Topic{}
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Topic) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Topic) ProtoMessage() {}
+
+func (x *Topic) ProtoReflect() protoreflect.Message {
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Topic.ProtoReflect.Descriptor instead.
+func (*Topic) Descriptor() ([]byte, []int) {
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *Topic) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Topic) GetMeasurements() []string {
+	if x != nil {
+		return x.Measurements
+	}
+	return nil
+}
+
 // A catalog entry, as the browser sees it.
 type Variable struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -378,13 +443,21 @@ type Variable struct {
 	// The catalog's default Grid block size (Aggregation.block_pixels), or 0
 	// when it leaves the size to SUBREGION_N.
 	DefaultBlockPixels int32 `protobuf:"varint,14,opt,name=default_block_pixels,json=defaultBlockPixels,proto3" json:"default_block_pixels,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Where the variable sits in the browser, like Giovanni's disciplines and
+	// measurements: a topic, for example "Air", and within it a measurement,
+	// for example "Temperature". The catalog checks both against a fixed list.
+	Topic       string `protobuf:"bytes,15,opt,name=topic,proto3" json:"topic,omitempty"`
+	Measurement string `protobuf:"bytes,16,opt,name=measurement,proto3" json:"measurement,omitempty"`
+	// The data product, for example "MERRA-2" or "MODIS", for searching and
+	// for saying where the numbers come from.
+	Product       string `protobuf:"bytes,17,opt,name=product,proto3" json:"product,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Variable) Reset() {
 	*x = Variable{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[2]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -396,7 +469,7 @@ func (x *Variable) String() string {
 func (*Variable) ProtoMessage() {}
 
 func (x *Variable) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[2]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -409,7 +482,7 @@ func (x *Variable) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Variable.ProtoReflect.Descriptor instead.
 func (*Variable) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{2}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Variable) GetId() string {
@@ -510,6 +583,27 @@ func (x *Variable) GetDefaultBlockPixels() int32 {
 	return 0
 }
 
+func (x *Variable) GetTopic() string {
+	if x != nil {
+		return x.Topic
+	}
+	return ""
+}
+
+func (x *Variable) GetMeasurement() string {
+	if x != nil {
+		return x.Measurement
+	}
+	return ""
+}
+
+func (x *Variable) GetProduct() string {
+	if x != nil {
+		return x.Product
+	}
+	return ""
+}
+
 type CreateJobRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Spec          *JobSpec               `protobuf:"bytes,1,opt,name=spec,proto3" json:"spec,omitempty"`
@@ -519,7 +613,7 @@ type CreateJobRequest struct {
 
 func (x *CreateJobRequest) Reset() {
 	*x = CreateJobRequest{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[3]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -531,7 +625,7 @@ func (x *CreateJobRequest) String() string {
 func (*CreateJobRequest) ProtoMessage() {}
 
 func (x *CreateJobRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[3]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -544,7 +638,7 @@ func (x *CreateJobRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateJobRequest.ProtoReflect.Descriptor instead.
 func (*CreateJobRequest) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{3}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CreateJobRequest) GetSpec() *JobSpec {
@@ -563,7 +657,7 @@ type CreateJobResponse struct {
 
 func (x *CreateJobResponse) Reset() {
 	*x = CreateJobResponse{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[4]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -575,7 +669,7 @@ func (x *CreateJobResponse) String() string {
 func (*CreateJobResponse) ProtoMessage() {}
 
 func (x *CreateJobResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[4]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -588,7 +682,7 @@ func (x *CreateJobResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateJobResponse.ProtoReflect.Descriptor instead.
 func (*CreateJobResponse) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{4}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CreateJobResponse) GetJob() *Job {
@@ -617,14 +711,21 @@ type JobSpec struct {
 	// Replaces the default aggregation settings.
 	Aggregation *v12.Aggregation `protobuf:"bytes,8,opt,name=aggregation,proto3" json:"aggregation,omitempty"`
 	// Replaces the catalog's default tests.
-	Tests         *v13.TestPlan `protobuf:"bytes,9,opt,name=tests,proto3" json:"tests,omitempty"`
+	Tests *v13.TestPlan `protobuf:"bytes,9,opt,name=tests,proto3" json:"tests,omitempty"`
+	// Leave the region's trend tests (TestPlan.series) out of the plan. The
+	// region's chart is still made.
+	SkipSeriesTests bool `protobuf:"varint,10,opt,name=skip_series_tests,json=skipSeriesTests,proto3" json:"skip_series_tests,omitempty"`
+	// Leave the per-cell tests behind the trend map (TestPlan.grid) out. The
+	// month-by-month map still works from preprocess's Grid. With both
+	// skipped, the job stops after preprocess.
+	SkipGridTests bool `protobuf:"varint,11,opt,name=skip_grid_tests,json=skipGridTests,proto3" json:"skip_grid_tests,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *JobSpec) Reset() {
 	*x = JobSpec{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[5]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -636,7 +737,7 @@ func (x *JobSpec) String() string {
 func (*JobSpec) ProtoMessage() {}
 
 func (x *JobSpec) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[5]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -649,7 +750,7 @@ func (x *JobSpec) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JobSpec.ProtoReflect.Descriptor instead.
 func (*JobSpec) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{5}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *JobSpec) GetVariableId() string {
@@ -715,6 +816,20 @@ func (x *JobSpec) GetTests() *v13.TestPlan {
 	return nil
 }
 
+func (x *JobSpec) GetSkipSeriesTests() bool {
+	if x != nil {
+		return x.SkipSeriesTests
+	}
+	return false
+}
+
+func (x *JobSpec) GetSkipGridTests() bool {
+	if x != nil {
+		return x.SkipGridTests
+	}
+	return false
+}
+
 // A job and everything known about it. The gateway is the only writer.
 type Job struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
@@ -735,7 +850,7 @@ type Job struct {
 
 func (x *Job) Reset() {
 	*x = Job{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[6]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -747,7 +862,7 @@ func (x *Job) String() string {
 func (*Job) ProtoMessage() {}
 
 func (x *Job) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[6]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -760,7 +875,7 @@ func (x *Job) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Job.ProtoReflect.Descriptor instead.
 func (*Job) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{6}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Job) GetId() string {
@@ -856,7 +971,7 @@ type TaskStatus struct {
 
 func (x *TaskStatus) Reset() {
 	*x = TaskStatus{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[7]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -868,7 +983,7 @@ func (x *TaskStatus) String() string {
 func (*TaskStatus) ProtoMessage() {}
 
 func (x *TaskStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[7]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -881,7 +996,7 @@ func (x *TaskStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TaskStatus.ProtoReflect.Descriptor instead.
 func (*TaskStatus) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{7}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *TaskStatus) GetMeta() *TaskMeta {
@@ -959,7 +1074,7 @@ type JobResults struct {
 
 func (x *JobResults) Reset() {
 	*x = JobResults{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[8]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -971,7 +1086,7 @@ func (x *JobResults) String() string {
 func (*JobResults) ProtoMessage() {}
 
 func (x *JobResults) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[8]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -984,7 +1099,7 @@ func (x *JobResults) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JobResults.ProtoReflect.Descriptor instead.
 func (*JobResults) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{8}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *JobResults) GetRaw() []*v11.RawDataset {
@@ -1017,7 +1132,7 @@ type GetJobRequest struct {
 
 func (x *GetJobRequest) Reset() {
 	*x = GetJobRequest{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[9]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1029,7 +1144,7 @@ func (x *GetJobRequest) String() string {
 func (*GetJobRequest) ProtoMessage() {}
 
 func (x *GetJobRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[9]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1042,7 +1157,7 @@ func (x *GetJobRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetJobRequest.ProtoReflect.Descriptor instead.
 func (*GetJobRequest) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{9}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetJobRequest) GetJobId() string {
@@ -1061,7 +1176,7 @@ type GetJobResponse struct {
 
 func (x *GetJobResponse) Reset() {
 	*x = GetJobResponse{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[10]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1073,7 +1188,7 @@ func (x *GetJobResponse) String() string {
 func (*GetJobResponse) ProtoMessage() {}
 
 func (x *GetJobResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[10]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1086,7 +1201,7 @@ func (x *GetJobResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetJobResponse.ProtoReflect.Descriptor instead.
 func (*GetJobResponse) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{10}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetJobResponse) GetJob() *Job {
@@ -1105,7 +1220,7 @@ type CancelJobRequest struct {
 
 func (x *CancelJobRequest) Reset() {
 	*x = CancelJobRequest{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[11]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1117,7 +1232,7 @@ func (x *CancelJobRequest) String() string {
 func (*CancelJobRequest) ProtoMessage() {}
 
 func (x *CancelJobRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[11]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1130,7 +1245,7 @@ func (x *CancelJobRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelJobRequest.ProtoReflect.Descriptor instead.
 func (*CancelJobRequest) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{11}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *CancelJobRequest) GetJobId() string {
@@ -1149,7 +1264,7 @@ type CancelJobResponse struct {
 
 func (x *CancelJobResponse) Reset() {
 	*x = CancelJobResponse{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[12]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1161,7 +1276,7 @@ func (x *CancelJobResponse) String() string {
 func (*CancelJobResponse) ProtoMessage() {}
 
 func (x *CancelJobResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[12]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1174,7 +1289,7 @@ func (x *CancelJobResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelJobResponse.ProtoReflect.Descriptor instead.
 func (*CancelJobResponse) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{12}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *CancelJobResponse) GetJob() *Job {
@@ -1193,7 +1308,7 @@ type WatchJobRequest struct {
 
 func (x *WatchJobRequest) Reset() {
 	*x = WatchJobRequest{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[13]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1205,7 +1320,7 @@ func (x *WatchJobRequest) String() string {
 func (*WatchJobRequest) ProtoMessage() {}
 
 func (x *WatchJobRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[13]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1218,7 +1333,7 @@ func (x *WatchJobRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchJobRequest.ProtoReflect.Descriptor instead.
 func (*WatchJobRequest) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{13}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *WatchJobRequest) GetJobId() string {
@@ -1237,7 +1352,7 @@ type WatchJobResponse struct {
 
 func (x *WatchJobResponse) Reset() {
 	*x = WatchJobResponse{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[14]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1249,7 +1364,7 @@ func (x *WatchJobResponse) String() string {
 func (*WatchJobResponse) ProtoMessage() {}
 
 func (x *WatchJobResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[14]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1262,7 +1377,7 @@ func (x *WatchJobResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchJobResponse.ProtoReflect.Descriptor instead.
 func (*WatchJobResponse) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{14}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *WatchJobResponse) GetJob() *Job {
@@ -1282,7 +1397,7 @@ type GetResultURLRequest struct {
 
 func (x *GetResultURLRequest) Reset() {
 	*x = GetResultURLRequest{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[15]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1294,7 +1409,7 @@ func (x *GetResultURLRequest) String() string {
 func (*GetResultURLRequest) ProtoMessage() {}
 
 func (x *GetResultURLRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[15]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1307,7 +1422,7 @@ func (x *GetResultURLRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetResultURLRequest.ProtoReflect.Descriptor instead.
 func (*GetResultURLRequest) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{15}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetResultURLRequest) GetJobId() string {
@@ -1340,7 +1455,7 @@ type GetResultURLResponse struct {
 
 func (x *GetResultURLResponse) Reset() {
 	*x = GetResultURLResponse{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[16]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1352,7 +1467,7 @@ func (x *GetResultURLResponse) String() string {
 func (*GetResultURLResponse) ProtoMessage() {}
 
 func (x *GetResultURLResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[16]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1365,7 +1480,7 @@ func (x *GetResultURLResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetResultURLResponse.ProtoReflect.Descriptor instead.
 func (*GetResultURLResponse) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{16}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetResultURLResponse) GetUrl() string {
@@ -1406,7 +1521,7 @@ type CreateUploadURLRequest struct {
 
 func (x *CreateUploadURLRequest) Reset() {
 	*x = CreateUploadURLRequest{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[17]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1418,7 +1533,7 @@ func (x *CreateUploadURLRequest) String() string {
 func (*CreateUploadURLRequest) ProtoMessage() {}
 
 func (x *CreateUploadURLRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[17]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1431,7 +1546,7 @@ func (x *CreateUploadURLRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateUploadURLRequest.ProtoReflect.Descriptor instead.
 func (*CreateUploadURLRequest) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{17}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *CreateUploadURLRequest) GetFilename() string {
@@ -1461,7 +1576,7 @@ type CreateUploadURLResponse struct {
 
 func (x *CreateUploadURLResponse) Reset() {
 	*x = CreateUploadURLResponse{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[18]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1473,7 +1588,7 @@ func (x *CreateUploadURLResponse) String() string {
 func (*CreateUploadURLResponse) ProtoMessage() {}
 
 func (x *CreateUploadURLResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[18]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1486,7 +1601,7 @@ func (x *CreateUploadURLResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateUploadURLResponse.ProtoReflect.Descriptor instead.
 func (*CreateUploadURLResponse) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{18}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *CreateUploadURLResponse) GetUrl() string {
@@ -1524,7 +1639,7 @@ type NarrateRequest struct {
 
 func (x *NarrateRequest) Reset() {
 	*x = NarrateRequest{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[19]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1536,7 +1651,7 @@ func (x *NarrateRequest) String() string {
 func (*NarrateRequest) ProtoMessage() {}
 
 func (x *NarrateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[19]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1549,7 +1664,7 @@ func (x *NarrateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NarrateRequest.ProtoReflect.Descriptor instead.
 func (*NarrateRequest) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{19}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *NarrateRequest) GetJobId() string {
@@ -1589,7 +1704,7 @@ type NarrateResponse struct {
 
 func (x *NarrateResponse) Reset() {
 	*x = NarrateResponse{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[20]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1601,7 +1716,7 @@ func (x *NarrateResponse) String() string {
 func (*NarrateResponse) ProtoMessage() {}
 
 func (x *NarrateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[20]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1614,7 +1729,7 @@ func (x *NarrateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NarrateResponse.ProtoReflect.Descriptor instead.
 func (*NarrateResponse) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{20}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *NarrateResponse) GetEvent() *v14.NarrateEvent {
@@ -1632,7 +1747,7 @@ type GetQuotaRequest struct {
 
 func (x *GetQuotaRequest) Reset() {
 	*x = GetQuotaRequest{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[21]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1644,7 +1759,7 @@ func (x *GetQuotaRequest) String() string {
 func (*GetQuotaRequest) ProtoMessage() {}
 
 func (x *GetQuotaRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[21]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1657,7 +1772,7 @@ func (x *GetQuotaRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetQuotaRequest.ProtoReflect.Descriptor instead.
 func (*GetQuotaRequest) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{21}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{22}
 }
 
 type GetQuotaResponse struct {
@@ -1677,7 +1792,7 @@ type GetQuotaResponse struct {
 
 func (x *GetQuotaResponse) Reset() {
 	*x = GetQuotaResponse{}
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[22]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1689,7 +1804,7 @@ func (x *GetQuotaResponse) String() string {
 func (*GetQuotaResponse) ProtoMessage() {}
 
 func (x *GetQuotaResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[22]
+	mi := &file_trenddetective_gateway_v1_gateway_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1702,7 +1817,7 @@ func (x *GetQuotaResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetQuotaResponse.ProtoReflect.Descriptor instead.
 func (*GetQuotaResponse) Descriptor() ([]byte, []int) {
-	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{22}
+	return file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *GetQuotaResponse) GetGiovanniUsedFraction() float64 {
@@ -1738,9 +1853,13 @@ var File_trenddetective_gateway_v1_gateway_proto protoreflect.FileDescriptor
 const file_trenddetective_gateway_v1_gateway_proto_rawDesc = "" +
 	"\n" +
 	"'trenddetective/gateway/v1/gateway.proto\x12\x19trenddetective.gateway.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a)trenddetective/analysis/v1/analysis.proto\x1a%trenddetective/common/v1/common.proto\x1a$trenddetective/gateway/v1/task.proto\x1a%trenddetective/ingest/v1/ingest.proto\x1a)trenddetective/narrator/v1/narrator.proto\x1a-trenddetective/preprocess/v1/preprocess.proto\"\x16\n" +
-	"\x14ListVariablesRequest\"Z\n" +
+	"\x14ListVariablesRequest\"\x94\x01\n" +
 	"\x15ListVariablesResponse\x12A\n" +
-	"\tvariables\x18\x01 \x03(\v2#.trenddetective.gateway.v1.VariableR\tvariables\"\xce\x04\n" +
+	"\tvariables\x18\x01 \x03(\v2#.trenddetective.gateway.v1.VariableR\tvariables\x128\n" +
+	"\x06topics\x18\x02 \x03(\v2 .trenddetective.gateway.v1.TopicR\x06topics\"?\n" +
+	"\x05Topic\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\"\n" +
+	"\fmeasurements\x18\x02 \x03(\tR\fmeasurements\"\xa0\x05\n" +
 	"\bVariable\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1e\n" +
@@ -1759,11 +1878,14 @@ const file_trenddetective_gateway_v1_gateway_proto_rawDesc = "" +
 	"datasetUrl\x12\"\n" +
 	"\rpixel_lat_deg\x18\f \x01(\x01R\vpixelLatDeg\x12\"\n" +
 	"\rpixel_lon_deg\x18\r \x01(\x01R\vpixelLonDeg\x120\n" +
-	"\x14default_block_pixels\x18\x0e \x01(\x05R\x12defaultBlockPixels\"J\n" +
+	"\x14default_block_pixels\x18\x0e \x01(\x05R\x12defaultBlockPixels\x12\x14\n" +
+	"\x05topic\x18\x0f \x01(\tR\x05topic\x12 \n" +
+	"\vmeasurement\x18\x10 \x01(\tR\vmeasurement\x12\x18\n" +
+	"\aproduct\x18\x11 \x01(\tR\aproduct\"J\n" +
 	"\x10CreateJobRequest\x126\n" +
 	"\x04spec\x18\x01 \x01(\v2\".trenddetective.gateway.v1.JobSpecR\x04spec\"E\n" +
 	"\x11CreateJobResponse\x120\n" +
-	"\x03job\x18\x01 \x01(\v2\x1e.trenddetective.gateway.v1.JobR\x03job\"\x9d\x04\n" +
+	"\x03job\x18\x01 \x01(\v2\x1e.trenddetective.gateway.v1.JobR\x03job\"\xf1\x04\n" +
 	"\aJobSpec\x12\x1f\n" +
 	"\vvariable_id\x18\x01 \x01(\tR\n" +
 	"variableId\x122\n" +
@@ -1775,7 +1897,10 @@ const file_trenddetective_gateway_v1_gateway_proto_rawDesc = "" +
 	"\x06upload\x18\x06 \x01(\v2!.trenddetective.common.v1.BlobRefR\x06upload\x12C\n" +
 	"\afilters\x18\a \x01(\v2).trenddetective.preprocess.v1.FilterChainR\afilters\x12K\n" +
 	"\vaggregation\x18\b \x01(\v2).trenddetective.preprocess.v1.AggregationR\vaggregation\x12:\n" +
-	"\x05tests\x18\t \x01(\v2$.trenddetective.analysis.v1.TestPlanR\x05tests\"\xe9\x03\n" +
+	"\x05tests\x18\t \x01(\v2$.trenddetective.analysis.v1.TestPlanR\x05tests\x12*\n" +
+	"\x11skip_series_tests\x18\n" +
+	" \x01(\bR\x0fskipSeriesTests\x12&\n" +
+	"\x0fskip_grid_tests\x18\v \x01(\bR\rskipGridTests\"\xe9\x03\n" +
 	"\x03Job\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x129\n" +
 	"\x05state\x18\x02 \x01(\x0e2#.trenddetective.gateway.v1.JobStateR\x05state\x126\n" +
@@ -1909,7 +2034,7 @@ func file_trenddetective_gateway_v1_gateway_proto_rawDescGZIP() []byte {
 }
 
 var file_trenddetective_gateway_v1_gateway_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_trenddetective_gateway_v1_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_trenddetective_gateway_v1_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_trenddetective_gateway_v1_gateway_proto_goTypes = []any{
 	(Domain)(0),                     // 0: trenddetective.gateway.v1.Domain
 	(JobState)(0),                   // 1: trenddetective.gateway.v1.JobState
@@ -1917,110 +2042,112 @@ var file_trenddetective_gateway_v1_gateway_proto_goTypes = []any{
 	(Artifact)(0),                   // 3: trenddetective.gateway.v1.Artifact
 	(*ListVariablesRequest)(nil),    // 4: trenddetective.gateway.v1.ListVariablesRequest
 	(*ListVariablesResponse)(nil),   // 5: trenddetective.gateway.v1.ListVariablesResponse
-	(*Variable)(nil),                // 6: trenddetective.gateway.v1.Variable
-	(*CreateJobRequest)(nil),        // 7: trenddetective.gateway.v1.CreateJobRequest
-	(*CreateJobResponse)(nil),       // 8: trenddetective.gateway.v1.CreateJobResponse
-	(*JobSpec)(nil),                 // 9: trenddetective.gateway.v1.JobSpec
-	(*Job)(nil),                     // 10: trenddetective.gateway.v1.Job
-	(*TaskStatus)(nil),              // 11: trenddetective.gateway.v1.TaskStatus
-	(*JobResults)(nil),              // 12: trenddetective.gateway.v1.JobResults
-	(*GetJobRequest)(nil),           // 13: trenddetective.gateway.v1.GetJobRequest
-	(*GetJobResponse)(nil),          // 14: trenddetective.gateway.v1.GetJobResponse
-	(*CancelJobRequest)(nil),        // 15: trenddetective.gateway.v1.CancelJobRequest
-	(*CancelJobResponse)(nil),       // 16: trenddetective.gateway.v1.CancelJobResponse
-	(*WatchJobRequest)(nil),         // 17: trenddetective.gateway.v1.WatchJobRequest
-	(*WatchJobResponse)(nil),        // 18: trenddetective.gateway.v1.WatchJobResponse
-	(*GetResultURLRequest)(nil),     // 19: trenddetective.gateway.v1.GetResultURLRequest
-	(*GetResultURLResponse)(nil),    // 20: trenddetective.gateway.v1.GetResultURLResponse
-	(*CreateUploadURLRequest)(nil),  // 21: trenddetective.gateway.v1.CreateUploadURLRequest
-	(*CreateUploadURLResponse)(nil), // 22: trenddetective.gateway.v1.CreateUploadURLResponse
-	(*NarrateRequest)(nil),          // 23: trenddetective.gateway.v1.NarrateRequest
-	(*NarrateResponse)(nil),         // 24: trenddetective.gateway.v1.NarrateResponse
-	(*GetQuotaRequest)(nil),         // 25: trenddetective.gateway.v1.GetQuotaRequest
-	(*GetQuotaResponse)(nil),        // 26: trenddetective.gateway.v1.GetQuotaResponse
-	(v1.TimeStep)(0),                // 27: trenddetective.common.v1.TimeStep
-	(*v1.DateRange)(nil),            // 28: trenddetective.common.v1.DateRange
-	(v11.Source)(0),                 // 29: trenddetective.ingest.v1.Source
-	(*v1.BBox)(nil),                 // 30: trenddetective.common.v1.BBox
-	(Stage)(0),                      // 31: trenddetective.gateway.v1.Stage
-	(*v1.BlobRef)(nil),              // 32: trenddetective.common.v1.BlobRef
-	(*v12.FilterChain)(nil),         // 33: trenddetective.preprocess.v1.FilterChain
-	(*v12.Aggregation)(nil),         // 34: trenddetective.preprocess.v1.Aggregation
-	(*v13.TestPlan)(nil),            // 35: trenddetective.analysis.v1.TestPlan
-	(*timestamppb.Timestamp)(nil),   // 36: google.protobuf.Timestamp
-	(*TaskMeta)(nil),                // 37: trenddetective.gateway.v1.TaskMeta
-	(*TaskError)(nil),               // 38: trenddetective.gateway.v1.TaskError
-	(*v11.RawDataset)(nil),          // 39: trenddetective.ingest.v1.RawDataset
-	(*v12.PreprocessResult)(nil),    // 40: trenddetective.preprocess.v1.PreprocessResult
-	(*v13.AnalysisResult)(nil),      // 41: trenddetective.analysis.v1.AnalysisResult
-	(*v14.ChatMessage)(nil),         // 42: trenddetective.narrator.v1.ChatMessage
-	(*v14.LlmConfig)(nil),           // 43: trenddetective.narrator.v1.LlmConfig
-	(*v14.NarrateEvent)(nil),        // 44: trenddetective.narrator.v1.NarrateEvent
+	(*Topic)(nil),                   // 6: trenddetective.gateway.v1.Topic
+	(*Variable)(nil),                // 7: trenddetective.gateway.v1.Variable
+	(*CreateJobRequest)(nil),        // 8: trenddetective.gateway.v1.CreateJobRequest
+	(*CreateJobResponse)(nil),       // 9: trenddetective.gateway.v1.CreateJobResponse
+	(*JobSpec)(nil),                 // 10: trenddetective.gateway.v1.JobSpec
+	(*Job)(nil),                     // 11: trenddetective.gateway.v1.Job
+	(*TaskStatus)(nil),              // 12: trenddetective.gateway.v1.TaskStatus
+	(*JobResults)(nil),              // 13: trenddetective.gateway.v1.JobResults
+	(*GetJobRequest)(nil),           // 14: trenddetective.gateway.v1.GetJobRequest
+	(*GetJobResponse)(nil),          // 15: trenddetective.gateway.v1.GetJobResponse
+	(*CancelJobRequest)(nil),        // 16: trenddetective.gateway.v1.CancelJobRequest
+	(*CancelJobResponse)(nil),       // 17: trenddetective.gateway.v1.CancelJobResponse
+	(*WatchJobRequest)(nil),         // 18: trenddetective.gateway.v1.WatchJobRequest
+	(*WatchJobResponse)(nil),        // 19: trenddetective.gateway.v1.WatchJobResponse
+	(*GetResultURLRequest)(nil),     // 20: trenddetective.gateway.v1.GetResultURLRequest
+	(*GetResultURLResponse)(nil),    // 21: trenddetective.gateway.v1.GetResultURLResponse
+	(*CreateUploadURLRequest)(nil),  // 22: trenddetective.gateway.v1.CreateUploadURLRequest
+	(*CreateUploadURLResponse)(nil), // 23: trenddetective.gateway.v1.CreateUploadURLResponse
+	(*NarrateRequest)(nil),          // 24: trenddetective.gateway.v1.NarrateRequest
+	(*NarrateResponse)(nil),         // 25: trenddetective.gateway.v1.NarrateResponse
+	(*GetQuotaRequest)(nil),         // 26: trenddetective.gateway.v1.GetQuotaRequest
+	(*GetQuotaResponse)(nil),        // 27: trenddetective.gateway.v1.GetQuotaResponse
+	(v1.TimeStep)(0),                // 28: trenddetective.common.v1.TimeStep
+	(*v1.DateRange)(nil),            // 29: trenddetective.common.v1.DateRange
+	(v11.Source)(0),                 // 30: trenddetective.ingest.v1.Source
+	(*v1.BBox)(nil),                 // 31: trenddetective.common.v1.BBox
+	(Stage)(0),                      // 32: trenddetective.gateway.v1.Stage
+	(*v1.BlobRef)(nil),              // 33: trenddetective.common.v1.BlobRef
+	(*v12.FilterChain)(nil),         // 34: trenddetective.preprocess.v1.FilterChain
+	(*v12.Aggregation)(nil),         // 35: trenddetective.preprocess.v1.Aggregation
+	(*v13.TestPlan)(nil),            // 36: trenddetective.analysis.v1.TestPlan
+	(*timestamppb.Timestamp)(nil),   // 37: google.protobuf.Timestamp
+	(*TaskMeta)(nil),                // 38: trenddetective.gateway.v1.TaskMeta
+	(*TaskError)(nil),               // 39: trenddetective.gateway.v1.TaskError
+	(*v11.RawDataset)(nil),          // 40: trenddetective.ingest.v1.RawDataset
+	(*v12.PreprocessResult)(nil),    // 41: trenddetective.preprocess.v1.PreprocessResult
+	(*v13.AnalysisResult)(nil),      // 42: trenddetective.analysis.v1.AnalysisResult
+	(*v14.ChatMessage)(nil),         // 43: trenddetective.narrator.v1.ChatMessage
+	(*v14.LlmConfig)(nil),           // 44: trenddetective.narrator.v1.LlmConfig
+	(*v14.NarrateEvent)(nil),        // 45: trenddetective.narrator.v1.NarrateEvent
 }
 var file_trenddetective_gateway_v1_gateway_proto_depIdxs = []int32{
-	6,  // 0: trenddetective.gateway.v1.ListVariablesResponse.variables:type_name -> trenddetective.gateway.v1.Variable
-	27, // 1: trenddetective.gateway.v1.Variable.step:type_name -> trenddetective.common.v1.TimeStep
-	28, // 2: trenddetective.gateway.v1.Variable.available:type_name -> trenddetective.common.v1.DateRange
-	0,  // 3: trenddetective.gateway.v1.Variable.domain:type_name -> trenddetective.gateway.v1.Domain
-	29, // 4: trenddetective.gateway.v1.Variable.default_source:type_name -> trenddetective.ingest.v1.Source
-	29, // 5: trenddetective.gateway.v1.Variable.sources:type_name -> trenddetective.ingest.v1.Source
-	9,  // 6: trenddetective.gateway.v1.CreateJobRequest.spec:type_name -> trenddetective.gateway.v1.JobSpec
-	10, // 7: trenddetective.gateway.v1.CreateJobResponse.job:type_name -> trenddetective.gateway.v1.Job
-	30, // 8: trenddetective.gateway.v1.JobSpec.bbox:type_name -> trenddetective.common.v1.BBox
-	28, // 9: trenddetective.gateway.v1.JobSpec.dates:type_name -> trenddetective.common.v1.DateRange
-	29, // 10: trenddetective.gateway.v1.JobSpec.source:type_name -> trenddetective.ingest.v1.Source
-	31, // 11: trenddetective.gateway.v1.JobSpec.stop_after:type_name -> trenddetective.gateway.v1.Stage
-	32, // 12: trenddetective.gateway.v1.JobSpec.upload:type_name -> trenddetective.common.v1.BlobRef
-	33, // 13: trenddetective.gateway.v1.JobSpec.filters:type_name -> trenddetective.preprocess.v1.FilterChain
-	34, // 14: trenddetective.gateway.v1.JobSpec.aggregation:type_name -> trenddetective.preprocess.v1.Aggregation
-	35, // 15: trenddetective.gateway.v1.JobSpec.tests:type_name -> trenddetective.analysis.v1.TestPlan
-	1,  // 16: trenddetective.gateway.v1.Job.state:type_name -> trenddetective.gateway.v1.JobState
-	9,  // 17: trenddetective.gateway.v1.Job.spec:type_name -> trenddetective.gateway.v1.JobSpec
-	11, // 18: trenddetective.gateway.v1.Job.tasks:type_name -> trenddetective.gateway.v1.TaskStatus
-	12, // 19: trenddetective.gateway.v1.Job.results:type_name -> trenddetective.gateway.v1.JobResults
-	36, // 20: trenddetective.gateway.v1.Job.created_at:type_name -> google.protobuf.Timestamp
-	36, // 21: trenddetective.gateway.v1.Job.updated_at:type_name -> google.protobuf.Timestamp
-	37, // 22: trenddetective.gateway.v1.TaskStatus.meta:type_name -> trenddetective.gateway.v1.TaskMeta
-	2,  // 23: trenddetective.gateway.v1.TaskStatus.state:type_name -> trenddetective.gateway.v1.TaskState
-	38, // 24: trenddetective.gateway.v1.TaskStatus.error:type_name -> trenddetective.gateway.v1.TaskError
-	36, // 25: trenddetective.gateway.v1.TaskStatus.started_at:type_name -> google.protobuf.Timestamp
-	36, // 26: trenddetective.gateway.v1.TaskStatus.finished_at:type_name -> google.protobuf.Timestamp
-	39, // 27: trenddetective.gateway.v1.JobResults.raw:type_name -> trenddetective.ingest.v1.RawDataset
-	40, // 28: trenddetective.gateway.v1.JobResults.preprocess:type_name -> trenddetective.preprocess.v1.PreprocessResult
-	41, // 29: trenddetective.gateway.v1.JobResults.analysis:type_name -> trenddetective.analysis.v1.AnalysisResult
-	10, // 30: trenddetective.gateway.v1.GetJobResponse.job:type_name -> trenddetective.gateway.v1.Job
-	10, // 31: trenddetective.gateway.v1.CancelJobResponse.job:type_name -> trenddetective.gateway.v1.Job
-	10, // 32: trenddetective.gateway.v1.WatchJobResponse.job:type_name -> trenddetective.gateway.v1.Job
-	3,  // 33: trenddetective.gateway.v1.GetResultURLRequest.artifact:type_name -> trenddetective.gateway.v1.Artifact
-	36, // 34: trenddetective.gateway.v1.GetResultURLResponse.expires_at:type_name -> google.protobuf.Timestamp
-	32, // 35: trenddetective.gateway.v1.CreateUploadURLResponse.upload:type_name -> trenddetective.common.v1.BlobRef
-	36, // 36: trenddetective.gateway.v1.CreateUploadURLResponse.expires_at:type_name -> google.protobuf.Timestamp
-	42, // 37: trenddetective.gateway.v1.NarrateRequest.history:type_name -> trenddetective.narrator.v1.ChatMessage
-	43, // 38: trenddetective.gateway.v1.NarrateRequest.llm:type_name -> trenddetective.narrator.v1.LlmConfig
-	44, // 39: trenddetective.gateway.v1.NarrateResponse.event:type_name -> trenddetective.narrator.v1.NarrateEvent
-	4,  // 40: trenddetective.gateway.v1.GatewayService.ListVariables:input_type -> trenddetective.gateway.v1.ListVariablesRequest
-	7,  // 41: trenddetective.gateway.v1.GatewayService.CreateJob:input_type -> trenddetective.gateway.v1.CreateJobRequest
-	13, // 42: trenddetective.gateway.v1.GatewayService.GetJob:input_type -> trenddetective.gateway.v1.GetJobRequest
-	17, // 43: trenddetective.gateway.v1.GatewayService.WatchJob:input_type -> trenddetective.gateway.v1.WatchJobRequest
-	15, // 44: trenddetective.gateway.v1.GatewayService.CancelJob:input_type -> trenddetective.gateway.v1.CancelJobRequest
-	19, // 45: trenddetective.gateway.v1.GatewayService.GetResultURL:input_type -> trenddetective.gateway.v1.GetResultURLRequest
-	21, // 46: trenddetective.gateway.v1.GatewayService.CreateUploadURL:input_type -> trenddetective.gateway.v1.CreateUploadURLRequest
-	23, // 47: trenddetective.gateway.v1.GatewayService.Narrate:input_type -> trenddetective.gateway.v1.NarrateRequest
-	25, // 48: trenddetective.gateway.v1.GatewayService.GetQuota:input_type -> trenddetective.gateway.v1.GetQuotaRequest
-	5,  // 49: trenddetective.gateway.v1.GatewayService.ListVariables:output_type -> trenddetective.gateway.v1.ListVariablesResponse
-	8,  // 50: trenddetective.gateway.v1.GatewayService.CreateJob:output_type -> trenddetective.gateway.v1.CreateJobResponse
-	14, // 51: trenddetective.gateway.v1.GatewayService.GetJob:output_type -> trenddetective.gateway.v1.GetJobResponse
-	18, // 52: trenddetective.gateway.v1.GatewayService.WatchJob:output_type -> trenddetective.gateway.v1.WatchJobResponse
-	16, // 53: trenddetective.gateway.v1.GatewayService.CancelJob:output_type -> trenddetective.gateway.v1.CancelJobResponse
-	20, // 54: trenddetective.gateway.v1.GatewayService.GetResultURL:output_type -> trenddetective.gateway.v1.GetResultURLResponse
-	22, // 55: trenddetective.gateway.v1.GatewayService.CreateUploadURL:output_type -> trenddetective.gateway.v1.CreateUploadURLResponse
-	24, // 56: trenddetective.gateway.v1.GatewayService.Narrate:output_type -> trenddetective.gateway.v1.NarrateResponse
-	26, // 57: trenddetective.gateway.v1.GatewayService.GetQuota:output_type -> trenddetective.gateway.v1.GetQuotaResponse
-	49, // [49:58] is the sub-list for method output_type
-	40, // [40:49] is the sub-list for method input_type
-	40, // [40:40] is the sub-list for extension type_name
-	40, // [40:40] is the sub-list for extension extendee
-	0,  // [0:40] is the sub-list for field type_name
+	7,  // 0: trenddetective.gateway.v1.ListVariablesResponse.variables:type_name -> trenddetective.gateway.v1.Variable
+	6,  // 1: trenddetective.gateway.v1.ListVariablesResponse.topics:type_name -> trenddetective.gateway.v1.Topic
+	28, // 2: trenddetective.gateway.v1.Variable.step:type_name -> trenddetective.common.v1.TimeStep
+	29, // 3: trenddetective.gateway.v1.Variable.available:type_name -> trenddetective.common.v1.DateRange
+	0,  // 4: trenddetective.gateway.v1.Variable.domain:type_name -> trenddetective.gateway.v1.Domain
+	30, // 5: trenddetective.gateway.v1.Variable.default_source:type_name -> trenddetective.ingest.v1.Source
+	30, // 6: trenddetective.gateway.v1.Variable.sources:type_name -> trenddetective.ingest.v1.Source
+	10, // 7: trenddetective.gateway.v1.CreateJobRequest.spec:type_name -> trenddetective.gateway.v1.JobSpec
+	11, // 8: trenddetective.gateway.v1.CreateJobResponse.job:type_name -> trenddetective.gateway.v1.Job
+	31, // 9: trenddetective.gateway.v1.JobSpec.bbox:type_name -> trenddetective.common.v1.BBox
+	29, // 10: trenddetective.gateway.v1.JobSpec.dates:type_name -> trenddetective.common.v1.DateRange
+	30, // 11: trenddetective.gateway.v1.JobSpec.source:type_name -> trenddetective.ingest.v1.Source
+	32, // 12: trenddetective.gateway.v1.JobSpec.stop_after:type_name -> trenddetective.gateway.v1.Stage
+	33, // 13: trenddetective.gateway.v1.JobSpec.upload:type_name -> trenddetective.common.v1.BlobRef
+	34, // 14: trenddetective.gateway.v1.JobSpec.filters:type_name -> trenddetective.preprocess.v1.FilterChain
+	35, // 15: trenddetective.gateway.v1.JobSpec.aggregation:type_name -> trenddetective.preprocess.v1.Aggregation
+	36, // 16: trenddetective.gateway.v1.JobSpec.tests:type_name -> trenddetective.analysis.v1.TestPlan
+	1,  // 17: trenddetective.gateway.v1.Job.state:type_name -> trenddetective.gateway.v1.JobState
+	10, // 18: trenddetective.gateway.v1.Job.spec:type_name -> trenddetective.gateway.v1.JobSpec
+	12, // 19: trenddetective.gateway.v1.Job.tasks:type_name -> trenddetective.gateway.v1.TaskStatus
+	13, // 20: trenddetective.gateway.v1.Job.results:type_name -> trenddetective.gateway.v1.JobResults
+	37, // 21: trenddetective.gateway.v1.Job.created_at:type_name -> google.protobuf.Timestamp
+	37, // 22: trenddetective.gateway.v1.Job.updated_at:type_name -> google.protobuf.Timestamp
+	38, // 23: trenddetective.gateway.v1.TaskStatus.meta:type_name -> trenddetective.gateway.v1.TaskMeta
+	2,  // 24: trenddetective.gateway.v1.TaskStatus.state:type_name -> trenddetective.gateway.v1.TaskState
+	39, // 25: trenddetective.gateway.v1.TaskStatus.error:type_name -> trenddetective.gateway.v1.TaskError
+	37, // 26: trenddetective.gateway.v1.TaskStatus.started_at:type_name -> google.protobuf.Timestamp
+	37, // 27: trenddetective.gateway.v1.TaskStatus.finished_at:type_name -> google.protobuf.Timestamp
+	40, // 28: trenddetective.gateway.v1.JobResults.raw:type_name -> trenddetective.ingest.v1.RawDataset
+	41, // 29: trenddetective.gateway.v1.JobResults.preprocess:type_name -> trenddetective.preprocess.v1.PreprocessResult
+	42, // 30: trenddetective.gateway.v1.JobResults.analysis:type_name -> trenddetective.analysis.v1.AnalysisResult
+	11, // 31: trenddetective.gateway.v1.GetJobResponse.job:type_name -> trenddetective.gateway.v1.Job
+	11, // 32: trenddetective.gateway.v1.CancelJobResponse.job:type_name -> trenddetective.gateway.v1.Job
+	11, // 33: trenddetective.gateway.v1.WatchJobResponse.job:type_name -> trenddetective.gateway.v1.Job
+	3,  // 34: trenddetective.gateway.v1.GetResultURLRequest.artifact:type_name -> trenddetective.gateway.v1.Artifact
+	37, // 35: trenddetective.gateway.v1.GetResultURLResponse.expires_at:type_name -> google.protobuf.Timestamp
+	33, // 36: trenddetective.gateway.v1.CreateUploadURLResponse.upload:type_name -> trenddetective.common.v1.BlobRef
+	37, // 37: trenddetective.gateway.v1.CreateUploadURLResponse.expires_at:type_name -> google.protobuf.Timestamp
+	43, // 38: trenddetective.gateway.v1.NarrateRequest.history:type_name -> trenddetective.narrator.v1.ChatMessage
+	44, // 39: trenddetective.gateway.v1.NarrateRequest.llm:type_name -> trenddetective.narrator.v1.LlmConfig
+	45, // 40: trenddetective.gateway.v1.NarrateResponse.event:type_name -> trenddetective.narrator.v1.NarrateEvent
+	4,  // 41: trenddetective.gateway.v1.GatewayService.ListVariables:input_type -> trenddetective.gateway.v1.ListVariablesRequest
+	8,  // 42: trenddetective.gateway.v1.GatewayService.CreateJob:input_type -> trenddetective.gateway.v1.CreateJobRequest
+	14, // 43: trenddetective.gateway.v1.GatewayService.GetJob:input_type -> trenddetective.gateway.v1.GetJobRequest
+	18, // 44: trenddetective.gateway.v1.GatewayService.WatchJob:input_type -> trenddetective.gateway.v1.WatchJobRequest
+	16, // 45: trenddetective.gateway.v1.GatewayService.CancelJob:input_type -> trenddetective.gateway.v1.CancelJobRequest
+	20, // 46: trenddetective.gateway.v1.GatewayService.GetResultURL:input_type -> trenddetective.gateway.v1.GetResultURLRequest
+	22, // 47: trenddetective.gateway.v1.GatewayService.CreateUploadURL:input_type -> trenddetective.gateway.v1.CreateUploadURLRequest
+	24, // 48: trenddetective.gateway.v1.GatewayService.Narrate:input_type -> trenddetective.gateway.v1.NarrateRequest
+	26, // 49: trenddetective.gateway.v1.GatewayService.GetQuota:input_type -> trenddetective.gateway.v1.GetQuotaRequest
+	5,  // 50: trenddetective.gateway.v1.GatewayService.ListVariables:output_type -> trenddetective.gateway.v1.ListVariablesResponse
+	9,  // 51: trenddetective.gateway.v1.GatewayService.CreateJob:output_type -> trenddetective.gateway.v1.CreateJobResponse
+	15, // 52: trenddetective.gateway.v1.GatewayService.GetJob:output_type -> trenddetective.gateway.v1.GetJobResponse
+	19, // 53: trenddetective.gateway.v1.GatewayService.WatchJob:output_type -> trenddetective.gateway.v1.WatchJobResponse
+	17, // 54: trenddetective.gateway.v1.GatewayService.CancelJob:output_type -> trenddetective.gateway.v1.CancelJobResponse
+	21, // 55: trenddetective.gateway.v1.GatewayService.GetResultURL:output_type -> trenddetective.gateway.v1.GetResultURLResponse
+	23, // 56: trenddetective.gateway.v1.GatewayService.CreateUploadURL:output_type -> trenddetective.gateway.v1.CreateUploadURLResponse
+	25, // 57: trenddetective.gateway.v1.GatewayService.Narrate:output_type -> trenddetective.gateway.v1.NarrateResponse
+	27, // 58: trenddetective.gateway.v1.GatewayService.GetQuota:output_type -> trenddetective.gateway.v1.GetQuotaResponse
+	50, // [50:59] is the sub-list for method output_type
+	41, // [41:50] is the sub-list for method input_type
+	41, // [41:41] is the sub-list for extension type_name
+	41, // [41:41] is the sub-list for extension extendee
+	0,  // [0:41] is the sub-list for field type_name
 }
 
 func init() { file_trenddetective_gateway_v1_gateway_proto_init() }
@@ -2029,14 +2156,14 @@ func file_trenddetective_gateway_v1_gateway_proto_init() {
 		return
 	}
 	file_trenddetective_gateway_v1_task_proto_init()
-	file_trenddetective_gateway_v1_gateway_proto_msgTypes[7].OneofWrappers = []any{}
+	file_trenddetective_gateway_v1_gateway_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_trenddetective_gateway_v1_gateway_proto_rawDesc), len(file_trenddetective_gateway_v1_gateway_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   23,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

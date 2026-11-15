@@ -33,6 +33,8 @@ export interface Run {
   heatmap?: Heatmap;
   /** The map grid behind the heatmap, for the month-by-month map. */
   grid?: Grid;
+  /** Whether the job asked for the month-by-month map. */
+  monthsMap?: boolean;
 }
 
 interface Props {

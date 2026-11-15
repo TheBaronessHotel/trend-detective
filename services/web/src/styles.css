@@ -272,6 +272,76 @@ p {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---- the variable browser: search, topics, and a list grouped by measurement ---- */
+.browse-search {
+  width: 100%;
+  margin: 0 0 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--fg);
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.browse-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0 0 0.5rem;
+}
+
+.browse-topics .action[aria-pressed="true"] {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.browse-count {
+  opacity: 0.6;
+}
+
+.browse-map {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.browse-list {
+  max-height: 24rem;
+  overflow-y: auto;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.browse-group-title {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 0.5rem 0.4rem 0.3rem;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.browse-group .option:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.browse-empty {
+  padding: 0.6rem 0.4rem;
+}
+
+.browse-total {
+  margin: 0.35rem 0 0;
+}
+
 .details {
   margin-top: 1rem;
   padding-left: 0.8rem;
@@ -1429,4 +1499,44 @@ p {
 
 .md th {
   font-weight: 650;
+}
+
+/* ---- what a job makes: one checkbox row per output ---- */
+.output {
+  display: grid;
+  grid-template-columns: 1.1rem minmax(0, 1fr);
+  column-gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.output:last-of-type {
+  border-bottom: 0;
+}
+
+.output input {
+  margin: 0;
+  accent-color: var(--fg);
+}
+
+.output-name {
+  font-size: 0.86rem;
+}
+
+.output-note {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.output.off {
+  cursor: default;
+  opacity: 0.45;
+}
+
+/* The cell size sits outside the numbered steps, so the next step needs room. */
+.cell-size + .step {
+  margin-top: 1.8rem;
 }

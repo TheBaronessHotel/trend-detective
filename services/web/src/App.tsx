@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import type { Variable } from "@gen/gateway/v1/gateway_pb";
+import type { Topic, Variable } from "@gen/gateway/v1/gateway_pb";
 import { Stage } from "@gen/gateway/v1/task_pb";
 import { Source } from "@gen/ingest/v1/ingest_pb";
 import type { Job } from "@gen/gateway/v1/gateway_pb";
@@ -22,6 +22,7 @@ import { DatesPicker } from "./components/DatesPicker";
 import { ExamplesBar } from "./components/ExamplesBar";
 import { JobPanel, type Run } from "./components/JobPanel";
 import { MonthsBar } from "./components/MonthsBar";
+import { ALL_OUTPUTS, makesMap, type Outputs, OutputsPicker } from "./components/OutputsPicker";
 import { PlaceFields } from "./components/PlaceFields";
 import { SourcePicker } from "./components/SourcePicker";
 import { ThemeButton } from "./components/ThemeButton";
@@ -66,6 +67,7 @@ async function watchUntilFinished(job: Job, signal: AbortSignal, onJob: (j: Job)
 
 export function App() {
   const [variables, setVariables] = useState<Variable[]>();
+  const [topics, setTopics] = useState<Topic[]>([]);
   const [loadError, setLoadError] = useState<string>();
   const [variableId, setVariableId] = useState<string>();
   const [box, setBox] = useState<Box>();
@@ -75,6 +77,8 @@ export function App() {
   const [file, setFile] = useState<File>();
   // Native pixels per heatmap cell side; undefined uses the variable's default.
   const [block, setBlock] = useState<number>();
+  // What the job makes beyond the region's chart.
+  const [outputs, setOutputs] = useState<Outputs>(ALL_OUTPUTS);
   const [run, setRun] = useState<Run>();
   const abort = useRef<AbortController | undefined>(undefined);
 
@@ -94,6 +98,15 @@ export function App() {
     setMonthsError(undefined);
     setT(0);
   }
+
+  // A job with the month-by-month map but no trend map opens straight to it.
+  useEffect(() => {
+    if (run?.phase === "done" && run.grid && run.monthsMap && !run.heatmap && !frames && !monthsLoading && !monthsError) {
+      void openMonths();
+    }
+    // openMonths reads the run it's given here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run]);
 
   async function openMonths() {
     const job = run?.job;
@@ -125,7 +138,10 @@ export function App() {
   useEffect(() => {
     gateway
       .listVariables({})
-      .then((res) => setVariables(res.variables))
+      .then((res) => {
+        setVariables(res.variables);
+        setTopics(res.topics);
+      })
       .catch((err) => setLoadError(errorMessage(err)));
     return () => abort.current?.abort();
   }, []);
@@ -170,7 +186,17 @@ export function App() {
     setFile(undefined);
     setBlock(undefined);
     setFocus((n) => n + 1);
-    void startJob({ variable: v, box: e.box, start: e.start, end: e.end, source: v.defaultSource, file: undefined, block: undefined });
+    void startJob({
+      variable: v,
+      box: e.box,
+      start: e.start,
+      end: e.end,
+      source: v.defaultSource,
+      file: undefined,
+      block: undefined,
+      // Examples show everything.
+      outputs: ALL_OUTPUTS,
+    });
   }
 
   interface JobInput {
@@ -181,13 +207,15 @@ export function App() {
     source: Source | undefined;
     file: File | undefined;
     block: number | undefined;
+    outputs: Outputs;
   }
 
   // An example passes its own values, since state set in the same click
   // isn't there yet.
   async function startJob(given?: JobInput) {
     if (!given && (blocker || !variable || !box || !start || !end)) return;
-    const input = given ?? { variable: variable!, box: box!, start: start!, end: end!, source, file, block };
+    const input = given ?? { variable: variable!, box: box!, start: start!, end: end!, source, file, block, outputs };
+    const map = makesMap(input.variable, input.source);
     abort.current?.abort();
     resetMonths();
     const ctrl = new AbortController();
@@ -210,6 +238,10 @@ export function App() {
             source: input.source,
             upload,
             stopAfter: STOP_AFTER,
+            // The gateway drops these tests, and with none left ends the job
+            // at preprocess, which has the chart and the map already.
+            skipSeriesTests: !input.outputs.regionTests,
+            skipGridTests: !map || !input.outputs.trendMap,
             ...(input.block ? { aggregation: { blockPixels: input.block } } : {}),
           },
         },
@@ -222,13 +254,16 @@ export function App() {
       // so a job that got through preprocess always draws its chart.
       const hasSeries = !!last.results?.preprocess?.series;
       const hasAnalysis = !!last.results?.analysis?.series;
-      const hasHeatmap = !!last.results?.analysis?.grid && !!last.results?.preprocess?.grid;
+      const hasGrid = !!last.results?.preprocess?.grid;
+      const hasHeatmap = !!last.results?.analysis?.grid && hasGrid;
+      // The grid also feeds the month-by-month map, when that was asked for.
+      const wantsGrid = hasHeatmap || (hasGrid && input.outputs.monthsMap);
       setRun({ phase: "done", job: last, loadingSeries: hasSeries });
       if (!hasSeries) return;
       const [series, analysis, grid, gridAnalysis] = await Promise.allSettled([
         loadSeries(job.id, signal),
         hasAnalysis ? loadSeriesAnalysis(job.id, signal) : Promise.resolve(undefined),
-        hasHeatmap ? loadGrid(job.id, signal) : Promise.resolve(undefined),
+        wantsGrid ? loadGrid(job.id, signal) : Promise.resolve(undefined),
         hasHeatmap ? loadGridAnalysis(job.id, signal) : Promise.resolve(undefined),
       ]);
       if (signal.aborted) return;
@@ -246,6 +281,7 @@ export function App() {
             ? heatmap(grid.value, gridAnalysis.value)
             : undefined,
         grid: grid.status === "fulfilled" ? grid.value : undefined,
+        monthsMap: input.outputs.monthsMap,
       });
     } catch (err) {
       if (signal.aborted) return;
@@ -290,7 +326,7 @@ export function App() {
         )}
         {!variables && !loadError && <p className="note">Loading the variables…</p>}
         <ExamplesBar variables={variables} busy={busy} onPick={pickExample} />
-        {variables && <VariablePicker variables={variables} selected={variable} onSelect={selectVariable} />}
+        {variables && <VariablePicker variables={variables} topics={topics} selected={variable} onSelect={selectVariable} />}
         <PlaceFields box={box} onBox={setBox} />
         <DatesPicker
           variable={variable}
@@ -303,6 +339,7 @@ export function App() {
         />
         <SourcePicker variable={variable} source={source} onSource={setSource} file={file} onFile={setFile} />
         <CellSizePicker variable={variable} source={source} box={box} block={block} onBlock={setBlock} />
+        <OutputsPicker variable={variable} source={source} outputs={outputs} onOutputs={setOutputs} />
         <button type="button" className="action primary run" disabled={!!blocker || busy} onClick={() => void startJob()}>
           {busy ? "Working…" : "Fetch the data"}
         </button>
@@ -311,8 +348,9 @@ export function App() {
       <main className="main">
         <Suspense fallback={<div className="map-wrap" />}>
           <MapView box={box} onBox={setBox} heatmap={run?.heatmap} focus={focus} months={months}>
-            {run?.heatmap && run.grid && (
+            {run?.grid && run.monthsMap && (
               <MonthsBar
+                canClose={!!run.heatmap}
                 frames={frames}
                 loading={monthsLoading}
                 error={monthsError}
@@ -328,7 +366,10 @@ export function App() {
           </MapView>
         </Suspense>
         {/* Keyed by job, so a new job starts with the panel open. */}
-        <JobPanel key={run?.job?.id ?? "new"} run={run} stopAfter={STOP_AFTER} seriesTitle={seriesTitle} onSaveCsv={saveCsv} onStop={stopJob} />
+        <JobPanel key={run?.job?.id ?? "new"} run={run}
+          // A job without tests ends at preprocess; its spec says where.
+          stopAfter={run?.job?.spec?.stopAfter || STOP_AFTER}
+          seriesTitle={seriesTitle} onSaveCsv={saveCsv} onStop={stopJob} />
       </main>
     </div>
   );
