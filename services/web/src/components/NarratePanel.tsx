@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Provider } from "@gen/narrator/v1/narrator_pb";
 import { errorMessage, gateway } from "../api";
 import { authorOf, DEFAULT_MODELS, historyFor, type LlmSettings, type Turn } from "../lib/narrate";
 
 const KEY_HEADER = "X-Llm-Api-Key";
+
+// The Markdown renderer loads on its own, the first time an answer shows.
+const Markdown = lazy(() => import("./Markdown"));
 
 /**
  * Explanations of the results in plain words. The overview works for
@@ -85,7 +88,14 @@ export function NarratePanel({ jobId }: { jobId: string }) {
         <ol className="narrate-turns" aria-live="polite">
           {turns.map((t, i) => (
             <li key={i} className={`turn turn-${t.role}`}>
-              <p className="turn-text">{t.text || (busy && i === turns.length - 1 ? "…" : "")}</p>
+              {t.role === "assistant" && t.text ? (
+                // Plain text until the Markdown renderer has loaded.
+                <Suspense fallback={<p className="turn-text">{t.text}</p>}>
+                  <Markdown text={t.text} />
+                </Suspense>
+              ) : (
+                <p className="turn-text">{t.text || (busy && i === turns.length - 1 ? "…" : "")}</p>
+              )}
               {t.role === "assistant" && t.model && <p className="note">{authorOf(t.model)}</p>}
               {t.unverified && t.unverified.length > 0 && (
                 <p className="note turn-warn">

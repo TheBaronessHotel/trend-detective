@@ -1337,3 +1337,96 @@ p {
   font-size: 0.74rem;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---- an AI answer in Markdown, in the panel's small type ---- */
+.md {
+  font-size: 0.82rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.md > :first-child {
+  margin-top: 0;
+}
+
+.md > :last-child {
+  margin-bottom: 0;
+}
+
+.md p,
+.md ul,
+.md ol,
+.md pre,
+.md blockquote,
+.md .md-table {
+  margin: 0 0 0.6rem;
+}
+
+.md ul,
+.md ol {
+  padding-left: 1.3rem;
+}
+
+.md li + li {
+  margin-top: 0.2rem;
+}
+
+.md .md-h {
+  margin: 0.9rem 0 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.md code {
+  padding: 0.05rem 0.25rem;
+  background: var(--soft);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
+
+.md pre {
+  padding: 0.6rem 0.75rem;
+  overflow-x: auto;
+  background: var(--soft);
+}
+
+.md pre code {
+  padding: 0;
+  background: none;
+}
+
+.md blockquote {
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--line);
+  color: var(--muted);
+}
+
+.md a {
+  color: var(--fg);
+}
+
+.md hr {
+  margin: 0.9rem 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.md-table {
+  overflow-x: auto;
+}
+
+.md table {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.md th,
+.md td {
+  padding: 0.25rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.md th {
+  font-weight: 650;
+}
