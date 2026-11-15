@@ -302,6 +302,10 @@ func (a *Adapter) status(ctx context.Context, taskID string) (taskStatus, error)
 		}
 		st.percent = int(sum / float64(len(details)))
 	}
+	// Nothing done yet reads as a stuck 0%, so the app shows the time instead.
+	if st.percent == 0 {
+		st.percent = core.Unknown
+	}
 	for _, d := range details {
 		if d.Pct < 100 {
 			st.step = d.Desc

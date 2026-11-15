@@ -192,7 +192,7 @@ func (a *Adapter) Fetch(ctx context.Context, task *ingestv1.IngestTask, sink cor
 			fmt.Sprintf("NASA's service worked on this for more than %s without finishing, so it was stopped. Try again, or pick a shorter date range or a smaller rectangle.", inWords(a.cfg.MaxWait)),
 			"Harmony job %s still %s at %d%% after %s", jobID, job.Status, job.Progress, waited.Round(time.Second))
 	}
-	core.ReportProgress(ctx, job.Progress, a.mode.working())
+	core.ReportProgress(ctx, a.mode.processing(job.Progress), a.mode.working())
 	return nil, core.Pending(pollEvery, fmt.Sprintf("Harmony job %s is %s, %d%%", jobID, job.Status, job.Progress))
 }
 
@@ -260,6 +260,34 @@ func (a *Adapter) stop(ctx context.Context, token, jobID, member, stateKey strin
 	}
 	a.freeSlot(ctx, token, member)
 	_ = a.rdb.Del(ctx, stateKey).Err()
+}
+
+// A task's progress is one scale that never goes back: Harmony's own work
+// fills the first part and the downloads the rest. Subsetting many monthly
+// files splits the time about evenly; an area average is nearly all
+// Harmony's work and one small file.
+func (m mode) processingShare() int {
+	if m.areaAverage {
+		return 90
+	}
+	return 50
+}
+
+// processing turns Harmony's percent into the task's. Harmony says 0 until
+// its first piece of work finishes, which for an area average is the end,
+// and while it queues. So 0 is reported as unknown: the app shows how long
+// the task has run rather than a 0% that looks stuck.
+func (m mode) processing(harmonyPercent int) int {
+	if harmonyPercent <= 0 {
+		return core.Unknown
+	}
+	return min(harmonyPercent, 100) * m.processingShare() / 100
+}
+
+// downloaded is the task's percent once n of total files are in.
+func (m mode) downloaded(n, total int) int {
+	share := m.processingShare()
+	return share + n*(100-share)/max(total, 1)
 }
 
 // working says what NASA is doing with a submitted job, for people.
@@ -345,7 +373,7 @@ func (a *Adapter) start(ctx context.Context, req *request, token, stateKey strin
 		return core.Transient(err)
 	}
 	_ = a.rdb.Expire(ctx, stateKey, stateTTL).Err()
-	core.ReportProgress(ctx, 0, a.mode.working())
+	core.ReportProgress(ctx, core.Unknown, a.mode.working())
 	return core.Pending(submitCheck, fmt.Sprintf("submitted Harmony job %s (%s, %d granules counted)", jobID, a.mode.version, hits))
 }
 
@@ -557,7 +585,7 @@ func (a *Adapter) download(ctx context.Context, token string, j *job, sink core.
 		}
 		return fmt.Sprintf("Downloading the files from NASA, %d of %d", n, total)
 	}
-	core.ReportProgress(ctx, 0, downloading(0))
+	core.ReportProgress(ctx, a.mode.downloaded(0, total), downloading(0))
 	for _, l := range links {
 		sem <- struct{}{}
 		wg.Go(func() {
@@ -567,7 +595,7 @@ func (a *Adapter) download(ctx context.Context, token string, j *job, sink core.
 				return
 			}
 			n := int(done.Add(1))
-			core.ReportProgress(ctx, n*100/total, downloading(n))
+			core.ReportProgress(ctx, a.mode.downloaded(n, total), downloading(n))
 		})
 	}
 	wg.Wait()

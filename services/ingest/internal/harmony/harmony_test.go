@@ -230,7 +230,9 @@ func TestSubmitPollAndDownload(t *testing.T) {
 }
 
 // The worker turns these reports into TaskProgress, which the app shows as
-// "NASA is cutting the files, 50%" and then a count of files downloaded.
+// "NASA is cutting the files" with one percent that only goes up: Harmony's
+// work fills the first half and the downloads the second. Before Harmony has
+// a number, there's no percent, so the app shows the time instead of 0%.
 func TestReportsProgress(t *testing.T) {
 	h := newHarness(t, Config{})
 	var (
@@ -247,12 +249,34 @@ func TestReportsProgress(t *testing.T) {
 		_, _ = h.a.Fetch(ctx, task(77), sink)
 	}
 	cutting := "NASA's Harmony service is cutting the files to your rectangle"
-	want := []string{"0 " + cutting, "50 " + cutting, "0 Downloading the files from NASA, 0 of 2"}
+	want := []string{"-1 " + cutting, "25 " + cutting, "50 Downloading the files from NASA, 0 of 2"}
 	if len(reports) != 5 || strings.Join(reports[:3], "|") != strings.Join(want, "|") {
 		t.Fatalf("reports: %q", reports)
 	}
-	if reports[4] != "100 Downloading the files from NASA, 2 of 2" {
-		t.Errorf("last report: %q", reports[4])
+	if reports[3] != "75 Downloading the files from NASA, 1 of 2" || reports[4] != "100 Downloading the files from NASA, 2 of 2" {
+		t.Errorf("download reports: %q", reports[3:])
+	}
+}
+
+func TestProgressScale(t *testing.T) {
+	subset := mode{}
+	average := mode{areaAverage: true}
+	for _, c := range []struct {
+		name      string
+		got, want int
+	}{
+		{"Harmony at 0 is unknown", subset.processing(0), core.Unknown},
+		{"Harmony halfway, subset", subset.processing(50), 25},
+		{"Harmony done, subset", subset.processing(100), 50},
+		{"an average at 0 is unknown", average.processing(0), core.Unknown},
+		{"Harmony done, average", average.processing(100), 90},
+		{"downloads start where Harmony ended", subset.downloaded(0, 72), 50},
+		{"downloads end at 100", subset.downloaded(72, 72), 100},
+		{"an average's one file", average.downloaded(1, 1), 100},
+	} {
+		if c.got != c.want {
+			t.Errorf("%s: got %d, want %d", c.name, c.got, c.want)
+		}
 	}
 }
 
